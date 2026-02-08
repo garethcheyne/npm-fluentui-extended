@@ -1,0 +1,66 @@
+{
+  "name": "fluentui-extended",
+  "version": "0.1.0",
+  "description": "Extended Fluent UI v9 components styled after Dynamics 365 - Lookup with async search, expandable details, and more",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/garethcheyne/npm-fluentui-extended.git"
+  },
+  "homepage": "https://github.com/garethcheyne/npm-fluentui-extended#readme",
+  "bugs": {
+    "url": "https://github.com/garethcheyne/npm-fluentui-extended/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "demo": "vite demo",
+    "lint": "eslint src --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "fluentui",
+    "fluent-ui",
+    "react",
+    "components",
+    "lookup",
+    "dropdown",
+    "dynamics365",
+    "dynamics-365",
+    "search",
+    "combobox"
+  ],
+  "author": "err403.com",
+  "license": "MIT",
+  "peerDependencies": {
+    "@fluentui/react-components": "^9.0.0",
+    "react": "^17.0.0 || ^18.0.0",
+    "@fluentui/react-icons": "^2.0.0",
+    "react-dom": "^17.0.0 || ^18.0.0"
+  },
+  "devDependencies": {
+    "@fluentui/react-components": "^9.56.0",
+    "@fluentui/react-icons": "^2.0.258",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vite": "^5.4.0"
+  }
+}
