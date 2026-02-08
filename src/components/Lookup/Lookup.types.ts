@@ -26,6 +26,8 @@ export interface LookupOption {
 }
 
 export interface LookupProps extends Omit<InputProps, 'onChange' | 'value'> {
+  /** Unique identifier for the lookup - auto-generated if not provided */
+  id?: string;
   /** The options to display in the dropdown */
   options?: LookupOption[];
   /** Currently selected option key (use with options array lookup) */

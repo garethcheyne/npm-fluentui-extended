@@ -10,6 +10,7 @@ import { useLookupStyles } from './Lookup.styles';
 import type { LookupProps, LookupOption } from './Lookup.types';
 
 export const Lookup: React.FC<LookupProps> = ({
+  id,
   options = [],
   selectedKey,
   selectedOption: selectedOptionProp,
@@ -27,6 +28,10 @@ export const Lookup: React.FC<LookupProps> = ({
   ...inputProps
 }) => {
   const styles = useLookupStyles();
+  
+  // Generate unique ID for accessibility - use provided id or auto-generate
+  const autoId = React.useId();
+  const lookupId = id ?? autoId;
 
   const [isOpen, setIsOpen] = React.useState(false);
   const [searchText, setSearchText] = React.useState('');
@@ -187,8 +192,10 @@ export const Lookup: React.FC<LookupProps> = ({
     }
   }, [disabled]);
 
-  // Handle click outside
+  // Handle click outside - only attach listener when dropdown is open
   React.useEffect(() => {
+    if (!isOpen) return;
+    
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
       if (
@@ -205,7 +212,7 @@ export const Lookup: React.FC<LookupProps> = ({
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [isOpen]);
 
   // Cleanup debounce on unmount
   React.useEffect(() => {
@@ -231,6 +238,7 @@ export const Lookup: React.FC<LookupProps> = ({
       <div className={styles.inputWrapper}>
         <Input
           {...inputProps}
+          id={lookupId}
           ref={inputRef}
           className={mergeClasses(styles.input, inputProps.className)}
           value={displayValue}
@@ -239,6 +247,10 @@ export const Lookup: React.FC<LookupProps> = ({
           onFocus={handleFocus}
           placeholder={placeholder}
           disabled={disabled}
+          aria-expanded={isOpen}
+          aria-haspopup="listbox"
+          aria-controls={isOpen ? `${lookupId}-listbox` : undefined}
+          aria-autocomplete="list"
           contentAfter={
             <span className={styles.iconContainer}>
               {clearable && selectedOption && !disabled && (
@@ -264,7 +276,13 @@ export const Lookup: React.FC<LookupProps> = ({
       </div>
 
       {isOpen && !disabled && (
-        <div className={styles.dropdown} ref={dropdownRef} role="listbox">
+        <div
+          id={`${lookupId}-listbox`}
+          className={styles.dropdown}
+          ref={dropdownRef}
+          role="listbox"
+          aria-labelledby={lookupId}
+        >
           {header && (
             <div className={styles.headerWrapper}>
               <div className={styles.header}>{header}</div>
