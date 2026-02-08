@@ -1,6 +1,6 @@
 {
   "name": "fluentui-extended",
-  "version": "0.1.0",
+  "version": "2026.2.1",
   "description": "Extended Fluent UI v9 components styled after Dynamics 365 - Lookup with async search, expandable details, and more",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -47,9 +47,9 @@
   "license": "MIT",
   "peerDependencies": {
     "@fluentui/react-components": "^9.0.0",
-    "react": "^17.0.0 || ^18.0.0",
     "@fluentui/react-icons": "^2.0.0",
-    "react-dom": "^17.0.0 || ^18.0.0"
+    "react": "^16.8.0 || ^17.0.0 || ^18.0.0",
+    "react-dom": "^16.8.0 || ^17.0.0 || ^18.0.0"
   },
   "devDependencies": {
     "@fluentui/react-components": "^9.56.0",
