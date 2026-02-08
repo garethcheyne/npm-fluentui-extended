@@ -4,6 +4,7 @@ import {
   Spinner,
   mergeClasses,
   Button,
+  useId,
 } from '@fluentui/react-components';
 import { SearchRegular, DismissRegular, ChevronDownRegular } from '@fluentui/react-icons';
 import { useLookupStyles } from './Lookup.styles';
@@ -30,7 +31,7 @@ export const Lookup: React.FC<LookupProps> = ({
   const styles = useLookupStyles();
   
   // Generate unique ID for accessibility - use provided id or auto-generate
-  const autoId = React.useId();
+  const autoId = useId('lookup-');
   const lookupId = id ?? autoId;
 
   const [isOpen, setIsOpen] = React.useState(false);
