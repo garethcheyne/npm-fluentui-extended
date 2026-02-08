@@ -7,7 +7,7 @@
   "types": "dist/index.d.ts",
   "repository": {
     "type": "git",
-    "url": "https://github.com/garethcheyne/npm-fluentui-extended.git"
+    "url": "git+https://github.com/garethcheyne/npm-fluentui-extended.git"
   },
   "homepage": "https://github.com/garethcheyne/npm-fluentui-extended#readme",
   "bugs": {
