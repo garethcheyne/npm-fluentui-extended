@@ -9,4 +9,10 @@ export default defineConfig({
   clean: true,
   external: ['react', 'react-dom', '@fluentui/react-components', '@fluentui/react-icons'],
   treeshake: true,
+  esbuildOptions(options) {
+    // Use classic JSX transform for React 16 compatibility
+    options.jsx = 'transform';
+    options.jsxFactory = 'React.createElement';
+    options.jsxFragment = 'React.Fragment';
+  },
 });
