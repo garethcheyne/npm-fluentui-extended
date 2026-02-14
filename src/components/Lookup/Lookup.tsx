@@ -4,9 +4,12 @@ import {
   Spinner,
   mergeClasses,
   Button,
+  Popover,
+  PopoverSurface,
+  PopoverTrigger,
   useId,
 } from '@fluentui/react-components';
-import { SearchRegular, DismissRegular, ChevronDownRegular } from '@fluentui/react-icons';
+import { DismissRegular, ChevronDownRegular } from '@fluentui/react-icons';
 import { useLookupStyles } from './Lookup.styles';
 import type { LookupProps, LookupOption } from './Lookup.types';
 
@@ -23,13 +26,16 @@ export const Lookup: React.FC<LookupProps> = ({
   clearable = true,
   minSearchLength = 0,
   searchDebounceMs = 300,
+  matchInputWidth = true,
   disabled,
   header,
   footer,
   ...inputProps
 }) => {
   const styles = useLookupStyles();
-  
+  const ariaLabel = inputProps['aria-label'];
+  const ariaLabelledBy = inputProps['aria-labelledby'];
+
   // Generate unique ID for accessibility - use provided id or auto-generate
   const autoId = useId('lookup-');
   const lookupId = id ?? autoId;
@@ -41,9 +47,11 @@ export const Lookup: React.FC<LookupProps> = ({
   const [internalSelectedOption, setInternalSelectedOption] = React.useState<LookupOption | null>(null);
 
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const inputWrapperRef = React.useRef<HTMLDivElement>(null);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
   const debounceRef = React.useRef<ReturnType<typeof setTimeout>>();
   const justSelectedRef = React.useRef(false);
+  const [dropdownWidth, setDropdownWidth] = React.useState<number>();
 
   // Find the selected option - prefer props, fallback to internal state
   const selectedOption = React.useMemo(
@@ -63,6 +71,14 @@ export const Lookup: React.FC<LookupProps> = ({
         opt.secondaryText?.toLowerCase().includes(lowerSearch)
     );
   }, [options, searchText, minSearchLength]);
+
+  const highlightedOptionId = React.useMemo(() => {
+    if (!isOpen || highlightedIndex < 0 || highlightedIndex >= filteredOptions.length) {
+      return undefined;
+    }
+
+    return `${lookupId}-option-${filteredOptions[highlightedIndex].key}`;
+  }, [filteredOptions, highlightedIndex, isOpen, lookupId]);
 
   // Display value in input
   const displayValue = React.useMemo(() => {
@@ -193,28 +209,6 @@ export const Lookup: React.FC<LookupProps> = ({
     }
   }, [disabled]);
 
-  // Handle click outside - only attach listener when dropdown is open
-  React.useEffect(() => {
-    if (!isOpen) return;
-    
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(target) &&
-        inputRef.current &&
-        !inputRef.current.contains(target)
-      ) {
-        setIsOpen(false);
-        setSearchText('');
-        setHighlightedIndex(-1);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen]);
-
   // Cleanup debounce on unmount
   React.useEffect(() => {
     return () => {
@@ -234,99 +228,176 @@ export const Lookup: React.FC<LookupProps> = ({
     }
   }, [highlightedIndex]);
 
+  React.useEffect(() => {
+    if (!isOpen || !matchInputWidth) {
+      return;
+    }
+
+    const updateWidth = () => {
+      const width = inputWrapperRef.current?.getBoundingClientRect().width;
+      if (width && width > 0) {
+        setDropdownWidth(width);
+      }
+    };
+
+    updateWidth();
+
+    if (typeof ResizeObserver !== 'undefined' && inputWrapperRef.current) {
+      const resizeObserver = new ResizeObserver(() => updateWidth());
+      resizeObserver.observe(inputWrapperRef.current);
+      return () => resizeObserver.disconnect();
+    }
+
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, [isOpen, matchInputWidth]);
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const closeOnScroll = () => {
+      setIsOpen(false);
+      setSearchText('');
+      setHighlightedIndex(-1);
+    };
+
+    window.addEventListener('scroll', closeOnScroll, true);
+    return () => window.removeEventListener('scroll', closeOnScroll, true);
+  }, [isOpen]);
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handlePointerDownOutside = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) {
+        return;
+      }
+
+      const insideInput = inputWrapperRef.current?.contains(target);
+      const insideDropdown = dropdownRef.current?.contains(target);
+
+      if (!insideInput && !insideDropdown) {
+        setIsOpen(false);
+        setSearchText('');
+        setHighlightedIndex(-1);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDownOutside);
+    return () => document.removeEventListener('mousedown', handlePointerDownOutside);
+  }, [isOpen]);
+
   return (
     <div className={styles.root}>
-      <div className={styles.inputWrapper}>
-        <Input
-          {...inputProps}
-          id={lookupId}
-          ref={inputRef}
-          className={mergeClasses(styles.input, inputProps.className)}
-          value={displayValue}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          onFocus={handleFocus}
-          placeholder={placeholder}
-          disabled={disabled}
-          aria-expanded={isOpen}
-          aria-haspopup="listbox"
-          aria-controls={isOpen ? `${lookupId}-listbox` : undefined}
-          aria-autocomplete="list"
-          contentAfter={
-            <span className={styles.iconContainer}>
-              {clearable && selectedOption && !disabled && (
-                <Button
-                  appearance="subtle"
-                  size="small"
-                  icon={<DismissRegular />}
-                  onClick={handleClear}
-                  className={styles.iconButton}
-                  aria-label="Clear selection"
-                />
-              )}
-              {loading ? (
-                <Spinner size="tiny" />
-              ) : (
-                <span className={styles.chevronIcon}>
-                  <ChevronDownRegular />
+      <Popover
+        open={isOpen && !disabled}
+        trapFocus={false}
+        withArrow={false}
+        positioning="below-start"
+      >
+        <PopoverTrigger disableButtonEnhancement>
+          <div className={styles.inputWrapper} ref={inputWrapperRef}>
+            <Input
+              {...inputProps}
+              id={lookupId}
+              ref={inputRef}
+              className={mergeClasses(styles.input, inputProps.className)}
+              value={displayValue}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              onFocus={handleFocus}
+              placeholder={placeholder}
+              disabled={disabled}
+              aria-expanded={isOpen}
+              aria-haspopup="listbox"
+              aria-controls={isOpen ? `${lookupId}-listbox` : undefined}
+              aria-autocomplete="list"
+              aria-activedescendant={highlightedOptionId}
+              aria-label={ariaLabelledBy ? undefined : ariaLabel ?? placeholder ?? 'Lookup'}
+              contentAfter={
+                <span className={styles.iconContainer}>
+                  {clearable && selectedOption && !disabled && (
+                    <Button
+                      appearance="subtle"
+                      size="small"
+                      icon={<DismissRegular />}
+                      onClick={handleClear}
+                      className={styles.iconButton}
+                      aria-label="Clear selection"
+                    />
+                  )}
+                  {loading ? (
+                    <Spinner size="tiny" />
+                  ) : (
+                    <span className={styles.chevronIcon}>
+                      <ChevronDownRegular />
+                    </span>
+                  )}
                 </span>
-              )}
-            </span>
-          }
-        />
-      </div>
+              }
+            />
+          </div>
+        </PopoverTrigger>
 
-      {isOpen && !disabled && (
-        <div
-          id={`${lookupId}-listbox`}
-          className={styles.dropdown}
-          ref={dropdownRef}
-          role="listbox"
-          aria-labelledby={lookupId}
+        <PopoverSurface
+          className={styles.dropdownSurface}
+          style={matchInputWidth && dropdownWidth ? { width: `${dropdownWidth}px` } : undefined}
         >
-          {header && (
-            <div className={styles.headerWrapper}>
-              <div className={styles.header}>{header}</div>
-            </div>
-          )}
-          {loading ? (
-            <div className={styles.loadingContainer}>
-              <Spinner size="small" label="Loading..." />
-            </div>
-          ) : filteredOptions.length === 0 ? (
-            <div className={styles.noResults}>{noResultsMessage}</div>
-          ) : (
-            <div className={styles.optionsContainer}>
-              <ul className={styles.optionsList}>
-                {filteredOptions.map((option, index) => {
-                  const isExpanded = expandedKeys.has(option.key);
-                  const hasDetails = option.details && option.details.length > 0;
+          <div
+            id={`${lookupId}-listbox`}
+            className={styles.dropdownContent}
+            ref={dropdownRef}
+            role="listbox"
+            aria-labelledby={lookupId}
+          >
+            {header && (
+              <div className={styles.headerWrapper}>
+                <div className={styles.header}>{header}</div>
+              </div>
+            )}
+            {loading ? (
+              <div className={styles.loadingContainer}>
+                <Spinner size="small" label="Loading..." />
+              </div>
+            ) : filteredOptions.length === 0 ? (
+              <div className={styles.noResults}>{noResultsMessage}</div>
+            ) : (
+              <div className={styles.optionsContainer}>
+                <div className={styles.optionsList}>
+                  {filteredOptions.map((option, index) => {
+                    const isExpanded = expandedKeys.has(option.key);
+                    const hasDetails = option.details && option.details.length > 0;
 
-                  const handleExpandClick = (e: React.MouseEvent) => {
-                    e.stopPropagation();
-                    setExpandedKeys((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(option.key)) {
-                        next.delete(option.key);
-                      } else {
-                        next.add(option.key);
-                      }
-                      return next;
-                    });
-                  };
+                    const handleExpandClick = (e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      setExpandedKeys((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(option.key)) {
+                          next.delete(option.key);
+                        } else {
+                          next.add(option.key);
+                        }
+                        return next;
+                      });
+                    };
 
-                  return (
-                    <li key={option.key}>
-                      <button
-                        type="button"
+                    return (
+                      <div
+                        key={option.key}
+                        id={`${lookupId}-option-${option.key}`}
                         role="option"
                         data-index={index}
-                        aria-selected={option.key === selectedKey}
+                        aria-selected={option.key === selectedOption?.key}
                         aria-disabled={option.disabled}
                         className={mergeClasses(
                           styles.option,
                           index === highlightedIndex && styles.optionHighlighted,
-                          option.key === selectedKey && styles.optionSelected,
+                          option.key === selectedOption?.key && styles.optionSelected,
                           option.disabled && styles.optionDisabled
                         )}
                         onClick={() => handleSelectOption(option)}
@@ -373,20 +444,20 @@ export const Lookup: React.FC<LookupProps> = ({
                             <ChevronDownRegular />
                           </span>
                         )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
-          {footer && (
-            <div className={styles.footerWrapper}>
-              <div className={styles.footer}>{footer}</div>
-            </div>
-          )}
-        </div>
-      )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {footer && (
+              <div className={styles.footerWrapper}>
+                <div className={styles.footer}>{footer}</div>
+              </div>
+            )}
+          </div>
+        </PopoverSurface>
+      </Popover>
     </div>
   );
 };

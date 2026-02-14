@@ -1,4 +1,4 @@
-import { makeStyles, tokens, shorthands } from '@fluentui/react-components';
+import { makeStyles, tokens } from '@fluentui/react-components';
 
 export const useLookupStyles = makeStyles({
   root: {
@@ -39,17 +39,14 @@ export const useLookupStyles = makeStyles({
     height: '20px',
   },
 
-  dropdown: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    zIndex: 1000,
+  dropdownSurface: {
+    padding: 0,
     marginTop: '4px',
-    backgroundColor: tokens.colorNeutralBackground1,
-    borderRadius: tokens.borderRadiusMedium,
-    boxShadow: tokens.shadow16,
-    ...shorthands.border('1px', 'solid', tokens.colorNeutralStroke1),
+    minWidth: '220px',
+    zIndex: 1000,
+  },
+
+  dropdownContent: {
     maxHeight: '350px',
     display: 'flex',
     flexDirection: 'column',
@@ -57,21 +54,24 @@ export const useLookupStyles = makeStyles({
   },
 
   optionsList: {
-    listStyle: 'none',
-    margin: 0,
+    display: 'flex',
+    flexDirection: 'column',
     padding: '4px',
+    gap: '2px',
   },
 
   option: {
     display: 'flex',
     flexDirection: 'row',
     alignItems: 'flex-start',
+    boxSizing: 'border-box',
     padding: '8px 12px',
     cursor: 'pointer',
     borderRadius: tokens.borderRadiusSmall,
     backgroundColor: 'transparent',
     border: 'none',
     width: '100%',
+    overflow: 'hidden',
     textAlign: 'left',
     gap: '8px',
 
@@ -99,7 +99,7 @@ export const useLookupStyles = makeStyles({
   optionContent: {
     display: 'flex',
     flexDirection: 'column',
-    flex: 1,
+    flex: '1 1 auto',
     minWidth: 0,
   },
 
@@ -109,6 +109,7 @@ export const useLookupStyles = makeStyles({
     justifyContent: 'center',
     width: '24px',
     height: '24px',
+    marginLeft: 'auto',
     flexShrink: 0,
     cursor: 'pointer',
     borderRadius: tokens.borderRadiusSmall,

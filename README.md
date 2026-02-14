@@ -25,6 +25,14 @@ npm install fluentui-extended @fluentui/react-components @fluentui/react-icons
 
 A searchable dropdown component styled after Dynamics 365 lookup fields. Supports async search, expandable option details, and customizable header/footer.
 
+![Lookup Component](assets/screenshot-lookup.png)
+
+### QueryBuilder
+
+An Advanced Find-style query builder for Dynamics 365. Build complex filter conditions with AND/OR logic, serialize to FetchXML or OData, and validate queries against the Dynamics 365 API.
+
+![QueryBuilder Component](assets/screenshot-querybuilder.png)
+
 ## Quick Start
 
 ```tsx
@@ -218,6 +226,265 @@ interface LookupOptionDetail {
 | `Enter` | Select highlighted option |
 | `Escape` | Close dropdown |
 | `Tab` | Close dropdown and move focus |
+
+---
+
+## QueryBuilder
+
+The QueryBuilder component provides an Advanced Find-style interface for building complex queries against Dynamics 365 entities.
+
+### Basic Usage (Dynamics 365)
+
+In Dynamics 365, fields are automatically loaded from entity metadata - no need to pass them manually:
+
+```tsx
+import { QueryBuilder, QueryBuilderApplyResult } from 'fluentui-extended';
+import { FluentProvider, webLightTheme } from '@fluentui/react-components';
+
+function App() {
+  const [fetchXml, setFetchXml] = React.useState<string>('');
+
+  const handleChange = (result: QueryBuilderApplyResult) => {
+    setFetchXml(result.fetchXml);
+    // Also available: result.odataFilter, result.fetchXmlFilter, result.state
+  };
+
+  return (
+    <FluentProvider theme={webLightTheme}>
+      <QueryBuilder
+        entityName="account"
+        entityDisplayName="Accounts"
+        onSerializedChange={handleChange}
+      />
+    </FluentProvider>
+  );
+}
+```
+
+### Loading Existing FetchXML
+
+Pass existing FetchXML to pre-populate the query builder:
+
+```tsx
+const existingFetchXml = `
+  <fetch version="1.0">
+    <entity name="account">
+      <filter type="and">
+        <condition attribute="name" operator="like" value="%Contoso%" />
+        <condition attribute="statecode" operator="eq" value="0" />
+      </filter>
+    </entity>
+  </fetch>
+`;
+
+<QueryBuilder
+  entityName="account"
+  initialFetchXml={existingFetchXml}
+  onSerializedChange={handleChange}
+/>
+```
+
+### Getting Values Back
+
+Use `onSerializedChange` to get the query whenever it changes:
+
+```tsx
+const handleChange = (result: QueryBuilderApplyResult) => {
+  // FetchXML for SDK queries
+  console.log(result.fetchXml);
+  // <fetch version="1.0"><entity name="account"><filter type="and">...</filter></entity></fetch>
+
+  // OData for Web API  
+  console.log(result.odataFilter);
+  // name eq 'Contoso' and revenue gt 1000000
+
+  // Just the filter element
+  console.log(result.fetchXmlFilter);
+  // <filter type="and">...</filter>
+
+  // Current state object (for saving/restoring)
+  console.log(result.state);
+};
+```
+
+### Features
+
+#### Import/Export FetchXML
+
+Users can download the current query as FetchXML or import existing FetchXML:
+
+```tsx
+<QueryBuilder
+  entityName="account"
+  showDownloadFetchXmlButton={true}  // Default: true
+  showUploadFetchXmlButton={true}    // Default: true
+/>
+```
+
+#### Live Preview
+
+Show real-time preview of the generated queries:
+
+```tsx
+<QueryBuilder
+  entityName="account"
+  fields={fields}
+  showODataPreview={true}
+  showFetchXmlPreview={true}
+/>
+```
+
+#### Validation with Dynamics 365 API
+
+The Validate button checks query structure and optionally tests against the Dynamics 365 API:
+
+```tsx
+<QueryBuilder
+  entityName="account"
+  fields={fields}
+  showValidateButton={true}  // Default: true
+/>
+```
+
+When running inside Dynamics 365:
+- Detects `Xrm.WebApi` availability
+- Executes a test query with `$top=1&$count=true`
+- Shows record count or API error message
+
+When running outside Dynamics 365:
+- Shows "API validation unavailable — not running in Dynamics 365 environment"
+
+#### Lookup Fields with Async Search
+
+For lookup-type fields, provide an async search callback:
+
+```tsx
+const handleLookupSearch = async (fieldId: string, searchText: string) => {
+  const response = await fetch(`/api/${fieldId}?search=${searchText}`);
+  const data = await response.json();
+  return data.map(item => ({
+    key: item.id,
+    text: item.name,
+    secondaryText: item.code,
+  }));
+};
+
+<QueryBuilder
+  entityName="account"
+  fields={fields}
+  onLookupSearch={handleLookupSearch}
+/>
+```
+
+### Standalone Usage (Outside Dynamics 365)
+
+When not running in Dynamics 365, provide fields manually:
+
+```tsx
+const fields: QueryBuilderField[] = [
+  { id: 'name', label: 'Account Name', dataType: 'string' },
+  { id: 'revenue', label: 'Annual Revenue', dataType: 'number' },
+  { id: 'statecode', label: 'Status', dataType: 'optionset', options: [
+    { label: 'Active', value: 0 },
+    { label: 'Inactive', value: 1 },
+  ]},
+];
+
+<QueryBuilder
+  entityName="account"
+  fields={fields}
+  onSerializedChange={handleChange}
+/>
+```
+
+### QueryBuilder Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `entityName` | `string` | - | Logical name of the entity (required) |
+| `entityDisplayName` | `string` | - | Display name shown in header |
+| `fields` | `QueryBuilderField[]` | - | Fields for filtering (auto-loaded from Xrm if omitted) |
+| `initialFetchXml` | `string` | - | FetchXML to pre-populate the query builder |
+| `initialState` | `QueryBuilderState` | - | Initial query state object |
+| `onSerializedChange` | `(result: QueryBuilderApplyResult) => void` | - | Called when query changes |
+| `onLookupSearch` | `(fieldId: string, searchText: string) => Promise<LookupOption[]>` | - | Lookup field search handler |
+| `showODataPreview` | `boolean` | `false` | Show OData filter preview |
+| `showFetchXmlPreview` | `boolean` | `false` | Show FetchXML preview |
+| `showResetToDefaultButton` | `boolean` | `true` | Show Reset button |
+| `showDownloadFetchXmlButton` | `boolean` | `true` | Show Download FetchXML button |
+| `showUploadFetchXmlButton` | `boolean` | `true` | Show Import FetchXML button |
+| `showValidateButton` | `boolean` | `true` | Show Validate button |
+| `showDeleteAllFiltersButton` | `boolean` | `true` | Show Delete All button |
+
+### QueryBuilderField
+
+```ts
+interface QueryBuilderField {
+  id: string;           // Logical attribute name
+  label: string;        // Display label
+  dataType: 'string' | 'number' | 'datetime' | 'boolean' | 'optionset' | 'lookup';
+  options?: Array<{ label: string; value: number }>;  // For optionset fields
+}
+```
+
+### QueryBuilderApplyResult
+
+```ts
+interface QueryBuilderApplyResult {
+  state: QueryBuilderState;      // Current query state
+  fetchXmlFilter: string;        // Just the <filter> element
+  fetchXml: string;              // Complete FetchXML document
+  odataFilter: string;           // OData $filter value
+}
+```
+
+### Programmatic API
+
+#### Serialize State
+
+```ts
+import { serializeQueryBuilderState } from 'fluentui-extended';
+
+const result = serializeQueryBuilderState(state, fields, 'account');
+console.log(result.fetchXml);
+console.log(result.odataFilter);
+```
+
+#### Parse FetchXML
+
+```ts
+import { parseFetchXmlToState } from 'fluentui-extended';
+
+const result = parseFetchXmlToState(fetchXmlString, fields);
+if (result.state) {
+  // Use result.state to populate QueryBuilder
+} else {
+  console.error(result.error);
+}
+```
+
+#### Validate State
+
+```ts
+import { validateQueryBuilderState } from 'fluentui-extended';
+
+const result = validateQueryBuilderState(state, fields);
+if (!result.isValid) {
+  result.errors.forEach(err => {
+    console.log(`${err.fieldLabel}: ${err.message}`);
+  });
+}
+```
+
+### Supported Operators
+
+| Data Type | Operators |
+|-----------|-----------|
+| `string` | Contains, Does Not Contain, Starts With, Ends With, Equals, Not Equals, Is Empty, Has Value |
+| `number`, `datetime` | Greater Than, Greater Than Or Equal, Less Than, Less Than Or Equal, Between, Equals, Not Equals, Is Empty, Has Value |
+| `optionset`, `lookup`, `boolean` | Equals, Not Equals, Is Empty, Has Value |
+
+---
 
 ## Contributing
 

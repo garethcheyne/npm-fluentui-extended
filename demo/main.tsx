@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { FluentProvider, webLightTheme, Button, Link, Text } from '@fluentui/react-components';
-import { Lookup, LookupOption } from '../src';
+import { Lookup, LookupOption, QueryBuilder, QueryBuilderApplyResult, QueryBuilderState } from '../src';
 import { BuildingRegular, AddRegular, PersonSearchRegular } from '@fluentui/react-icons';
 
 // Static options for basic demos
@@ -92,6 +92,30 @@ function App() {
   const [selectedOption3, setSelectedOption3] = useState<LookupOption | null>(null);
   const [dynamicOptions, setDynamicOptions] = useState<LookupOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [queryBuilderState, setQueryBuilderState] = useState<QueryBuilderState | null>(null);
+  const [queryBuilderResult, setQueryBuilderResult] = useState<QueryBuilderApplyResult | null>(null);
+
+  const sampleQueryFields = [
+    { id: 'name', label: 'Name', dataType: 'string' as const },
+    {
+      id: 'statecode',
+      label: 'State',
+      dataType: 'optionset' as const,
+      options: [
+        { label: 'Active', value: 0 },
+        { label: 'Inactive', value: 1 },
+      ],
+    },
+    { id: 'createdon', label: 'Created On', dataType: 'datetime' as const },
+    { id: 'revenue', label: 'Revenue', dataType: 'number' as const },
+    { id: 'ownerid', label: 'Owner', dataType: 'lookup' as const },
+  ];
+
+  const sampleRelatedEntities = [
+    { id: 'contact', label: 'Contacts' },
+    { id: 'opportunity', label: 'Opportunities' },
+    { id: 'activitypointer', label: 'Activities' },
+  ];
 
   // Handle selection - receives full option with all data
   const handleOptionSelect = useCallback((option: LookupOption | null) => {
@@ -125,7 +149,7 @@ function App() {
 
   return (
     <FluentProvider theme={webLightTheme}>
-      <div style={{ padding: 40, maxWidth: 500 }}>
+      <div style={{ padding: 40, maxWidth: 800 }}>
         <h1>Lookup Component Demo</h1>
 
         {/* Basic Lookup - No Header/Footer */}
@@ -230,6 +254,44 @@ function App() {
           <p style={{ marginTop: 8, fontSize: 12, color: '#888' }}>
             Try searching: "contoso", "acme", "fab", "north"
           </p>
+        </section>
+
+        {/* Query Builder */}
+        <section style={{ marginBottom: 40 }}>
+          <h2>Query Builder (New)</h2>
+          <p style={{ color: '#666', marginBottom: 12 }}>
+            Standalone Query Builder component from <strong>fluentui-extended</strong> (no modal wrapper).
+          </p>
+
+          <div style={{ border: '0px solid #e1dfdd', borderRadius: 8, padding: 16, background: '#fff', width: '100%' }}>
+            <QueryBuilder
+              entityName="account"
+              entityDisplayName="Accounts"
+              fields={sampleQueryFields}
+              relatedEntities={sampleRelatedEntities}
+              showODataPreview
+              showFetchXmlPreview 
+              showDataSourceToggle
+              onStateChange={(state) => setQueryBuilderState(state)}
+              onSerializedChange={(result) => setQueryBuilderResult(result)}
+            />
+          </div>
+
+          <div style={{ marginTop: 12, display: 'grid', gap: 12 }}>
+            <div style={{ border: '1px solid #e1dfdd', borderRadius: 6, padding: 12, background: '#faf9f8' }}>
+              <Text weight="semibold">Live State</Text>
+              <pre style={{ margin: '8px 0 0', fontSize: 12, overflowX: 'auto' }}>
+                {JSON.stringify(queryBuilderState, null, 2)}
+              </pre>
+            </div>
+
+            <div style={{ border: '1px solid #e1dfdd', borderRadius: 6, padding: 12, background: '#faf9f8' }}>
+              <Text weight="semibold">Serialized Output</Text>
+              <pre style={{ margin: '8px 0 0', fontSize: 12, overflowX: 'auto' }}>
+                {JSON.stringify(queryBuilderResult, null, 2)}
+              </pre>
+            </div>
+          </div>
         </section>
       </div>
     </FluentProvider>
