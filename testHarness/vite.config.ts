@@ -80,8 +80,8 @@ function dynamicsAuthPlugin(): Plugin {
         }
       });
 
-      // Proxy for Dynamics Web API calls (avoids CORS)
-      server.middlewares.use('/api/dynamics', async (req, res) => {
+      // Proxy handler for both /api/dynamics and /api/data/v9.2
+      const proxyHandler = async (req: any, res: any, pathPrefix: string) => {
         const dynamicsUrl = env.VITE_DYNAMICS_URL?.replace(/\/$/, '');
 
         if (!dynamicsUrl) {
@@ -94,8 +94,9 @@ function dynamicsAuthPlugin(): Plugin {
         try {
           const token = await getToken();
 
-          // Get the path after /api/dynamics
+          // Get the path after the prefix - req.url is already stripped of the prefix
           const apiPath = req.url || '';
+          // Both paths need to construct the full Dynamics URL with /api/data/v9.2
           const targetUrl = `${dynamicsUrl}/api/data/v9.2${apiPath}`;
 
           console.log(`[Dynamics Proxy] ${req.method} ${targetUrl}`);
@@ -122,7 +123,13 @@ function dynamicsAuthPlugin(): Plugin {
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ error: String(error) }));
         }
-      });
+      };
+
+      // Proxy for native Dynamics Web API calls (used by QueryBuilder)
+      server.middlewares.use('/api/data/v9.2', (req, res) => proxyHandler(req, res, '/api/data/v9.2'));
+
+      // Proxy for Dynamics Web API calls via /api/dynamics (used by dynamics-mock.ts)
+      server.middlewares.use('/api/dynamics', (req, res) => proxyHandler(req, res, '/api/dynamics'));
     },
   };
 }

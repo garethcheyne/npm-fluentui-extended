@@ -163,7 +163,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                     setEntitySetName(entityMetadata.EntitySetName);
                 }
 
-                // Fetch attributes with expanded OptionSet for picklists
+                // Fetch regular attributes
                 const attributesResponse = await fetch(
                     `/api/data/v9.2/EntityDefinitions(LogicalName='${props.entityName}')/Attributes?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName`,
                     {
@@ -183,9 +183,36 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                 const attributesData = await attributesResponse.json();
                 const attributesArray = attributesData.value || [];
 
+                // Fetch lookup attributes separately with Targets property
+                const lookupResponse = await fetch(
+                    `/api/data/v9.2/EntityDefinitions(LogicalName='${props.entityName}')/Attributes/Microsoft.Dynamics.CRM.LookupAttributeMetadata?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName,Targets`,
+                    {
+                        headers: {
+                            'OData-MaxVersion': '4.0',
+                            'OData-Version': '4.0',
+                            'Accept': 'application/json',
+                        },
+                    }
+                );
+
+                const lookupData = lookupResponse.ok ? await lookupResponse.json() : { value: [] };
+                const lookupAttributes = lookupData.value || [];
+
+                // Create a map of lookup attributes by LogicalName for easy lookup
+                const lookupMap = new Map<string, any>(lookupAttributes.map((attr: any) => [attr.LogicalName, attr]));
+
+                // Merge lookup Targets into the main attributes array
+                const mergedAttributes = attributesArray.map((attr: any) => {
+                    const lookupAttr = lookupMap.get(attr.LogicalName);
+                    if (lookupAttr?.Targets) {
+                        return { ...attr, Targets: lookupAttr.Targets };
+                    }
+                    return attr;
+                });
+
                 // First pass: collect all unique target entity names from lookup fields
                 const targetEntityNames = new Set<string>();
-                for (const attribute of attributesArray) {
+                for (const attribute of mergedAttributes) {
                     if (Array.isArray(attribute?.Targets)) {
                         for (const target of attribute.Targets) {
                             const entityName = typeof target === 'string' ? target : target?.entityLogicalName;
@@ -221,7 +248,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                     }
                 }
 
-                const resolvedFields: QueryBuilderField[] = attributesArray
+                const resolvedFields: QueryBuilderField[] = mergedAttributes
                     .filter((attribute: any) => attribute?.LogicalName && attribute?.IsValidForAdvancedFind !== false)
                     .map((attribute: any) => {
                         const dataType = dataTypeFromAttribute(attribute);

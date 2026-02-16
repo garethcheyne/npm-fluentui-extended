@@ -5,6 +5,62 @@ import { Lookup, LookupOption, QueryBuilder, QueryBuilderApplyResult, QueryBuild
 import { BuildingRegular, AddRegular, PersonSearchRegular, PlugConnectedRegular, PlugDisconnectedRegular, PersonRegular } from '@fluentui/react-icons';
 import { installDynamicsMock, loginToDynamics, isDynamicsAuthenticated, logoutFromDynamics, getDynamicsUser } from './dynamics-mock';
 
+// Helper to search Dynamics records via native API (fetch)
+const searchDynamicsRecordsNative = async (
+  entitySetName: string,
+  searchText: string,
+  nameField: string = 'name',
+  secondaryField?: string,
+  detailFields?: string[],
+  top: number = 25
+): Promise<LookupOption[]> => {
+  try {
+    // Build select fields
+    const selectFields = [nameField];
+    if (secondaryField) selectFields.push(secondaryField);
+    if (detailFields) selectFields.push(...detailFields);
+    const select = `$select=${selectFields.join(',')}`;
+
+    // Build filter
+    let filter = '';
+    if (searchText) {
+      filter = `&$filter=contains(${nameField},'${searchText.replace(/'/g, "''")}')`;
+    }
+
+    const queryOptions = `${select}${filter}&$top=${top}`;
+    const response = await fetch(`/api/data/v9.2/${entitySetName}?${queryOptions}`, {
+      headers: {
+        'OData-MaxVersion': '4.0',
+        'OData-Version': '4.0',
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.error('[Dynamics Native] Search failed:', response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    const entities = data.value || [];
+
+    return entities.map((record: any) => ({
+      key: record[`${entitySetName.replace(/s$/, '')}id`] || record.id,
+      text: record[nameField] || 'Unnamed',
+      secondaryText: secondaryField ? record[secondaryField] : undefined,
+      icon: <BuildingRegular />,
+      details: detailFields?.map(field => ({
+        label: field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1'),
+        value: record[field] || '-'
+      })).filter(d => d.value !== '-'),
+      data: record, // Pass full record for additional use
+    }));
+  } catch (error) {
+    console.error('[Dynamics Native] Search failed:', error);
+    return [];
+  }
+};
+
 // Helper to search Dynamics records via Xrm.WebApi
 const searchDynamicsRecords = async (
   entitySetName: string,
@@ -167,7 +223,7 @@ const searchAccountsApi = (searchText: string): Promise<LookupOption[]> => {
 function App() {
   const [selectedKey1, setSelectedKey1] = useState<string | null>(null);
   const [selectedKey2, setSelectedKey2] = useState<string | null>(null);
-  
+
   // Dynamic search state - store full option to persist display and access data
   const [selectedOption3, setSelectedOption3] = useState<LookupOption | null>(null);
   const [dynamicOptions, setDynamicOptions] = useState<LookupOption[]>([]);
@@ -232,28 +288,6 @@ function App() {
     setDynamicsUser(null);
   };
 
-  const sampleQueryFields = [
-    { id: 'name', label: 'Name', dataType: 'string' as const },
-    {
-      id: 'statecode',
-      label: 'State',
-      dataType: 'optionset' as const,
-      options: [
-        { label: 'Active', value: 0 },
-        { label: 'Inactive', value: 1 },
-      ],
-    },
-    { id: 'createdon', label: 'Created On', dataType: 'datetime' as const },
-    { id: 'revenue', label: 'Revenue', dataType: 'number' as const },
-    { id: 'ownerid', label: 'Owner', dataType: 'lookup' as const },
-  ];
-
-  const sampleRelatedEntities = [
-    { id: 'contact', label: 'Contacts' },
-    { id: 'opportunity', label: 'Opportunities' },
-    { id: 'activitypointer', label: 'Activities' },
-  ];
-
   // Handle selection - receives full option with all data
   const handleOptionSelect = useCallback((option: LookupOption | null) => {
     setSelectedOption3(option);
@@ -263,18 +297,20 @@ function App() {
     }
   }, []);
 
-  // Handle dynamic search - uses live Dynamics when connected, mock otherwise
+  // Handle dynamic search - uses native API when connected, mock otherwise
   const handleSearchChange = useCallback(async (searchText: string) => {
     setIsLoading(true);
     try {
       let results: LookupOption[];
       if (dynamicsConnected) {
-        // Use live Dynamics data
-        results = await searchDynamicsRecords(
+        // Use top=5 for empty search (initial load), top=25 for actual search
+        results = await searchDynamicsRecordsNative(
           'accounts',
           searchText,
           'name',
           'accountnumber',
+          ['telephone1', 'address1_city'],
+          searchText ? 25 : 5
           ['telephone1', 'address1_city']
         );
       } else {
@@ -296,6 +332,11 @@ function App() {
       handleSearchChange('');
     }
   }, [dynamicOptions.length, handleSearchChange]);
+
+  // Load top 5 results on mount or when connection state changes
+  useEffect(() => {
+    handleSearchChange('');
+  }, [dynamicsConnected, handleSearchChange]);
 
   // Live Dynamics account search
   const handleLiveAccountSearch = useCallback(async (searchText: string) => {
@@ -343,40 +384,63 @@ function App() {
     }
   }, [dynamicsConnected, liveContactOptions.length, handleLiveContactSearch]);
 
+  const containerStyle: React.CSSProperties = {
+    padding: '40px',
+    maxWidth: '1200px',
+    margin: '0 auto',
+    position: 'relative',
+  };
+
+  const headerStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '32px',
+    flexWrap: 'wrap',
+    gap: '16px',
+  };
+
+  const connectionStatusStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  };
+
   return (
     <FluentProvider theme={webLightTheme}>
-      <div style={{ padding: 40, maxWidth: 800, position: 'relative' }}>
-        {/* Connection status - top right */}
-        <div style={{ position: 'absolute', top: 40, right: 40, display: 'flex', alignItems: 'center', gap: 8 }}>
-          {dynamicsLoading ? (
-            <Text size={200}>Connecting...</Text>
-          ) : !dynamicsConfigured ? (
-            <Badge appearance="tint" color="warning" icon={<PlugDisconnectedRegular />}>
-              Not Configured
-            </Badge>
-          ) : dynamicsConnected ? (
-            <>
-              <Badge appearance="filled" color="success" icon={<PlugConnectedRegular />}>
-                Connected
-              </Badge>
-              {dynamicsUser && <Text size={200}>{dynamicsUser}</Text>}
-              <Button appearance="subtle" size="small" onClick={handleDynamicsLogout}>
-                Disconnect
-              </Button>
-            </>
-          ) : (
-            <>
-              <Badge appearance="tint" color="severe" icon={<PlugDisconnectedRegular />}>
-                Disconnected
-              </Badge>
-              <Button appearance="primary" size="small" onClick={handleDynamicsLogin}>
-                Connect
-              </Button>
-            </>
-          )}
-        </div>
+      <div style={containerStyle}>
+        {/* Header with connection status */}
+        <div style={headerStyle}>
+          <h1 style={{ margin: 0 }}>FluentUI Extended Test Harness</h1>
 
-        <h1>FluentUI Extended Test Harness</h1>
+          <div style={connectionStatusStyle}>
+            {dynamicsLoading ? (
+              <Text size={200}>Connecting...</Text>
+            ) : !dynamicsConfigured ? (
+              <Badge appearance="tint" color="warning" icon={<PlugDisconnectedRegular />}>
+                Not Configured
+              </Badge>
+            ) : dynamicsConnected ? (
+              <>
+                <Badge appearance="filled" color="success" icon={<PlugConnectedRegular />}>
+                  Connected
+                </Badge>
+                <Button appearance="subtle" size="small" onClick={handleDynamicsLogout}>
+                  Disconnect
+                </Button>
+              </>
+            ) : (
+              <>
+                <Badge appearance="tint" color="severe" icon={<PlugDisconnectedRegular />}>
+                  Disconnected
+                </Badge>
+                <Button appearance="primary" size="small" onClick={handleDynamicsLogin}>
+                  Connect
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
 
         {/* Basic Lookup - No Header/Footer */}
         <section style={{ marginBottom: 40 }}>
@@ -437,7 +501,7 @@ function App() {
           <h2>Dynamic Search (Async API)</h2>
           <p style={{ color: '#666', marginBottom: 12 }}>
             {dynamicsConnected
-              ? <>Searching <strong>live Dynamics 365</strong> accounts via <code>Xrm.WebApi</code></>
+              ? <>Searching <strong>live Dynamics 365</strong> accounts via native <code>fetch()</code> API</>
               : <>Using simulated API with 800ms delay. <strong>Connect to Dynamics</strong> for live data.</>
             }
           </p>
@@ -492,18 +556,48 @@ function App() {
           <h2>Query Builder</h2>
           <p style={{ color: '#666', marginBottom: 12 }}>
             {dynamicsConnected
-              ? <>Fields loaded from <strong>Dynamics 365</strong> via <code>Xrm.Utility.getEntityMetadata</code>.</>
-              : <>Using mock fields. <strong>Connect to Dynamics</strong> to load real entity metadata.</>
+              ? <>Fields loaded from <strong>Dynamics 365</strong> via native <code>fetch()</code> API.</>
+              : <>Requires connection to Dynamics 365 to load entity metadata.</>
             }
           </p>
 
-          <div style={{ border: dynamicsConnected ? '1px solid #0078d4' : '0px solid #e1dfdd', borderRadius: 8, padding: 16, background: '#fff', width: '100%' }}>
+          <div style={{ border: dynamicsConnected ? '1px solid #0078d4' : '1px solid #e1dfdd', borderRadius: 8, padding: 16, background: '#fff', width: '100%', position: 'relative', minHeight: '400px' }}>
+            {!dynamicsConnected && (
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '16px',
+                borderRadius: 8,
+                zIndex: 10,
+              }}>
+                <PlugDisconnectedRegular style={{ fontSize: '48px', color: '#999' }} />
+                <Text size={500} weight="semibold">Connect to Dynamics 365</Text>
+                <Text size={300} style={{ color: '#666', textAlign: 'center', maxWidth: '400px' }}>
+                  QueryBuilder requires a live connection to load entity metadata, fields, and relationships.
+                </Text>
+                <Button appearance="primary" onClick={handleDynamicsLogin} disabled={!dynamicsConfigured || dynamicsLoading}>
+                  {dynamicsLoading ? 'Connecting...' : 'Connect Now'}
+                </Button>
+                {!dynamicsConfigured && (
+                  <Text size={200} style={{ color: '#999' }}>
+                    Configure environment variables to enable connection
+                  </Text>
+                )}
+              </div>
+            )}
             <QueryBuilder
-              key={dynamicsConnected ? `live-${liveQueryBuilderKey}` : 'static'}
+              key={`live-${liveQueryBuilderKey}`}
               entityName="account"
-              entityDisplayName={dynamicsConnected ? "Accounts (Live)" : "Accounts"}
-              fields={dynamicsConnected ? undefined : sampleQueryFields}
-              relatedEntities={dynamicsConnected ? undefined : sampleRelatedEntities}
+              entityDisplayName="Accounts"
               showODataPreview
               showFetchXmlPreview
               showDataSourceToggle

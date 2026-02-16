@@ -206,10 +206,17 @@ const isValueEmpty = (value: any): boolean => {
  * Infer data type from Dynamics 365 attribute metadata
  */
 export const dataTypeFromAttribute = (attribute: any): QueryBuilderDataType => {
-    const type = String(attribute?.AttributeType || attribute?.Type || '').toLowerCase();
+    // Handle both AttributeType (string) and AttributeTypeName (object with Value property)
+    const typeValue = attribute?.AttributeTypeName?.Value || attribute?.AttributeType || attribute?.Type || '';
+    const type = String(typeValue).toLowerCase();
+    
+    // Check if the attribute has Targets array - definitive indicator of lookup
+    if (attribute?.Targets && Array.isArray(attribute.Targets) && attribute.Targets.length > 0) {
+        return 'lookup';
+    }
     
     if (['picklist', 'state', 'status'].includes(type)) return 'optionset';
-    if (['lookup', 'customer', 'owner', 'partylist', 'uniqueidentifier'].includes(type)) return 'lookup';
+    if (['lookup', 'customer', 'owner', 'partylist', 'uniqueidentifier', 'lookuptype'].includes(type)) return 'lookup';
     if (['datetime'].includes(type)) return 'datetime';
     if (['boolean'].includes(type)) return 'boolean';
     if (['integer', 'decimal', 'double', 'money', 'bigint', 'int'].includes(type)) return 'number';
