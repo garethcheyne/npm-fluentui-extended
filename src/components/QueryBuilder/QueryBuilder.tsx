@@ -139,95 +139,125 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
 
             setLoading(true);
             try {
-                const xrm = (window as any).Xrm;
-                if (xrm?.Utility?.getEntityMetadata) {
-                    const metadata = await xrm.Utility.getEntityMetadata(props.entityName);
-
-                    // Extract EntitySetName for OData queries
-                    if (metadata?.EntitySetName && !disposed) {
-                        setEntitySetName(metadata.EntitySetName);
+                // Fetch entity metadata using native Web API
+                const entityResponse = await fetch(
+                    `/api/data/v9.2/EntityDefinitions(LogicalName='${props.entityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute`,
+                    {
+                        headers: {
+                            'OData-MaxVersion': '4.0',
+                            'OData-Version': '4.0',
+                            'Accept': 'application/json',
+                        },
                     }
+                );
 
-                    const attributesCollection = metadata?.Attributes?._collection || metadata?.Attributes || {};
-                    const attributesArray: any[] = Array.isArray(attributesCollection)
-                        ? attributesCollection
-                        : Object.keys(attributesCollection).map((key) => attributesCollection[key]);
+                if (!entityResponse.ok) {
+                    console.warn('[QueryBuilder] Failed to fetch entity metadata');
+                    return;
+                }
 
-                    // First pass: collect all unique target entity names from lookup fields
-                    const targetEntityNames = new Set<string>();
-                    for (const attribute of attributesArray) {
-                        if (Array.isArray(attribute?.Targets)) {
-                            for (const target of attribute.Targets) {
-                                const entityName = typeof target === 'string' ? target : target?.entityLogicalName;
-                                if (entityName) targetEntityNames.add(entityName);
-                            }
+                const entityMetadata = await entityResponse.json();
+
+                // Extract EntitySetName for OData queries
+                if (entityMetadata?.EntitySetName && !disposed) {
+                    setEntitySetName(entityMetadata.EntitySetName);
+                }
+
+                // Fetch attributes with expanded OptionSet for picklists
+                const attributesResponse = await fetch(
+                    `/api/data/v9.2/EntityDefinitions(LogicalName='${props.entityName}')/Attributes?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName`,
+                    {
+                        headers: {
+                            'OData-MaxVersion': '4.0',
+                            'OData-Version': '4.0',
+                            'Accept': 'application/json',
+                        },
+                    }
+                );
+
+                if (!attributesResponse.ok) {
+                    console.warn('[QueryBuilder] Failed to fetch entity attributes');
+                    return;
+                }
+
+                const attributesData = await attributesResponse.json();
+                const attributesArray = attributesData.value || [];
+
+                // First pass: collect all unique target entity names from lookup fields
+                const targetEntityNames = new Set<string>();
+                for (const attribute of attributesArray) {
+                    if (Array.isArray(attribute?.Targets)) {
+                        for (const target of attribute.Targets) {
+                            const entityName = typeof target === 'string' ? target : target?.entityLogicalName;
+                            if (entityName) targetEntityNames.add(entityName);
                         }
                     }
+                }
 
-                    // Fetch metadata for each target entity to get entitySetName and primaryNameAttribute
-                    const targetMetadataCache: Record<string, { entitySetName?: string; displayName?: string; primaryNameAttribute?: string }> = {};
-                    for (const targetEntityName of targetEntityNames) {
-                        try {
-                            const targetMeta = await xrm.Utility.getEntityMetadata(targetEntityName);
+                // Fetch metadata for each target entity to get entitySetName and primaryNameAttribute
+                const targetMetadataCache: Record<string, { entitySetName?: string; displayName?: string; primaryNameAttribute?: string }> = {};
+                for (const targetEntityName of targetEntityNames) {
+                    try {
+                        const targetResponse = await fetch(
+                            `/api/data/v9.2/EntityDefinitions(LogicalName='${targetEntityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute`,
+                            {
+                                headers: {
+                                    'OData-MaxVersion': '4.0',
+                                    'OData-Version': '4.0',
+                                    'Accept': 'application/json',
+                                },
+                            }
+                        );
+                        if (targetResponse.ok) {
+                            const targetMeta = await targetResponse.json();
                             targetMetadataCache[targetEntityName] = {
                                 entitySetName: targetMeta?.EntitySetName,
                                 displayName: targetMeta?.DisplayName?.UserLocalizedLabel?.Label || targetMeta?.LogicalName,
                                 primaryNameAttribute: targetMeta?.PrimaryNameAttribute,
                             };
-                        } catch (targetErr) {
-                            console.warn(`[QueryBuilder] Could not fetch metadata for target entity "${targetEntityName}":`, targetErr);
                         }
+                    } catch (targetErr) {
+                        console.warn(`[QueryBuilder] Could not fetch metadata for target entity "${targetEntityName}":`, targetErr);
                     }
+                }
 
-                    const resolvedFields: QueryBuilderField[] = attributesArray
-                        .filter((attribute: any) => attribute?.LogicalName && attribute?.IsValidForAdvancedFind !== false)
-                        .map((attribute: any) => {
-                            const dataType = dataTypeFromAttribute(attribute);
-                            const optionSet = attribute?.OptionSet?.Options;
-                            const options =
-                                dataType === 'optionset' && Array.isArray(optionSet)
-                                    ? optionSet
-                                        .map((option: any) => ({
-                                            label: option?.Label?.UserLocalizedLabel?.Label || option?.Label || String(option?.Value),
-                                            value: option?.Value,
-                                        }))
-                                        .filter((option: { label: string; value: string | number }) => option.value !== undefined && option.value !== null)
-                                    : undefined;
+                const resolvedFields: QueryBuilderField[] = attributesArray
+                    .filter((attribute: any) => attribute?.LogicalName && attribute?.IsValidForAdvancedFind !== false)
+                    .map((attribute: any) => {
+                        const dataType = dataTypeFromAttribute(attribute);
 
-                            // Parse lookup targets and enrich with cached metadata
-                            const targets = dataType === 'lookup' && Array.isArray(attribute.Targets)
-                                ? attribute.Targets.map((target: any) => {
-                                    const entityLogicalName = typeof target === 'string' ? target : (target?.entityLogicalName || target);
-                                    const cached = targetMetadataCache[entityLogicalName] || {};
-                                    return {
-                                        entityLogicalName,
-                                        entitySetName: target?.entitySetName || cached.entitySetName,
-                                        displayName: target?.displayName || cached.displayName,
-                                        primaryNameAttribute: target?.primaryNameAttribute || cached.primaryNameAttribute,
-                                    };
-                                })
-                                : undefined;
+                        // Parse lookup targets and enrich with cached metadata
+                        const targets = dataType === 'lookup' && Array.isArray(attribute.Targets)
+                            ? attribute.Targets.map((target: any) => {
+                                const entityLogicalName = typeof target === 'string' ? target : (target?.entityLogicalName || target);
+                                const cached = targetMetadataCache[entityLogicalName] || {};
+                                return {
+                                    entityLogicalName,
+                                    entitySetName: target?.entitySetName || cached.entitySetName,
+                                    displayName: target?.displayName || cached.displayName,
+                                    primaryNameAttribute: target?.primaryNameAttribute || cached.primaryNameAttribute,
+                                };
+                            })
+                            : undefined;
 
-                            // DisplayName can be an object with UserLocalizedLabel or a string
-                            const displayName = attribute.DisplayName;
-                            const label = typeof displayName === 'string'
-                                ? displayName
-                                : (displayName?.UserLocalizedLabel?.Label || attribute.SchemaName || attribute.LogicalName);
+                        // DisplayName can be an object with UserLocalizedLabel or a string
+                        const displayName = attribute.DisplayName;
+                        const label = typeof displayName === 'string'
+                            ? displayName
+                            : (displayName?.UserLocalizedLabel?.Label || attribute.SchemaName || attribute.LogicalName);
 
-                            return {
-                                id: attribute.LogicalName,
-                                label,
-                                schemaName: attribute.SchemaName,
-                                dataType,
-                                options,
-                                targets,
-                            };
-                        })
-                        .sort((left, right) => String(left.label).localeCompare(String(right.label), undefined, { sensitivity: 'base' }));
+                        return {
+                            id: attribute.LogicalName,
+                            label,
+                            schemaName: attribute.SchemaName,
+                            dataType,
+                            targets,
+                        };
+                    })
+                    .sort((left: QueryBuilderField, right: QueryBuilderField) => String(left.label).localeCompare(String(right.label), undefined, { sensitivity: 'base' }));
 
-                    if (!disposed && resolvedFields.length > 0) {
-                        setAvailableFields(resolvedFields);
-                    }
+                if (!disposed && resolvedFields.length > 0) {
+                    setAvailableFields(resolvedFields);
                 }
             } catch (error) {
                 console.error('[QueryBuilder] Error loading fields:', error);
@@ -334,69 +364,61 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
     const loadRelatedEntityFields = React.useCallback(
         async (groupId: string, conditionId: string, targetEntity: string) => {
             try {
-                const xrm = (window as any).Xrm;
-                if (!xrm?.Utility?.getEntityMetadata) {
-                    console.warn('[QueryBuilder] Xrm.Utility.getEntityMetadata not available, cannot load related entity fields');
-                    return;
+                let resolvedFields: QueryBuilderField[] = [];
+
+                // Use callback if provided, otherwise use native Web API
+                if (props.onFetchEntityFields) {
+                    resolvedFields = await props.onFetchEntityFields(targetEntity);
+                } else {
+                    // Use native Web API directly (same origin)
+                    const response = await fetch(
+                        `/api/data/v9.2/EntityDefinitions(LogicalName='${targetEntity}')/Attributes?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName`,
+                        {
+                            headers: {
+                                'OData-MaxVersion': '4.0',
+                                'OData-Version': '4.0',
+                                'Accept': 'application/json',
+                            },
+                        }
+                    );
+
+                    if (!response.ok) {
+                        console.warn('[QueryBuilder] Failed to fetch entity metadata:', response.status, response.statusText);
+                        return;
+                    }
+
+                    const data = await response.json();
+                    const attributesArray = data.value || [];
+
+                    if (attributesArray.length === 0) {
+                        console.warn('[QueryBuilder] No attributes found for entity:', targetEntity);
+                        return;
+                    }
+
+                    resolvedFields = attributesArray
+                        .filter((attr: any) => {
+                            if (!attr?.LogicalName) return false;
+                            const attrType = attr.AttributeType || attr.AttributeTypeName?.Value;
+                            if (attrType === 'Virtual' || attrType === 'CalendarRules') return false;
+                            if (attrType === 'Uniqueidentifier' && !attr.LogicalName.endsWith('id')) return false;
+                            return true;
+                        })
+                        .map((attr: any) => {
+                            const dataType = dataTypeFromAttribute(attr);
+                            const displayName = attr.DisplayName;
+                            const label = typeof displayName === 'string'
+                                ? displayName
+                                : (displayName?.UserLocalizedLabel?.Label || attr.SchemaName || attr.LogicalName);
+
+                            return {
+                                id: attr.LogicalName,
+                                label,
+                                schemaName: attr.SchemaName,
+                                dataType,
+                            };
+                        })
+                        .sort((a: QueryBuilderField, b: QueryBuilderField) => String(a.label).localeCompare(String(b.label), undefined, { sensitivity: 'base' }));
                 }
-
-                // In Dynamics 365, getEntityMetadata without the second parameter returns all attributes
-                const metadata = await xrm.Utility.getEntityMetadata(targetEntity);
-
-                if (!metadata) {
-                    console.warn('[QueryBuilder] No metadata returned for entity:', targetEntity);
-                    return;
-                }
-
-                // Handle different metadata structures in various Dynamics versions
-                const attributesCollection = metadata?.Attributes?._collection || metadata?.Attributes || {};
-                const attributesArray: any[] = Array.isArray(attributesCollection)
-                    ? attributesCollection
-                    : Object.keys(attributesCollection).map((key) => attributesCollection[key]);
-
-                if (attributesArray.length === 0) {
-                    console.warn('[QueryBuilder] No attributes found in metadata for entity:', targetEntity);
-                    return;
-                }
-
-                const resolvedFields: QueryBuilderField[] = attributesArray
-                    .filter((attr: any) => {
-                        // Must have a logical name
-                        if (!attr?.LogicalName) return false;
-                        // Filter out internal/hidden attributes, but be more permissive
-                        const attrType = attr.AttributeType || attr.AttributeTypeName?.Value;
-                        // Skip virtual, uniqueidentifier (except primary key), and internal attributes
-                        if (attrType === 'Virtual' || attrType === 'CalendarRules') return false;
-                        if (attrType === 'Uniqueidentifier' && !attr.LogicalName.endsWith('id')) return false;
-                        return true;
-                    })
-                    .map((attr: any) => {
-                        const dataType = dataTypeFromAttribute(attr);
-                        const optionSet = attr?.OptionSet?.Options;
-                        const options =
-                            dataType === 'optionset' && Array.isArray(optionSet)
-                                ? optionSet
-                                    .map((opt: any) => ({
-                                        label: opt?.Label?.UserLocalizedLabel?.Label || opt?.Label || String(opt?.Value),
-                                        value: opt?.Value,
-                                    }))
-                                    .filter((opt: { label: string; value: string | number }) => opt.value !== undefined && opt.value !== null)
-                                : undefined;
-
-                        const displayName = attr.DisplayName;
-                        const label = typeof displayName === 'string'
-                            ? displayName
-                            : (displayName?.UserLocalizedLabel?.Label || attr.SchemaName || attr.LogicalName);
-
-                        return {
-                            id: attr.LogicalName,
-                            label,
-                            schemaName: attr.SchemaName,
-                            dataType,
-                            options,
-                        };
-                    })
-                    .sort((a, b) => String(a.label).localeCompare(String(b.label), undefined, { sensitivity: 'base' }));
 
                 if (resolvedFields.length > 0) {
                     // Auto-add a default condition if none exist
@@ -423,7 +445,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                 console.error('[QueryBuilder] Error loading related entity fields:', error);
             }
         },
-        [updateGroup],
+        [props.onFetchEntityFields, updateGroup],
     );
 
     // Add a nested condition to a related entity
@@ -584,28 +606,8 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
         return new Set(validationResult.errors.map((e) => e.conditionId).filter(Boolean));
     }, [validationResult]);
 
-    // Check if Xrm WebApi is available (running in Dynamics 365)
-    const isXrmAvailable = React.useMemo(() => {
-        try {
-            return typeof (window as any).Xrm?.WebApi?.retrieveMultipleRecords === 'function';
-        } catch {
-            return false;
-        }
-    }, []);
-
     const onValidate = React.useCallback(async () => {
         const result = validateQueryBuilderState(builderState, availableFields);
-
-        // Add API validation info
-        if (!isXrmAvailable) {
-            result.apiValidation = {
-                available: false,
-                tested: false,
-            };
-            setValidationResult(result);
-            setValidationDialogOpen(true);
-            return;
-        }
 
         // If local validation failed, don't test API
         if (!result.isValid) {
@@ -618,19 +620,31 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
             return;
         }
 
-        // Test against XRM API
+        // Test against Web API directly
         setApiValidating(true);
         setValidationResult(result);
         setValidationDialogOpen(true);
 
         try {
-            const Xrm = (window as any).Xrm;
             const { odataFilter } = serializeQueryBuilderState(builderState, availableFields, props.entityName, entitySetName);
-            const options = odataFilter ? `?$filter=${odataFilter}&$top=1&$count=true` : '?$top=1&$count=true';
-
-            // Use entitySetName for WebApi (OData requires plural name like "accounts")
             const entitySetForApi = entitySetName || props.entityName;
-            const response = await Xrm.WebApi.retrieveMultipleRecords(entitySetForApi, options);
+            const queryOptions = odataFilter ? `$filter=${odataFilter}&$top=1&$count=true` : '$top=1&$count=true';
+
+            const response = await fetch(`/api/data/v9.2/${entitySetForApi}?${queryOptions}`, {
+                headers: {
+                    'OData-MaxVersion': '4.0',
+                    'OData-Version': '4.0',
+                    'Accept': 'application/json',
+                    'Prefer': 'odata.include-annotations="*"',
+                },
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || `HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
 
             setValidationResult({
                 ...result,
@@ -638,7 +652,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                     available: true,
                     tested: true,
                     success: true,
-                    recordCount: response['@odata.count'] ?? response.entities?.length ?? 0,
+                    recordCount: data['@odata.count'] ?? data.value?.length ?? 0,
                 },
             });
         } catch (err: any) {
@@ -654,7 +668,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
         } finally {
             setApiValidating(false);
         }
-    }, [builderState, availableFields, entitySetName, isXrmAvailable, props.entityName]);
+    }, [builderState, availableFields, entitySetName, props.entityName]);
 
     const onOpenUploadDialog = React.useCallback(() => {
         setUploadXmlText('');

@@ -1,7 +1,7 @@
 /**
  * QueryBuilder LookupInput Component
  * 
- * Internal component for lookup field value input with automatic Xrm.WebApi search.
+ * Internal component for lookup field value input with automatic Web API search.
  */
 
 import * as React from 'react';
@@ -34,10 +34,9 @@ export const LookupValueInput: React.FC<LookupValueInputProps> = ({
     const [resultCount, setResultCount] = React.useState<number>(0);
     const [headerText, setHeaderText] = React.useState<string>('');
 
-    // Automatic search using Xrm.WebApi when targets are available
-    const searchUsingXrm = React.useCallback(async (searchText: string, limit: number = 15): Promise<{ results: LookupOption[]; entityDisplayName: string }> => {
-        const xrm = (window as any).Xrm;
-        if (!xrm?.WebApi?.retrieveMultipleRecords || !targets || targets.length === 0) {
+    // Automatic search using native Web API when targets are available
+    const searchUsingWebApi = React.useCallback(async (searchText: string, limit: number = 15): Promise<{ results: LookupOption[]; entityDisplayName: string }> => {
+        if (!targets || targets.length === 0) {
             return { results: [], entityDisplayName: '' };
         }
 
@@ -55,16 +54,25 @@ export const LookupValueInput: React.FC<LookupValueInputProps> = ({
 
             try {
                 const nameAttr = target.primaryNameAttribute;
-                let options = `?$select=${nameAttr}&$top=${limit}`;
+                let queryOptions = `$select=${nameAttr}&$top=${limit}`;
 
                 if (searchText) {
-                    options += `&$filter=contains(${nameAttr},'${searchText.replace(/'/g, "''")}')`;
+                    queryOptions += `&$filter=contains(${nameAttr},'${searchText.replace(/'/g, "''")}')`;
                 }
 
-                const response = await xrm.WebApi.retrieveMultipleRecords(target.entitySetName, options);
+                const response = await fetch(`/api/data/v9.2/${target.entitySetName}?${queryOptions}`, {
+                    headers: {
+                        'OData-MaxVersion': '4.0',
+                        'OData-Version': '4.0',
+                        'Accept': 'application/json',
+                    },
+                });
 
-                // Dynamics 365 WebApi returns records in response.value (not response.entities)
-                const records = response.value || response.entities || [];
+                if (!response.ok) continue;
+
+                const data = await response.json();
+                const records = data.value || [];
+                
                 for (const record of records) {
                     // Extract the ID from the record (entityLogicalName + 'id')
                     const idField = `${target.entityLogicalName}id`;
@@ -88,14 +96,13 @@ export const LookupValueInput: React.FC<LookupValueInputProps> = ({
     // Load initial top 5 records when the lookup becomes usable
     React.useEffect(() => {
         const loadInitialRecords = async () => {
-            const xrm = (window as any).Xrm;
             const hasValidTargets = targets && targets.length > 0 && targets.some(t => t.entitySetName && t.primaryNameAttribute);
             
-            // Only pre-load if we have valid targets and Xrm is available (and no custom search)
-            if (!disabled && hasValidTargets && xrm?.WebApi?.retrieveMultipleRecords && !onLookupSearch) {
+            // Only pre-load if we have valid targets (and no custom search)
+            if (!disabled && hasValidTargets && !onLookupSearch) {
                 setLookupLoading(true);
                 try {
-                    const searchResult = await searchUsingXrm('', 5); // Get top 5 records
+                    const searchResult = await searchUsingWebApi('', 5); // Get top 5 records
                     setLookupOptions(searchResult.results);
                     setResultCount(searchResult.results.length);
                     setHeaderText(searchResult.entityDisplayName);
@@ -106,7 +113,7 @@ export const LookupValueInput: React.FC<LookupValueInputProps> = ({
         };
         
         loadInitialRecords();
-    }, [targets, disabled, onLookupSearch, searchUsingXrm]);
+    }, [targets, disabled, onLookupSearch, searchUsingWebApi]);
 
     const handleSearchChange = React.useCallback(
         async (searchText: string) => {
@@ -126,8 +133,8 @@ export const LookupValueInput: React.FC<LookupValueInputProps> = ({
                     // Use first target display name if available
                     entityName = targets?.[0]?.displayName || '';
                 } else {
-                    // Fall back to automatic Xrm.WebApi search
-                    const searchResult = await searchUsingXrm(searchText);
+                    // Use native Web API search
+                    const searchResult = await searchUsingWebApi(searchText);
                     results = searchResult.results;
                     entityName = searchResult.entityDisplayName;
                 }
@@ -139,7 +146,7 @@ export const LookupValueInput: React.FC<LookupValueInputProps> = ({
                 setLookupLoading(false);
             }
         },
-        [fieldId, onLookupSearch, searchUsingXrm, targets],
+        [fieldId, onLookupSearch, searchUsingWebApi, targets],
     );
 
     const handleOptionSelect = React.useCallback(
@@ -153,7 +160,7 @@ export const LookupValueInput: React.FC<LookupValueInputProps> = ({
         [onValueChange],
     );
 
-    // Determine if lookup is usable (has either onLookupSearch or valid targets with Xrm)
+    // Determine if lookup is usable (has either onLookupSearch or valid targets)
     const hasValidTargets = targets && targets.length > 0 && targets.some(t => t.entitySetName && t.primaryNameAttribute);
     const isUsable = !disabled && (onLookupSearch || hasValidTargets);
 

@@ -349,7 +349,7 @@ The Validate button checks query structure and optionally tests against the Dyna
 ```
 
 When running inside Dynamics 365:
-- Detects `Xrm.WebApi` availability
+- Uses native fetch to `/api/data/v9.2/` endpoints
 - Executes a test query with `$top=1&$count=true`
 - Shows record count or API error message
 
@@ -405,7 +405,7 @@ const fields: QueryBuilderField[] = [
 |------|------|---------|-------------|
 | `entityName` | `string` | - | Logical name of the entity (required) |
 | `entityDisplayName` | `string` | - | Display name shown in header |
-| `fields` | `QueryBuilderField[]` | - | Fields for filtering (auto-loaded from Xrm if omitted) |
+| `fields` | `QueryBuilderField[]` | - | Fields for filtering (auto-loaded via Web API if omitted) |
 | `initialFetchXml` | `string` | - | FetchXML to pre-populate the query builder |
 | `initialState` | `QueryBuilderState` | - | Initial query state object |
 | `onSerializedChange` | `(result: QueryBuilderApplyResult) => void` | - | Called when query changes |

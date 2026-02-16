@@ -98,7 +98,7 @@ export const useEntityFields = (
         }
     }, [providedFields]);
 
-    // Load fields from Xrm metadata
+    // Load fields from Web API metadata
     React.useEffect(() => {
         let disposed = false;
 
@@ -111,19 +111,49 @@ export const useEntityFields = (
             setError(null);
 
             try {
-                const xrm = (window as any).Xrm;
-                if (!xrm?.Utility?.getEntityMetadata) {
+                // Fetch entity metadata using native Web API
+                const entityResponse = await fetch(
+                    `/api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute`,
+                    {
+                        headers: {
+                            'OData-MaxVersion': '4.0',
+                            'OData-Version': '4.0',
+                            'Accept': 'application/json',
+                        },
+                    }
+                );
+
+                if (!entityResponse.ok) {
+                    console.warn('[QueryBuilder] Failed to fetch entity metadata');
                     return;
                 }
 
-                const metadata = await xrm.Utility.getEntityMetadata(entityName);
+                const entityMetadata = await entityResponse.json();
 
                 // Extract EntitySetName for OData queries
-                if (metadata?.EntitySetName && !disposed) {
-                    setEntitySetName(metadata.EntitySetName);
+                if (entityMetadata?.EntitySetName && !disposed) {
+                    setEntitySetName(entityMetadata.EntitySetName);
                 }
 
-                const attributesArray = extractAttributesArray(metadata);
+                // Fetch attributes
+                const attributesResponse = await fetch(
+                    `/api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName`,
+                    {
+                        headers: {
+                            'OData-MaxVersion': '4.0',
+                            'OData-Version': '4.0',
+                            'Accept': 'application/json',
+                        },
+                    }
+                );
+
+                if (!attributesResponse.ok) {
+                    console.warn('[QueryBuilder] Failed to fetch entity attributes');
+                    return;
+                }
+
+                const attributesData = await attributesResponse.json();
+                const attributesArray = attributesData.value || [];
 
                 // First pass: collect all unique target entity names from lookup fields
                 const targetEntityNames = new Set<string>();
@@ -140,12 +170,25 @@ export const useEntityFields = (
                 const targetMetadataCache: Record<string, { entitySetName?: string; displayName?: string; primaryNameAttribute?: string }> = {};
                 for (const targetEntityName of targetEntityNames) {
                     try {
-                        const targetMeta = await xrm.Utility.getEntityMetadata(targetEntityName);
-                        targetMetadataCache[targetEntityName] = {
-                            entitySetName: targetMeta?.EntitySetName,
-                            displayName: targetMeta?.DisplayName?.UserLocalizedLabel?.Label || targetMeta?.LogicalName,
-                            primaryNameAttribute: targetMeta?.PrimaryNameAttribute,
-                        };
+                        const targetResponse = await fetch(
+                            `/api/data/v9.2/EntityDefinitions(LogicalName='${targetEntityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute`,
+                            {
+                                headers: {
+                                    'OData-MaxVersion': '4.0',
+                                    'OData-Version': '4.0',
+                                    'Accept': 'application/json',
+                                },
+                            }
+                        );
+
+                        if (targetResponse.ok) {
+                            const targetMeta = await targetResponse.json();
+                            targetMetadataCache[targetEntityName] = {
+                                entitySetName: targetMeta?.EntitySetName,
+                                displayName: targetMeta?.DisplayName?.UserLocalizedLabel?.Label || targetMeta?.LogicalName,
+                                primaryNameAttribute: targetMeta?.PrimaryNameAttribute,
+                            };
+                        }
                     } catch (targetErr) {
                         console.warn(`[QueryBuilder] Could not fetch metadata for target entity "${targetEntityName}":`, targetErr);
                     }
@@ -173,7 +216,7 @@ export const useEntityFields = (
 
                         return { ...baseField, targets };
                     })
-                    .sort((a, b) => String(a.label).localeCompare(String(b.label), undefined, { sensitivity: 'base' }));
+                    .sort((a: QueryBuilderField, b: QueryBuilderField) => String(a.label).localeCompare(String(b.label), undefined, { sensitivity: 'base' }));
 
                 if (!disposed && resolvedFields.length > 0) {
                     setFields(resolvedFields);
@@ -208,43 +251,50 @@ export interface RelatedEntityFieldsResult {
 /**
  * Load fields for a related entity from Dynamics 365 metadata.
  * This is a standalone function, not a hook, because it's called in response to user actions.
+ * @param targetEntity - The logical name of the entity to load fields for
+ * @param fetchFields - Optional callback to fetch fields. If not provided, uses native Web API.
  */
-export const loadEntityFields = async (targetEntity: string): Promise<QueryBuilderField[]> => {
-    const xrm = (window as any).Xrm;
-    if (!xrm?.Utility?.getEntityMetadata) {
-        console.warn('[QueryBuilder] Xrm.Utility.getEntityMetadata not available');
-        return [];
+export const loadEntityFields = async (
+    targetEntity: string,
+    fetchFields?: (entityLogicalName: string) => Promise<QueryBuilderField[]>
+): Promise<QueryBuilderField[]> => {
+    // Use callback if provided
+    if (fetchFields) {
+        return fetchFields(targetEntity);
     }
 
-    const metadata = await xrm.Utility.getEntityMetadata(targetEntity);
+    // Use native Web API directly (same origin)
+    try {
+        const response = await fetch(
+            `/api/data/v9.2/EntityDefinitions(LogicalName='${targetEntity}')/Attributes?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName`,
+            {
+                headers: {
+                    'OData-MaxVersion': '4.0',
+                    'OData-Version': '4.0',
+                    'Accept': 'application/json',
+                },
+            }
+        );
 
-    if (!metadata) {
-        console.warn('[QueryBuilder] No metadata returned for entity:', targetEntity);
-        return [];
-    }
-
-    const attributesArray = extractAttributesArray(metadata);
-
-    if (attributesArray.length === 0) {
-        console.warn('[QueryBuilder] No attributes found in metadata for entity:', targetEntity);
-        return [];
-    }
-
-    return attributesArray
-        .filter((attr: any) => isValidAttribute(attr, false))
-        .map((attr: any) => parseAttributeToField(attr))
-        .sort((a, b) => String(a.label).localeCompare(String(b.label), undefined, { sensitivity: 'base' }));
-};
-
-/**
- * Check if Xrm WebApi is available (running in Dynamics 365).
- */
-export const useXrmAvailability = (): boolean => {
-    return React.useMemo(() => {
-        try {
-            return typeof (window as any).Xrm?.WebApi?.retrieveMultipleRecords === 'function';
-        } catch {
-            return false;
+        if (!response.ok) {
+            console.warn('[QueryBuilder] Failed to fetch entity metadata:', response.status, response.statusText);
+            return [];
         }
-    }, []);
+
+        const data = await response.json();
+        const attributesArray = data.value || [];
+
+        if (attributesArray.length === 0) {
+            console.warn('[QueryBuilder] No attributes found for entity:', targetEntity);
+            return [];
+        }
+
+        return attributesArray
+            .filter((attr: any) => isValidAttribute(attr, false))
+            .map((attr: any) => parseAttributeToField(attr))
+            .sort((a: QueryBuilderField, b: QueryBuilderField) => String(a.label).localeCompare(String(b.label), undefined, { sensitivity: 'base' }));
+    } catch (error) {
+        console.error('[QueryBuilder] Error fetching entity fields:', error);
+        return [];
+    }
 };

@@ -210,7 +210,7 @@ export interface QueryBuilderLookupOption {
 
 export interface QueryBuilderProps {
   entityName: string;
-  /** Entity set name for OData queries (e.g., "accounts"). If not provided, will be fetched from Xrm metadata. */
+  /** Entity set name for OData queries (e.g., "accounts"). If not provided, will be fetched from the Web API. */
   entitySetName?: string;
   entityDisplayName?: string;
   fields?: QueryBuilderField[];
@@ -243,4 +243,6 @@ export interface QueryBuilderProps {
   onSerializedChange?: (result: QueryBuilderApplyResult) => void;
   /** Callback for lookup field search - returns options for the lookup dropdown */
   onLookupSearch?: (fieldId: string, searchText: string) => Promise<QueryBuilderLookupOption[]> | QueryBuilderLookupOption[];
+  /** Callback to fetch fields for a related entity. If provided, this is used instead of the native Web API. */
+  onFetchEntityFields?: (entityLogicalName: string) => Promise<QueryBuilderField[]>;
 }

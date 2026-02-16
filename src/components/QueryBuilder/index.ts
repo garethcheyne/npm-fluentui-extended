@@ -48,7 +48,6 @@ export {
   parseAttributeToField,
   isValidAttribute,
   extractAttributesArray,
-  useXrmAvailability,
 } from './QueryBuilder.hooks';
 export type { UseEntityFieldsResult, RelatedEntityFieldsResult } from './QueryBuilder.hooks';
 
