@@ -498,7 +498,8 @@ describe('serializeQueryBuilderState', () => {
 
             const result = serializeQueryBuilderState(state, testFields, 'account');
 
-            expect(result.odataFilter).toBe("ownerid eq '12345678-1234-1234-1234-123456789012'");
+            // OData uses _fieldname_value format for lookups, and GUIDs are not quoted
+            expect(result.odataFilter).toBe("_ownerid_value eq 12345678-1234-1234-1234-123456789012");
         });
     });
 
@@ -946,5 +947,1040 @@ describe('validateQueryBuilderState', () => {
             expect(result.isValid).toBe(false);
             expect(result.errors[0].message).toBe('Related entity not selected');
         });
+    });
+});
+
+describe('serializeQueryBuilderState - Related Entity (link-entity)', () => {
+    const testFieldsWithLookup: QueryBuilderField[] = [
+        { id: 'name', label: 'Name', dataType: 'string' },
+        { id: 'ownerid', label: 'Owner', dataType: 'lookup', targets: [{ entityLogicalName: 'systemuser' }, { entityLogicalName: 'team' }] },
+        { id: 'pricelevelid', label: 'Price List', dataType: 'lookup', targets: [{ entityLogicalName: 'pricelevel' }] },
+    ];
+
+    it('serializes related entity condition as link-entity', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        {
+                            id: 'cond1',
+                            kind: 'relatedEntity',
+                            fieldId: '',
+                            operator: 'containsdata',
+                            value: '',
+                            relatedEntityName: 'ownerid',
+                            relatedEntityTarget: 'systemuser',
+                            nestedConditions: [
+                                {
+                                    id: 'nested1',
+                                    fieldId: 'fullname',
+                                    operator: 'eq',
+                                    value: 'John Doe',
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFieldsWithLookup, 'account');
+
+        expect(result.fetchXml).toContain('<link-entity name="systemuser"');
+        expect(result.fetchXml).toContain('from="systemuserid"');
+        expect(result.fetchXml).toContain('to="ownerid"');
+        expect(result.fetchXml).toContain('<condition attribute="fullname" operator="eq" value="John Doe"');
+    });
+
+    it('serializes related entity with OR nested logic', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        {
+                            id: 'cond1',
+                            kind: 'relatedEntity',
+                            fieldId: '',
+                            operator: 'containsdata',
+                            value: '',
+                            relatedEntityName: 'ownerid',
+                            relatedEntityTarget: 'systemuser',
+                            nestedLogic: 'or',
+                            nestedConditions: [
+                                { id: 'nested1', fieldId: 'fullname', operator: 'eq', value: 'John' },
+                                { id: 'nested2', fieldId: 'fullname', operator: 'eq', value: 'Jane' },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFieldsWithLookup, 'account');
+
+        expect(result.fetchXml).toContain('<filter type="or">');
+        expect(result.fetchXml).toContain('value="John"');
+        expect(result.fetchXml).toContain('value="Jane"');
+    });
+
+    it('serializes multiple related entity conditions', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        {
+                            id: 'cond1',
+                            kind: 'relatedEntity',
+                            fieldId: '',
+                            operator: 'containsdata',
+                            value: '',
+                            relatedEntityName: 'ownerid',
+                            relatedEntityTarget: 'systemuser',
+                            nestedConditions: [
+                                { id: 'nested1', fieldId: 'fullname', operator: 'contains', value: 'Admin' },
+                            ],
+                        },
+                        {
+                            id: 'cond2',
+                            kind: 'relatedEntity',
+                            fieldId: '',
+                            operator: 'containsdata',
+                            value: '',
+                            relatedEntityName: 'pricelevelid',
+                            relatedEntityTarget: 'pricelevel',
+                            nestedConditions: [
+                                { id: 'nested2', fieldId: 'name', operator: 'eq', value: 'Standard' },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFieldsWithLookup, 'account');
+
+        expect(result.fetchXml).toContain('<link-entity name="systemuser"');
+        expect(result.fetchXml).toContain('<link-entity name="pricelevel"');
+        expect(result.fetchXml).toContain('to="ownerid"');
+        expect(result.fetchXml).toContain('to="pricelevelid"');
+    });
+
+    it('serializes nested condition with null operator', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        {
+                            id: 'cond1',
+                            kind: 'relatedEntity',
+                            fieldId: '',
+                            operator: 'containsdata',
+                            value: '',
+                            relatedEntityName: 'ownerid',
+                            relatedEntityTarget: 'systemuser',
+                            nestedConditions: [
+                                { id: 'nested1', fieldId: 'email', operator: 'null', value: '' },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFieldsWithLookup, 'account');
+
+        expect(result.fetchXml).toContain('<condition attribute="email" operator="null"');
+    });
+
+    it('combines regular condition with related entity condition', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        { id: 'cond1', fieldId: 'name', operator: 'eq', value: 'Contoso' },
+                        {
+                            id: 'cond2',
+                            kind: 'relatedEntity',
+                            fieldId: '',
+                            operator: 'containsdata',
+                            value: '',
+                            relatedEntityName: 'ownerid',
+                            relatedEntityTarget: 'systemuser',
+                            nestedConditions: [
+                                { id: 'nested1', fieldId: 'fullname', operator: 'eq', value: 'John' },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFieldsWithLookup, 'account');
+
+        expect(result.fetchXml).toContain('<condition attribute="name" operator="eq" value="Contoso"');
+        expect(result.fetchXml).toContain('<link-entity name="systemuser"');
+    });
+
+    it('includes empty link-entity when nested conditions are empty', () => {
+        // Note: Empty nested conditions still generate link-entity (design decision)
+        // Validation should catch this case before serialization
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        { id: 'cond1', fieldId: 'name', operator: 'eq', value: 'Test' },
+                        {
+                            id: 'cond2',
+                            kind: 'relatedEntity',
+                            fieldId: '',
+                            operator: 'containsdata',
+                            value: '',
+                            relatedEntityName: 'ownerid',
+                            relatedEntityTarget: 'systemuser',
+                            nestedConditions: [],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFieldsWithLookup, 'account');
+
+        // Serializer still outputs link-entity (validation should prevent this case)
+        expect(result.fetchXml).toContain('<link-entity');
+        expect(result.fetchXml).toContain('<condition attribute="name"');
+    });
+
+    it('serializes related entity to OData using navigation property syntax', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        {
+                            id: 'cond1',
+                            kind: 'relatedEntity',
+                            fieldId: '',
+                            operator: 'containsdata',
+                            value: '',
+                            relatedEntityName: 'primarycontactid',
+                            relatedEntityTarget: 'contact',
+                            nestedConditions: [
+                                { id: 'nested1', fieldId: 'firstname', operator: 'eq', value: 'John' },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFieldsWithLookup, 'account');
+
+        // OData should use navigation property syntax: primarycontactid/firstname eq 'John'
+        expect(result.odataFilter).toBe("primarycontactid/firstname eq 'John'");
+    });
+
+    it('serializes related entity with multiple nested conditions to OData', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        {
+                            id: 'cond1',
+                            kind: 'relatedEntity',
+                            fieldId: '',
+                            operator: 'containsdata',
+                            value: '',
+                            relatedEntityName: 'ownerid',
+                            relatedEntityTarget: 'systemuser',
+                            nestedLogic: 'and',
+                            nestedConditions: [
+                                { id: 'nested1', fieldId: 'fullname', operator: 'eq', value: 'John Doe' },
+                                { id: 'nested2', fieldId: 'emailaddress1', operator: 'notnull', value: '' },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFieldsWithLookup, 'account');
+
+        // Multiple conditions should be combined with logic operator
+        expect(result.odataFilter).toBe("(ownerid/fullname eq 'John Doe' and ownerid/emailaddress1 ne null)");
+    });
+
+    it('serializes related entity with OR logic to OData', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        {
+                            id: 'cond1',
+                            kind: 'relatedEntity',
+                            fieldId: '',
+                            operator: 'containsdata',
+                            value: '',
+                            relatedEntityName: 'ownerid',
+                            relatedEntityTarget: 'systemuser',
+                            nestedLogic: 'or',
+                            nestedConditions: [
+                                { id: 'nested1', fieldId: 'fullname', operator: 'eq', value: 'John' },
+                                { id: 'nested2', fieldId: 'fullname', operator: 'eq', value: 'Jane' },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFieldsWithLookup, 'account');
+
+        // OR logic for multiple conditions
+        expect(result.odataFilter).toBe("(ownerid/fullname eq 'John' or ownerid/fullname eq 'Jane')");
+    });
+
+    it('combines regular and related entity conditions in OData', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        { id: 'cond1', fieldId: 'name', operator: 'eq', value: 'Contoso' },
+                        {
+                            id: 'cond2',
+                            kind: 'relatedEntity',
+                            fieldId: '',
+                            operator: 'containsdata',
+                            value: '',
+                            relatedEntityName: 'ownerid',
+                            relatedEntityTarget: 'systemuser',
+                            nestedConditions: [
+                                { id: 'nested1', fieldId: 'fullname', operator: 'contains', value: 'Admin' },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFieldsWithLookup, 'account');
+
+        // Both regular condition and related entity condition should be in OData
+        expect(result.odataFilter).toBe("(name eq 'Contoso' and contains(ownerid/fullname, 'Admin'))");
+    });
+});
+
+describe('serializeQueryBuilderState - Additional operators', () => {
+    const testFields: QueryBuilderField[] = [
+        { id: 'name', label: 'Name', dataType: 'string' },
+        { id: 'revenue', label: 'Revenue', dataType: 'number' },
+        { id: 'createdon', label: 'Created On', dataType: 'datetime' },
+        {
+            id: 'statecode',
+            label: 'State',
+            dataType: 'optionset',
+            options: [
+                { label: 'Active', value: 0 },
+                { label: 'Inactive', value: 1 },
+            ],
+        },
+    ];
+
+    it('serializes less than (lt) operator', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        { id: 'cond1', fieldId: 'revenue', operator: 'lt', value: 5000 },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFields, 'account');
+
+        expect(result.fetchXmlFilter).toContain('operator="lt" value="5000"');
+        expect(result.odataFilter).toBe('revenue lt 5000');
+    });
+
+    it('serializes not equals (ne) operator', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        { id: 'cond1', fieldId: 'name', operator: 'ne', value: 'Test' },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFields, 'account');
+
+        expect(result.fetchXmlFilter).toContain('operator="ne" value="Test"');
+        expect(result.odataFilter).toBe("name ne 'Test'");
+    });
+
+    it('serializes optionset value as integer', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        { id: 'cond1', fieldId: 'statecode', operator: 'eq', value: 0 },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFields, 'account');
+
+        expect(result.fetchXmlFilter).toContain('value="0"');
+        expect(result.odataFilter).toBe('statecode eq 0');
+    });
+
+    it('serializes datetime field in ISO format', () => {
+        const dateValue = '2025-01-15T10:30:00.000Z';
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        { id: 'cond1', fieldId: 'createdon', operator: 'gt', value: dateValue },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFields, 'account');
+
+        expect(result.fetchXmlFilter).toContain(`value="${dateValue}"`);
+        expect(result.odataFilter).toContain(dateValue);
+    });
+
+    it('serializes datetime field without quotes in OData', () => {
+        // This specifically tests that datetime values are NOT wrapped in quotes
+        // OData requires datetime values as unquoted ISO 8601 format
+        const testFields: QueryBuilderField[] = [
+            { id: 'createdon', label: 'Created On', dataType: 'datetime' },
+        ];
+
+        const dateValue = '2025-06-20';
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        { id: 'cond1', fieldId: 'createdon', operator: 'ge', value: dateValue },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFields, 'account');
+
+        // OData should NOT have quotes around datetime value
+        // Should be: createdon ge 2025-06-20T00:00:00Z
+        // NOT: createdon ge '2025-06-20T00:00:00Z'
+        expect(result.odataFilter).toBe('createdon ge 2025-06-20T00:00:00Z');
+        expect(result.odataFilter).not.toContain("'2025-06-20");
+    });
+
+    it('serializes datetime between operator correctly in OData', () => {
+        const testFields: QueryBuilderField[] = [
+            { id: 'createdon', label: 'Created On', dataType: 'datetime' },
+        ];
+
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        { id: 'cond1', fieldId: 'createdon', operator: 'between', value: '2025-01-01', value2: '2025-12-31' },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFields, 'account');
+
+        // Both date values should be unquoted with time component
+        expect(result.odataFilter).toBe('(createdon ge 2025-01-01T00:00:00Z and createdon le 2025-12-31T00:00:00Z)');
+    });
+});
+
+describe('validateQueryBuilderState - Related entity validation', () => {
+    const testFields: QueryBuilderField[] = [
+        { id: 'name', label: 'Name', dataType: 'string' },
+        { id: 'ownerid', label: 'Owner', dataType: 'lookup', targets: [{ entityLogicalName: 'systemuser' }] },
+    ];
+
+    it('validates related entity with valid nested conditions', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        {
+                            id: 'cond1',
+                            kind: 'relatedEntity',
+                            fieldId: '',
+                            operator: 'containsdata',
+                            value: '',
+                            relatedEntityName: 'ownerid',
+                            relatedEntityTarget: 'systemuser',
+                            nestedConditions: [
+                                { id: 'nested1', fieldId: 'fullname', operator: 'eq', value: 'John' },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const result = validateQueryBuilderState(state, testFields);
+
+        // Related entity with nested conditions should be valid
+        // (actual validation depends on implementation)
+        expect(result.errors.filter(e => e.message === 'Related entity not selected')).toHaveLength(0);
+    });
+
+    it('returns error when related entity has no nested conditions', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        {
+                            id: 'cond1',
+                            kind: 'relatedEntity',
+                            fieldId: '',
+                            operator: 'containsdata',
+                            value: '',
+                            relatedEntityName: 'ownerid',
+                            relatedEntityTarget: 'systemuser',
+                            nestedConditions: [],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const result = validateQueryBuilderState(state, testFields);
+
+        expect(result.isValid).toBe(false);
+    });
+
+    it('returns error when nested condition has empty value', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        {
+                            id: 'cond1',
+                            kind: 'relatedEntity',
+                            fieldId: '',
+                            operator: 'containsdata',
+                            value: '',
+                            relatedEntityName: 'ownerid',
+                            relatedEntityTarget: 'systemuser',
+                            nestedConditions: [
+                                { id: 'nested1', fieldId: 'fullname', operator: 'eq', value: '' },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const result = validateQueryBuilderState(state, testFields);
+
+        expect(result.isValid).toBe(false);
+        expect(result.errors.some(e => e.message === 'Value is required')).toBe(true);
+    });
+});
+
+describe('serializeQueryBuilderState - in/not-in operators', () => {
+    it('serializes in operator with multiple values to FetchXML', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        {
+                            id: 'cond1',
+                            kind: 'field',
+                            fieldId: 'statecode',
+                            operator: 'in',
+                            value: [1, 2, 3],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFields, 'account');
+
+        expect(result.fetchXmlFilter).toContain('operator="in"');
+        expect(result.fetchXmlFilter).toContain('<value>1</value>');
+        expect(result.fetchXmlFilter).toContain('<value>2</value>');
+        expect(result.fetchXmlFilter).toContain('<value>3</value>');
+    });
+
+    it('serializes not-in operator with multiple values to FetchXML', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        {
+                            id: 'cond1',
+                            kind: 'field',
+                            fieldId: 'statecode',
+                            operator: 'not-in',
+                            value: [100, 200],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFields, 'account');
+
+        expect(result.fetchXmlFilter).toContain('operator="not-in"');
+        expect(result.fetchXmlFilter).toContain('<value>100</value>');
+        expect(result.fetchXmlFilter).toContain('<value>200</value>');
+    });
+
+    it('serializes in operator to OData', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        {
+                            id: 'cond1',
+                            kind: 'field',
+                            fieldId: 'statecode',
+                            operator: 'in',
+                            value: [1, 2, 3],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFields, 'account');
+
+        expect(result.odataFilter).toBe('statecode in (1, 2, 3)');
+    });
+
+    it('serializes not-in operator to OData with multiple ne conditions', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        {
+                            id: 'cond1',
+                            kind: 'field',
+                            fieldId: 'statecode',
+                            operator: 'not-in',
+                            value: [100, 200],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFields, 'account');
+
+        expect(result.odataFilter).toContain('statecode ne 100');
+        expect(result.odataFilter).toContain('statecode ne 200');
+        expect(result.odataFilter).toContain(' and ');
+    });
+
+    it('handles single value in array for in operator', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        {
+                            id: 'cond1',
+                            kind: 'field',
+                            fieldId: 'statecode',
+                            operator: 'in',
+                            value: [42],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFields, 'account');
+
+        expect(result.fetchXmlFilter).toContain('operator="in"');
+        expect(result.fetchXmlFilter).toContain('<value>42</value>');
+    });
+});
+
+describe('parseFetchXmlToState - in/not-in operators', () => {
+    it('parses in operator with multiple value elements', () => {
+        const xml = `
+            <fetch>
+                <entity name="account">
+                    <filter type="and">
+                        <condition attribute="statecode" operator="in">
+                            <value>1</value>
+                            <value>2</value>
+                            <value>3</value>
+                        </condition>
+                    </filter>
+                </entity>
+            </fetch>
+        `;
+
+        const result = parseFetchXmlToState(xml, testFields);
+
+        expect(result.error).toBeNull();
+        expect(result.state!.groups[0].conditions[0].operator).toBe('in');
+        expect(result.state!.groups[0].conditions[0].value).toEqual([1, 2, 3]);
+    });
+
+    it('parses not-in operator with multiple value elements', () => {
+        const xml = `
+            <fetch>
+                <entity name="account">
+                    <filter type="and">
+                        <condition attribute="statecode" operator="not-in">
+                            <value>100</value>
+                            <value>200</value>
+                        </condition>
+                    </filter>
+                </entity>
+            </fetch>
+        `;
+
+        const result = parseFetchXmlToState(xml, testFields);
+
+        expect(result.error).toBeNull();
+        expect(result.state!.groups[0].conditions[0].operator).toBe('not-in');
+        expect(result.state!.groups[0].conditions[0].value).toEqual([100, 200]);
+    });
+
+    it('parses in operator with string values', () => {
+        const xml = `
+            <fetch>
+                <entity name="account">
+                    <filter type="and">
+                        <condition attribute="name" operator="in">
+                            <value>Contoso</value>
+                            <value>Microsoft</value>
+                        </condition>
+                    </filter>
+                </entity>
+            </fetch>
+        `;
+
+        const result = parseFetchXmlToState(xml, testFields);
+
+        expect(result.error).toBeNull();
+        expect(result.state!.groups[0].conditions[0].operator).toBe('in');
+        expect(result.state!.groups[0].conditions[0].value).toEqual(['Contoso', 'Microsoft']);
+    });
+});
+
+describe('validateQueryBuilderState - in/not-in operators', () => {
+    const testFields: QueryBuilderField[] = [
+        { id: 'name', label: 'Name', dataType: 'string' },
+        {
+            id: 'statecode',
+            label: 'Status',
+            dataType: 'optionset',
+            options: [
+                { label: 'Active', value: 1 },
+                { label: 'Inactive', value: 2 },
+            ],
+        },
+    ];
+
+    it('validates in operator with array of values', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        { id: 'cond1', fieldId: 'statecode', operator: 'in', value: [1, 2] },
+                    ],
+                },
+            ],
+        };
+
+        const result = validateQueryBuilderState(state, testFields);
+
+        expect(result.isValid).toBe(true);
+    });
+
+    it('returns error for in operator with empty array', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        { id: 'cond1', fieldId: 'statecode', operator: 'in', value: [] },
+                    ],
+                },
+            ],
+        };
+
+        const result = validateQueryBuilderState(state, testFields);
+
+        expect(result.isValid).toBe(false);
+        expect(result.errors[0].message).toBe('Value is required');
+    });
+
+    it('returns error for not-in operator with undefined value', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        { id: 'cond1', fieldId: 'statecode', operator: 'not-in', value: undefined },
+                    ],
+                },
+            ],
+        };
+
+        const result = validateQueryBuilderState(state, testFields);
+
+        expect(result.isValid).toBe(false);
+        expect(result.errors[0].message).toBe('Value is required');
+    });
+
+    it('returns error for in operator with array of only empty values', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        { id: 'cond1', fieldId: 'name', operator: 'in', value: ['', '  '] },
+                    ],
+                },
+            ],
+        };
+
+        const result = validateQueryBuilderState(state, testFields);
+
+        expect(result.isValid).toBe(false);
+        expect(result.errors[0].message).toBe('Value is required');
+    });
+});
+
+describe('XML and OData validation - complex scenarios', () => {
+    const testFields: QueryBuilderField[] = [
+        { id: 'name', label: 'Name', dataType: 'string' },
+        { id: 'revenue', label: 'Revenue', dataType: 'number' },
+        { id: 'isactive', label: 'Active', dataType: 'boolean' },
+        {
+            id: 'statecode',
+            label: 'Status',
+            dataType: 'optionset',
+            options: [
+                { label: 'Active', value: 1 },
+                { label: 'Inactive', value: 2 },
+                { label: 'Pending', value: 3 },
+            ],
+        },
+        { id: 'ownerid', label: 'Owner', dataType: 'lookup', targets: [{ entityLogicalName: 'systemuser' }] },
+    ];
+
+    it('produces parseable FetchXML for complex multi-group query', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'or',
+                    conditions: [
+                        { id: 'cond1', fieldId: 'name', operator: 'contains', value: 'Test' },
+                        { id: 'cond2', fieldId: 'statecode', operator: 'in', value: [1, 2] },
+                    ],
+                },
+                {
+                    id: 'grp2',
+                    logic: 'and',
+                    conditions: [
+                        { id: 'cond3', fieldId: 'revenue', operator: 'gt', value: 10000 },
+                        { id: 'cond4', fieldId: 'isactive', operator: 'eq', value: true },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFields, 'account');
+
+        // Verify the FetchXML can be parsed back
+        const parseResult = parseFetchXmlToState(result.fetchXml, testFields);
+        expect(parseResult.error).toBeNull();
+        expect(parseResult.state).not.toBeNull();
+        expect(parseResult.state!.groups.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('escapes special XML characters in values', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        { id: 'cond1', fieldId: 'name', operator: 'eq', value: '<script>alert("XSS")</script> & test' },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFields, 'account');
+
+        // Verify escaped characters
+        expect(result.fetchXml).toContain('&lt;script&gt;');
+        expect(result.fetchXml).toContain('&amp;');
+        expect(result.fetchXml).toContain('&quot;');
+        // Verify the FetchXML is still parseable
+        const parseResult = parseFetchXmlToState(result.fetchXml, testFields);
+        expect(parseResult.error).toBeNull();
+    });
+
+    it('produces valid OData for in operator with special characters', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        { id: 'cond1', fieldId: 'name', operator: 'in', value: ["O'Brien", "McDonald's"] },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFields, 'account', 'accounts');
+
+        // Verify single quotes are escaped in OData
+        expect(result.odataFilter).toContain("''Brien");
+        expect(result.odataFilter).toContain("McDonald''s");
+        // Verify basic OData structure
+        expect(result.odataFilter).toContain('name in (');
+    });
+
+    it('produces valid OData for multiple conditions with all operators', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        { id: 'cond1', fieldId: 'name', operator: 'startswith', value: 'Test' },
+                        { id: 'cond2', fieldId: 'revenue', operator: 'between', value: 1000, value2: 5000 },
+                        { id: 'cond3', fieldId: 'statecode', operator: 'not-in', value: [2, 3] },
+                        { id: 'cond4', fieldId: 'isactive', operator: 'notnull', value: '' },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFields, 'account', 'accounts');
+
+        // Verify all operators are properly represented
+        expect(result.odataFilter).toContain('startswith(name,');
+        expect(result.odataFilter).toContain('revenue ge 1000');
+        expect(result.odataFilter).toContain('revenue le 5000');
+        expect(result.odataFilter).toContain('statecode ne 2');
+        expect(result.odataFilter).toContain('statecode ne 3');
+        expect(result.odataFilter).toContain('isactive ne null');
+    });
+
+    it('produces valid output for related entity with complex nested conditions', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [
+                        { id: 'cond1', fieldId: 'name', operator: 'eq', value: 'Contoso' },
+                        {
+                            id: 'cond2',
+                            kind: 'relatedEntity',
+                            fieldId: '',
+                            operator: 'containsdata',
+                            value: '',
+                            relatedEntityName: 'ownerid',
+                            relatedEntityTarget: 'systemuser',
+                            nestedLogic: 'or',
+                            nestedFields: [
+                                { id: 'fullname', label: 'Full Name', dataType: 'string' },
+                                { id: 'emailaddress1', label: 'Email', dataType: 'string' },
+                            ],
+                            nestedConditions: [
+                                { id: 'n1', fieldId: 'fullname', operator: 'contains', value: 'Admin' },
+                                { id: 'n2', fieldId: 'emailaddress1', operator: 'endswith', value: '@contoso.com' },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFields, 'account', 'accounts');
+
+        // FetchXML checks
+        expect(result.fetchXml).toContain('<link-entity name="systemuser"');
+        expect(result.fetchXml).toContain('<filter type="or">');
+        expect(result.fetchXml).toContain('operator="like" value="%Admin%"');
+        expect(result.fetchXml).toContain('operator="like" value="%@contoso.com"');
+
+        // OData checks
+        expect(result.odataFilter).toContain("name eq 'Contoso'");
+        expect(result.odataFilter).toContain("contains(ownerid/fullname, 'Admin')");
+        expect(result.odataFilter).toContain("endswith(ownerid/emailaddress1, '@contoso.com')");
+        expect(result.odataFilter).toContain(' or '); // nested OR logic
     });
 });

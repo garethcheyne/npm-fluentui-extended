@@ -243,6 +243,10 @@ export const useQueryBuilderStyles = makeStyles({
     width: '100%',
     minWidth: 0,
   },
+  optionsetListbox: {
+    maxHeight: '300px',
+    minWidth: 'fit-content',
+  },
   removeCell: {
     display: 'flex',
     justifyContent: 'flex-end',
@@ -370,5 +374,75 @@ export const useQueryBuilderStyles = makeStyles({
     justifyContent: 'center',
     paddingTop: tokens.spacingVerticalXL,
     paddingBottom: tokens.spacingVerticalXL,
+  },
+  // Related entity nested card styles
+  relatedEntityCard: {
+    border: `1px solid ${tokens.colorBrandStroke1}`,
+    borderRadius: tokens.borderRadiusSmall,
+    backgroundColor: tokens.colorNeutralBackground3,
+    padding: tokens.spacingHorizontalS,
+    marginTop: tokens.spacingVerticalXS,
+    marginBottom: tokens.spacingVerticalS,
+  },
+  relatedEntityHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalS,
+  },
+  relatedEntityHeaderLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    flexWrap: 'wrap',
+  },
+  relatedEntityLabel: {
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorBrandForeground1,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  relatedEntityDropdown: {
+    width: '100%',
+    marginTop: tokens.spacingVerticalXS,
+    marginBottom: tokens.spacingVerticalXS,
+  },
+  nestedLogicDropdown: {
+    width: '80px',
+    marginBottom: tokens.spacingVerticalXS,
+  },
+  relatedEntityConditions: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXS,
+  },
+  nestedConditionHeader: {
+    display: 'grid',
+    gridTemplateColumns: gridWithoutBetween,
+    gap: tokens.spacingHorizontalS,
+    alignItems: 'center',
+    color: tokens.colorNeutralForeground3,
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightRegular,
+    paddingLeft: tokens.spacingHorizontalXS,
+    paddingRight: tokens.spacingHorizontalXS,
+    marginBottom: tokens.spacingVerticalXS,
+  },
+  nestedConditionRow: {
+    display: 'grid',
+    gridTemplateColumns: gridWithoutBetween,
+    gap: tokens.spacingHorizontalS,
+    alignItems: 'center',
+    minHeight: '32px',
+    backgroundColor: tokens.colorNeutralBackground1,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderRadius: tokens.borderRadiusSmall,
+    padding: tokens.spacingHorizontalXS,
+    boxSizing: 'border-box',
+  },
+  nestedConditionRowWithBetween: {
+    gridTemplateColumns: gridWithBetween,
+  },
+  relatedEntityAddRow: {
+    paddingTop: tokens.spacingVerticalXS,
   },
 });

@@ -29,6 +29,8 @@ A searchable dropdown component styled after Dynamics 365 lookup fields. Support
 
 ### QueryBuilder
 
+> **🚧 Beta** - This component is in beta. Please report any issues on [GitHub](https://github.com/garethcheyne/npm-fluentui-extended/issues).
+
 An Advanced Find-style query builder for Dynamics 365. Build complex filter conditions with AND/OR logic, serialize to FetchXML or OData, and validate queries against the Dynamics 365 API.
 
 ![QueryBuilder Component](assets/screenshot-querybuilder.png)

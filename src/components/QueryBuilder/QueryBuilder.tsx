@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Button, Combobox, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, DialogTrigger, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Option, Select, Spinner, Text, Textarea } from '@fluentui/react-components';
+import { Button, Combobox, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, DialogTrigger, Dropdown, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Option, Spinner, Text, Textarea } from '@fluentui/react-components';
+import { DatePicker } from '@fluentui/react-datepicker-compat';
 import { AddRegular, ArrowDownloadRegular, ArrowResetRegular, ArrowUploadRegular, CheckmarkCircleRegular, CopyRegular, DeleteRegular, DismissRegular, MoreHorizontalRegular, WarningRegular } from '@fluentui/react-icons';
 import { mergeClasses, useQueryBuilderStyles } from './QueryBuilder.styles';
 import { Lookup } from '../Lookup';
@@ -10,588 +11,36 @@ import type {
     QueryBuilderField,
     QueryBuilderGroup,
     QueryBuilderLookupOption,
+    QueryBuilderLookupTarget,
     QueryBuilderProps,
+    QueryBuilderRelatedEntity,
     QueryBuilderState,
 } from './QueryBuilder.types';
 
-const FALLBACK_FIELDS: QueryBuilderField[] = [
-    { id: 'name', label: 'Name', dataType: 'string' },
-    { id: 'createdon', label: 'Created On', dataType: 'datetime' },
-    {
-        id: 'statecode',
-        label: 'State',
-        dataType: 'optionset',
-        options: [
-            { label: 'Active', value: 0 },
-            { label: 'Inactive', value: 1 },
-        ],
-    },
-    { id: 'ownerid', label: 'Owner', dataType: 'lookup' },
-];
-
-const escapeXml = (value: string): string =>
-    value
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&apos;');
-
-const prettyPrintXml = (xml: string): string => {
-    const INDENT = '  ';
-    let formatted = '';
-    let indent = 0;
-    const tokens = xml.replace(/>\s*</g, '><').split(/(<[^>]+>)/g).filter(Boolean);
-
-    for (const token of tokens) {
-        if (token.startsWith('</')) {
-            indent--;
-            formatted += INDENT.repeat(Math.max(indent, 0)) + token + '\n';
-        } else if (token.startsWith('<') && token.endsWith('/>')) {
-            formatted += INDENT.repeat(indent) + token + '\n';
-        } else if (token.startsWith('<')) {
-            formatted += INDENT.repeat(indent) + token + '\n';
-            indent++;
-        } else {
-            formatted += INDENT.repeat(indent) + token + '\n';
-        }
-    }
-
-    return formatted.trim();
-};
-
-export interface QueryBuilderValidationError {
-    groupId: string;
-    conditionId: string;
-    fieldLabel: string;
-    message: string;
-}
-
-export interface QueryBuilderValidationResult {
-    isValid: boolean;
-    errors: QueryBuilderValidationError[];
-    apiValidation?: {
-        available: boolean;
-        tested: boolean;
-        success?: boolean;
-        recordCount?: number;
-        errorMessage?: string;
-    };
-}
-
-export const validateQueryBuilderState = (
-    state: QueryBuilderState,
-    fields: QueryBuilderField[]
-): QueryBuilderValidationResult => {
-    const errors: QueryBuilderValidationError[] = [];
-
-    for (const group of state.groups) {
-        if (group.conditions.length === 0) {
-            errors.push({
-                groupId: group.id,
-                conditionId: '',
-                fieldLabel: 'Group',
-                message: 'Group has no conditions',
-            });
-            continue;
-        }
-
-        for (const condition of group.conditions) {
-            if (condition.kind === 'relatedEntity') {
-                if (!condition.relatedEntityName) {
-                    errors.push({
-                        groupId: group.id,
-                        conditionId: condition.id,
-                        fieldLabel: 'Related Entity',
-                        message: 'Related entity not selected',
-                    });
-                }
-                continue;
-            }
-
-            const field = fields.find((f) => f.id === condition.fieldId);
-            const fieldLabel = field?.label || condition.fieldId;
-
-            // Check if field exists
-            if (!field) {
-                errors.push({
-                    groupId: group.id,
-                    conditionId: condition.id,
-                    fieldLabel,
-                    message: `Unknown field: ${condition.fieldId}`,
-                });
-                continue;
-            }
-
-            // Skip value check for null/notnull operators
-            const isNullOperator = condition.operator === 'null' || condition.operator === 'notnull';
-            if (isNullOperator) continue;
-
-            // Check for empty value
-            const value = condition.value;
-            const isEmpty = value === undefined || value === null || String(value).trim() === '';
-
-            if (isEmpty) {
-                errors.push({
-                    groupId: group.id,
-                    conditionId: condition.id,
-                    fieldLabel,
-                    message: 'Value is required',
-                });
-            }
-
-            // Check between operator has second value
-            if (condition.operator === 'between') {
-                const value2 = condition.value2;
-                const isEmpty2 = value2 === undefined || value2 === null || String(value2).trim() === '';
-                if (isEmpty2) {
-                    errors.push({
-                        groupId: group.id,
-                        conditionId: condition.id,
-                        fieldLabel,
-                        message: 'Second value is required for Between operator',
-                    });
-                }
-            }
-        }
-    }
-
-    return {
-        isValid: errors.length === 0,
-        errors,
-    };
-};
-
-const dataTypeFromAttribute = (attribute: any): QueryBuilderField['dataType'] => {
-    const type = String(attribute?.AttributeType || attribute?.Type || '').toLowerCase();
-    if (['picklist', 'state', 'status'].includes(type)) return 'optionset';
-    if (['lookup', 'customer', 'owner', 'partylist', 'uniqueidentifier'].includes(type)) return 'lookup';
-    if (['datetime'].includes(type)) return 'datetime';
-    if (['boolean'].includes(type)) return 'boolean';
-    if (['integer', 'decimal', 'double', 'money', 'bigint', 'int'].includes(type)) return 'number';
-    return 'string';
-};
-
-const getOperatorsForType = (dataType: QueryBuilderField['dataType']): Array<{ value: string; label: string }> => {
-    const common = [
-        { value: 'eq', label: 'Equals' },
-        { value: 'ne', label: 'Not Equals' },
-        { value: 'null', label: 'Is Empty' },
-        { value: 'notnull', label: 'Has Value' },
-    ];
-
-    if (dataType === 'string') {
-        return [
-            { value: 'contains', label: 'Contains' },
-            { value: 'notcontains', label: 'Does Not Contain' },
-            { value: 'startswith', label: 'Starts With' },
-            { value: 'endswith', label: 'Ends With' },
-            ...common,
-        ];
-    }
-
-    if (dataType === 'number' || dataType === 'datetime') {
-        return [
-            { value: 'gt', label: 'Greater Than' },
-            { value: 'ge', label: 'Greater Than Or Equal' },
-            { value: 'lt', label: 'Less Than' },
-            { value: 'le', label: 'Less Than Or Equal' },
-            { value: 'between', label: 'Between' },
-            ...common,
-        ];
-    }
-
-    return common;
-};
-
-const getDefaultValueForField = (field: QueryBuilderField): string | number | boolean => {
-    if (field.dataType === 'optionset' && field.options && field.options.length > 0) {
-        return String(field.options[0].value);
-    }
-
-    return '';
-};
-
-const createCondition = (defaultField: QueryBuilderField): QueryBuilderCondition => ({
-    id: `cond_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
-    kind: 'field',
-    fieldId: defaultField.id,
-    operator: getOperatorsForType(defaultField.dataType)[0].value as any,
-    value: getDefaultValueForField(defaultField),
-    value2: '',
-});
-
-const createRelatedCondition = (relatedEntityName?: string): QueryBuilderCondition => ({
-    id: `rel_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
-    kind: 'relatedEntity',
-    fieldId: '__related_entity__',
-    operator: 'containsdata',
-    value: '',
-    value2: '',
-    relatedEntityName,
-});
-
-const parseFetchXmlOperator = (op: string): QueryBuilderCondition['operator'] => {
-    const map: Record<string, QueryBuilderCondition['operator']> = {
-        'eq': 'eq',
-        'ne': 'ne',
-        'gt': 'gt',
-        'ge': 'ge',
-        'lt': 'lt',
-        'le': 'le',
-        'null': 'null',
-        'not-null': 'notnull',
-        'like': 'contains',
-        'not-like': 'notcontains',
-    };
-    return map[op] || 'eq';
-};
-
-export interface ParseFetchXmlResult {
-    state: QueryBuilderState | null;
-    error: string | null;
-}
-
-export const parseFetchXmlToState = (xml: string, fields: QueryBuilderField[]): ParseFetchXmlResult => {
-    try {
-        const trimmed = xml.trim();
-        if (!trimmed) {
-            return { state: null, error: 'Please enter FetchXML content.' };
-        }
-
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(trimmed, 'application/xml');
-        const parseError = doc.querySelector('parsererror');
-        if (parseError) {
-            const errorText = parseError.textContent || 'Unknown XML parsing error';
-            return { state: null, error: `XML parsing error: ${errorText.slice(0, 200)}` };
-        }
-
-        const groups: QueryBuilderGroup[] = [];
-        const defaultField = fields[0] || FALLBACK_FIELDS[0];
-
-        // Find all filter elements (top-level or nested)
-        const filterElements = doc.querySelectorAll('filter');
-
-        // Also gather any standalone condition elements not inside a filter
-        const topLevelConditions: QueryBuilderCondition[] = [];
-
-        const parseCondition = (condEl: Element): QueryBuilderCondition => {
-            const attr = condEl.getAttribute('attribute') || '';
-            const rawOp = condEl.getAttribute('operator') || 'eq';
-            let value = condEl.getAttribute('value') || '';
-
-            // Handle like patterns
-            let operator = parseFetchXmlOperator(rawOp);
-            if (rawOp === 'like') {
-                if (value.startsWith('%') && value.endsWith('%')) {
-                    operator = 'contains';
-                    value = value.slice(1, -1);
-                } else if (value.endsWith('%')) {
-                    operator = 'startswith';
-                    value = value.slice(0, -1);
-                } else if (value.startsWith('%')) {
-                    operator = 'endswith';
-                    value = value.slice(1);
-                }
-            }
-
-            const field = fields.find((f) => f.id === attr);
-            return {
-                id: `cond_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
-                kind: 'field',
-                fieldId: field?.id || attr || defaultField.id,
-                operator,
-                value,
-                value2: '',
-            };
-        };
-
-        filterElements.forEach((filterEl, idx) => {
-            const logic = (filterEl.getAttribute('type') || 'and').toLowerCase() as 'and' | 'or';
-            const conditions: QueryBuilderCondition[] = [];
-
-            // Get conditions directly under this filter (not in nested filters)
-            filterEl.querySelectorAll(':scope > condition').forEach((condEl) => {
-                conditions.push(parseCondition(condEl));
-            });
-
-            // Even empty filters become groups (user can add conditions)
-            groups.push({
-                id: `grp_${Date.now()}_${idx}`,
-                logic,
-                conditions: conditions.length > 0 ? conditions : [createCondition(defaultField)],
-            });
-        });
-
-        // If no filter elements, look for conditions directly under entity
-        if (filterElements.length === 0) {
-            const entityConditions = doc.querySelectorAll('entity > condition, fetch > entity > condition');
-            entityConditions.forEach((condEl) => {
-                topLevelConditions.push(parseCondition(condEl));
-            });
-
-            if (topLevelConditions.length > 0) {
-                groups.push({
-                    id: `grp_${Date.now()}_0`,
-                    logic: 'and',
-                    conditions: topLevelConditions,
-                });
-            }
-        }
-
-        // If still no groups, inform user no filter conditions were found
-        if (groups.length === 0) {
-            return { 
-                state: null,
-                error: 'No filter conditions found in the FetchXML. The QueryBuilder imports <filter> and <condition> elements. Your FetchXML only contains attributes and entity definitions.',
-            };
-        }
-
-        return { state: { groups }, error: null };
-    } catch (err) {
-        return { state: null, error: `Error parsing FetchXML: ${err instanceof Error ? err.message : 'Unknown error'}` };
-    }
-};
-
-const createGroup = (defaultField: QueryBuilderField): QueryBuilderGroup => ({
-    id: `grp_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
-    logic: 'and',
-    conditions: [createCondition(defaultField)],
-});
-
-const cloneState = (state: QueryBuilderState | undefined, defaultField: QueryBuilderField): QueryBuilderState => {
-    if (!state?.groups?.length) {
-        return { groups: [createGroup(defaultField)] };
-    }
-
-    return {
-        groups: state.groups.map((group) => ({
-            id: group.id || `grp_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
-            logic: group.logic || 'and',
-            conditions: (group.conditions || []).map((condition) => ({
-                id: condition.id || `cond_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
-                kind: condition.kind || 'field',
-                fieldId: condition.fieldId || defaultField.id,
-                operator: (condition.operator || 'eq') as any,
-                value: condition.value ?? '',
-                value2: condition.value2 ?? '',
-                relatedEntityName: condition.relatedEntityName,
-            })),
-        })),
-    };
-};
-
-export const serializeQueryBuilderState = (
-    state: QueryBuilderState,
-    fields: QueryBuilderField[],
-    entityName: string,
-): QueryBuilderApplyResult => {
-    const defaultField = fields[0] || FALLBACK_FIELDS[0];
-
-    const conditionToFetchXml = (condition: QueryBuilderCondition, field: QueryBuilderField): string => {
-        if (condition.kind === 'relatedEntity') {
-            const alias = escapeXml(condition.relatedEntityName || 'related');
-            return `<condition entityname="${alias}" attribute="${alias}id" operator="not-null" />`;
-        }
-
-        const attr = escapeXml(condition.fieldId);
-        const operatorMap: Record<string, string> = {
-            eq: 'eq',
-            ne: 'ne',
-            gt: 'gt',
-            ge: 'ge',
-            lt: 'lt',
-            le: 'le',
-            null: 'null',
-            notnull: 'not-null',
-            contains: 'like',
-            notcontains: 'not-like',
-            startswith: 'like',
-            endswith: 'like',
-        };
-
-        const operator = operatorMap[condition.operator] || 'eq';
-
-        if (condition.operator === 'null' || condition.operator === 'notnull') {
-            return `<condition attribute="${attr}" operator="${operator}" />`;
-        }
-
-        if (condition.operator === 'between') {
-            return [
-                `<condition attribute="${attr}" operator="ge" value="${escapeXml(String(condition.value ?? ''))}" />`,
-                `<condition attribute="${attr}" operator="le" value="${escapeXml(String(condition.value2 ?? ''))}" />`,
-            ].join('');
-        }
-
-        let value = condition.value;
-        if (field.dataType === 'boolean') {
-            value = value === true || value === 'true' || value === 1 || value === '1' ? '1' : '0';
-        }
-
-        if (condition.operator === 'contains' || condition.operator === 'notcontains') value = `%${value}%`;
-        if (condition.operator === 'startswith') value = `${value}%`;
-        if (condition.operator === 'endswith') value = `%${value}`;
-
-        return `<condition attribute="${attr}" operator="${operator}" value="${escapeXml(String(value ?? ''))}" />`;
-    };
-
-    const conditionToOData = (condition: QueryBuilderCondition, field: QueryBuilderField): string => {
-        if (condition.kind === 'relatedEntity') {
-            return `${condition.relatedEntityName || 'related'} ne null`;
-        }
-
-        const quote = (val: any): string => {
-            if (field.dataType === 'number') return String(val ?? 0);
-            if (field.dataType === 'boolean') return val === true || val === 'true' || val === 1 || val === '1' ? 'true' : 'false';
-            return `'${String(val ?? '').replace(/'/g, "''")}'`;
-        };
-
-        switch (condition.operator) {
-            case 'eq':
-                return `${condition.fieldId} eq ${quote(condition.value)}`;
-            case 'ne':
-                return `${condition.fieldId} ne ${quote(condition.value)}`;
-            case 'gt':
-                return `${condition.fieldId} gt ${quote(condition.value)}`;
-            case 'ge':
-                return `${condition.fieldId} ge ${quote(condition.value)}`;
-            case 'lt':
-                return `${condition.fieldId} lt ${quote(condition.value)}`;
-            case 'le':
-                return `${condition.fieldId} le ${quote(condition.value)}`;
-            case 'null':
-                return `${condition.fieldId} eq null`;
-            case 'notnull':
-                return `${condition.fieldId} ne null`;
-            case 'contains':
-                return `contains(${condition.fieldId}, ${quote(condition.value)})`;
-            case 'notcontains':
-                return `not contains(${condition.fieldId}, ${quote(condition.value)})`;
-            case 'startswith':
-                return `startswith(${condition.fieldId}, ${quote(condition.value)})`;
-            case 'endswith':
-                return `endswith(${condition.fieldId}, ${quote(condition.value)})`;
-            case 'between':
-                return `(${condition.fieldId} ge ${quote(condition.value)} and ${condition.fieldId} le ${quote(condition.value2)})`;
-            default:
-                return `${condition.fieldId} eq ${quote(condition.value)}`;
-        }
-    };
-
-    const filterParts = state.groups.map((group) => {
-        const conditionsXml = group.conditions
-            .map((condition) => {
-                const field = fields.find((candidate) => candidate.id === condition.fieldId) || defaultField;
-                return conditionToFetchXml(condition, field);
-            })
-            .join('');
-
-        return `<filter type="${group.logic}">${conditionsXml}</filter>`;
-    });
-
-    const fetchXmlFilter =
-        filterParts.length > 1 ? `<filter type="and">${filterParts.join('')}</filter>` : filterParts[0] || '<filter type="and"></filter>';
-
-    const fetchXml = `<fetch version="1.0"><entity name="${escapeXml(entityName)}">${fetchXmlFilter}</entity></fetch>`;
-
-    const odataFilter = state.groups
-        .map((group) => {
-            const rowFilters = group.conditions
-                .map((condition) => {
-                    const field = fields.find((candidate) => candidate.id === condition.fieldId) || defaultField;
-                    return conditionToOData(condition, field);
-                })
-                .filter(Boolean);
-
-            return rowFilters.length > 1 ? `(${rowFilters.join(` ${group.logic} `)})` : rowFilters[0] || '';
-        })
-        .filter(Boolean)
-        .join(' and ');
-
-    return {
-        state: JSON.parse(JSON.stringify(state)) as QueryBuilderState,
-        fetchXmlFilter,
-        fetchXml,
-        odataFilter,
-    };
-};
-
-/** Internal component for lookup field value input */
-interface LookupValueInputProps {
-    fieldId: string;
-    value: string;
-    displayName: string;
-    disabled: boolean;
-    onLookupSearch?: (fieldId: string, searchText: string) => Promise<QueryBuilderLookupOption[]> | QueryBuilderLookupOption[];
-    onValueChange: (value: string, displayName: string) => void;
-}
-
-const LookupValueInput: React.FC<LookupValueInputProps> = ({
-    fieldId,
-    value,
-    displayName,
-    disabled,
-    onLookupSearch,
-    onValueChange,
-}) => {
-    const [lookupOptions, setLookupOptions] = React.useState<LookupOption[]>([]);
-    const [lookupLoading, setLookupLoading] = React.useState(false);
-
-    const handleSearchChange = React.useCallback(
-        async (searchText: string) => {
-            if (!onLookupSearch) return;
-
-            setLookupLoading(true);
-            try {
-                const results = await onLookupSearch(fieldId, searchText);
-                setLookupOptions(
-                    results.map((r) => ({
-                        key: r.key,
-                        text: r.text,
-                        secondaryText: r.secondaryText,
-                    })),
-                );
-            } finally {
-                setLookupLoading(false);
-            }
-        },
-        [fieldId, onLookupSearch],
-    );
-
-    const handleOptionSelect = React.useCallback(
-        (option: LookupOption | null) => {
-            if (option) {
-                onValueChange(option.key, option.text);
-            } else {
-                onValueChange('', '');
-            }
-        },
-        [onValueChange],
-    );
-
-    // Build selected option for display
-    const selectedOption: LookupOption | null = value
-        ? { key: value, text: displayName || value }
-        : null;
-
-    return (
-        <Lookup
-            size="small"
-            appearance="filled-darker"
-            placeholder="Search..."
-            aria-label="Lookup value"
-            options={lookupOptions}
-            selectedOption={selectedOption}
-            onSearchChange={handleSearchChange}
-            onOptionSelect={handleOptionSelect}
-            loading={lookupLoading}
-            disabled={disabled || !onLookupSearch}
-            clearable
-            minSearchLength={1}
-        />
-    );
-};
+// Import from new modular files
+import { getOperatorsForType, getOperatorsForTypeSimple, operatorRequiresValue, operatorIsMultiValue, operatorRequiresValue2, getOperatorValueType } from './QueryBuilder.operators';
+import { serializeQueryBuilderState, prettyPrintXml, escapeXml } from './QueryBuilder.serializer';
+import { parseFetchXmlToState, ParseFetchXmlResult } from './QueryBuilder.parser';
+import {
+    FALLBACK_FIELDS,
+    validateQueryBuilderState,
+    dataTypeFromAttribute,
+    getDefaultValueForField,
+    createCondition,
+    createRelatedCondition,
+    createGroup,
+    cloneState,
+    getOperatorOptionsForType,
+    QueryBuilderValidationError,
+    QueryBuilderValidationResult,
+} from './QueryBuilder.utils';
+import { LookupValueInput } from './QueryBuilder.LookupInput';
+import { loadEntityFields, useEntityFields, extractAttributesArray, isValidAttribute, parseAttributeToField } from './QueryBuilder.hooks';
+
+// Re-export for backward compatibility
+export type { QueryBuilderValidationError, QueryBuilderValidationResult };
+export { validateQueryBuilderState, serializeQueryBuilderState, parseFetchXmlToState };
+export type { ParseFetchXmlResult };
 
 export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
     const styles = useQueryBuilderStyles();
@@ -599,8 +48,61 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
     const [availableFields, setAvailableFields] = React.useState<QueryBuilderField[]>(
         props.fields && props.fields.length > 0 ? props.fields : FALLBACK_FIELDS,
     );
+    // EntitySetName for OData queries (e.g., "accounts" instead of "account")
+    const [entitySetName, setEntitySetName] = React.useState<string | undefined>(props.entitySetName);
 
     const defaultField = availableFields[0] || FALLBACK_FIELDS[0];
+
+    // Convert fields to LookupOption format for field selector
+    const fieldLookupOptions: LookupOption[] = React.useMemo(() => {
+        const formatDataType = (dataType: QueryBuilderField['dataType']): string => {
+            const labels: Record<QueryBuilderField['dataType'], string> = {
+                string: 'Text',
+                number: 'Number',
+                datetime: 'Date/Time',
+                boolean: 'Yes/No',
+                optionset: 'Choice',
+                lookup: 'Lookup',
+            };
+            return labels[dataType] || dataType;
+        };
+
+        return availableFields.map((field) => ({
+            key: field.id,
+            text: field.label,
+            details: [
+                { label: 'Logical Name', value: field.id },
+                ...(field.schemaName ? [{ label: 'Schema Name', value: field.schemaName }] : []),
+                { label: 'Type', value: formatDataType(field.dataType) },
+            ],
+            data: field,
+        }));
+    }, [availableFields]);
+
+    // Compute related entities from lookup fields (auto-detect if not provided via props)
+    const computedRelatedEntities: QueryBuilderRelatedEntity[] = React.useMemo(() => {
+        // If consumer provided related entities, use those
+        if (props.relatedEntities && props.relatedEntities.length > 0) {
+            return props.relatedEntities;
+        }
+
+        // Auto-detect from lookup fields
+        const related: QueryBuilderRelatedEntity[] = [];
+        for (const field of availableFields) {
+            if (field.dataType === 'lookup' && field.targets && field.targets.length > 0) {
+                for (const target of field.targets) {
+                    related.push({
+                        id: field.id, // Use lookup field name as ID (for link-entity)
+                        label: `${field.label} (${target.displayName || target.entityLogicalName})`,
+                        lookupField: field.id,
+                        targetEntity: target.entityLogicalName,
+                        targetEntitySetName: target.entitySetName,
+                    });
+                }
+            }
+        }
+        return related;
+    }, [availableFields, props.relatedEntities]);
 
     const [builderState, setBuilderState] = React.useState<QueryBuilderState>(() => cloneState(props.initialState, defaultField));
     const initialFetchXmlParsedRef = React.useRef(false);
@@ -640,14 +142,45 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                 const xrm = (window as any).Xrm;
                 if (xrm?.Utility?.getEntityMetadata) {
                     const metadata = await xrm.Utility.getEntityMetadata(props.entityName);
+
+                    // Extract EntitySetName for OData queries
+                    if (metadata?.EntitySetName && !disposed) {
+                        setEntitySetName(metadata.EntitySetName);
+                    }
+
                     const attributesCollection = metadata?.Attributes?._collection || metadata?.Attributes || {};
                     const attributesArray: any[] = Array.isArray(attributesCollection)
                         ? attributesCollection
                         : Object.keys(attributesCollection).map((key) => attributesCollection[key]);
 
+                    // First pass: collect all unique target entity names from lookup fields
+                    const targetEntityNames = new Set<string>();
+                    for (const attribute of attributesArray) {
+                        if (Array.isArray(attribute?.Targets)) {
+                            for (const target of attribute.Targets) {
+                                const entityName = typeof target === 'string' ? target : target?.entityLogicalName;
+                                if (entityName) targetEntityNames.add(entityName);
+                            }
+                        }
+                    }
+
+                    // Fetch metadata for each target entity to get entitySetName and primaryNameAttribute
+                    const targetMetadataCache: Record<string, { entitySetName?: string; displayName?: string; primaryNameAttribute?: string }> = {};
+                    for (const targetEntityName of targetEntityNames) {
+                        try {
+                            const targetMeta = await xrm.Utility.getEntityMetadata(targetEntityName);
+                            targetMetadataCache[targetEntityName] = {
+                                entitySetName: targetMeta?.EntitySetName,
+                                displayName: targetMeta?.DisplayName?.UserLocalizedLabel?.Label || targetMeta?.LogicalName,
+                                primaryNameAttribute: targetMeta?.PrimaryNameAttribute,
+                            };
+                        } catch (targetErr) {
+                            console.warn(`[QueryBuilder] Could not fetch metadata for target entity "${targetEntityName}":`, targetErr);
+                        }
+                    }
+
                     const resolvedFields: QueryBuilderField[] = attributesArray
                         .filter((attribute: any) => attribute?.LogicalName && attribute?.IsValidForAdvancedFind !== false)
-                        .slice(0, 100)
                         .map((attribute: any) => {
                             const dataType = dataTypeFromAttribute(attribute);
                             const optionSet = attribute?.OptionSet?.Options;
@@ -661,19 +194,43 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                         .filter((option: { label: string; value: string | number }) => option.value !== undefined && option.value !== null)
                                     : undefined;
 
+                            // Parse lookup targets and enrich with cached metadata
+                            const targets = dataType === 'lookup' && Array.isArray(attribute.Targets)
+                                ? attribute.Targets.map((target: any) => {
+                                    const entityLogicalName = typeof target === 'string' ? target : (target?.entityLogicalName || target);
+                                    const cached = targetMetadataCache[entityLogicalName] || {};
+                                    return {
+                                        entityLogicalName,
+                                        entitySetName: target?.entitySetName || cached.entitySetName,
+                                        displayName: target?.displayName || cached.displayName,
+                                        primaryNameAttribute: target?.primaryNameAttribute || cached.primaryNameAttribute,
+                                    };
+                                })
+                                : undefined;
+
+                            // DisplayName can be an object with UserLocalizedLabel or a string
+                            const displayName = attribute.DisplayName;
+                            const label = typeof displayName === 'string'
+                                ? displayName
+                                : (displayName?.UserLocalizedLabel?.Label || attribute.SchemaName || attribute.LogicalName);
+
                             return {
                                 id: attribute.LogicalName,
-                                label: attribute.DisplayName?.UserLocalizedLabel?.Label || attribute.DisplayName || attribute.SchemaName || attribute.LogicalName,
+                                label,
+                                schemaName: attribute.SchemaName,
                                 dataType,
                                 options,
+                                targets,
                             };
                         })
-                        .sort((left, right) => left.label.localeCompare(right.label, undefined, { sensitivity: 'base' }));
+                        .sort((left, right) => String(left.label).localeCompare(String(right.label), undefined, { sensitivity: 'base' }));
 
                     if (!disposed && resolvedFields.length > 0) {
                         setAvailableFields(resolvedFields);
                     }
                 }
+            } catch (error) {
+                console.error('[QueryBuilder] Error loading fields:', error);
             } finally {
                 if (!disposed) {
                     setLoading(false);
@@ -695,10 +252,10 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
     React.useEffect(() => {
         if (!props.onSerializedChange) return;
         const timeout = setTimeout(() => {
-            props.onSerializedChange?.(serializeQueryBuilderState(builderState, availableFields, props.entityName));
+            props.onSerializedChange?.(serializeQueryBuilderState(builderState, availableFields, props.entityName, entitySetName));
         }, 150);
         return () => clearTimeout(timeout);
-    }, [availableFields, builderState, props.entityName, props.onSerializedChange]);
+    }, [availableFields, builderState, entitySetName, props.entityName, props.onSerializedChange]);
 
     React.useEffect(() => {
         const fallbackField = availableFields[0] || FALLBACK_FIELDS[0];
@@ -773,6 +330,155 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
         [defaultField, updateGroup],
     );
 
+    // Load metadata for a related entity and store fields in nestedFields
+    const loadRelatedEntityFields = React.useCallback(
+        async (groupId: string, conditionId: string, targetEntity: string) => {
+            try {
+                const xrm = (window as any).Xrm;
+                if (!xrm?.Utility?.getEntityMetadata) {
+                    console.warn('[QueryBuilder] Xrm.Utility.getEntityMetadata not available, cannot load related entity fields');
+                    return;
+                }
+
+                // In Dynamics 365, getEntityMetadata without the second parameter returns all attributes
+                const metadata = await xrm.Utility.getEntityMetadata(targetEntity);
+
+                if (!metadata) {
+                    console.warn('[QueryBuilder] No metadata returned for entity:', targetEntity);
+                    return;
+                }
+
+                // Handle different metadata structures in various Dynamics versions
+                const attributesCollection = metadata?.Attributes?._collection || metadata?.Attributes || {};
+                const attributesArray: any[] = Array.isArray(attributesCollection)
+                    ? attributesCollection
+                    : Object.keys(attributesCollection).map((key) => attributesCollection[key]);
+
+                if (attributesArray.length === 0) {
+                    console.warn('[QueryBuilder] No attributes found in metadata for entity:', targetEntity);
+                    return;
+                }
+
+                const resolvedFields: QueryBuilderField[] = attributesArray
+                    .filter((attr: any) => {
+                        // Must have a logical name
+                        if (!attr?.LogicalName) return false;
+                        // Filter out internal/hidden attributes, but be more permissive
+                        const attrType = attr.AttributeType || attr.AttributeTypeName?.Value;
+                        // Skip virtual, uniqueidentifier (except primary key), and internal attributes
+                        if (attrType === 'Virtual' || attrType === 'CalendarRules') return false;
+                        if (attrType === 'Uniqueidentifier' && !attr.LogicalName.endsWith('id')) return false;
+                        return true;
+                    })
+                    .map((attr: any) => {
+                        const dataType = dataTypeFromAttribute(attr);
+                        const optionSet = attr?.OptionSet?.Options;
+                        const options =
+                            dataType === 'optionset' && Array.isArray(optionSet)
+                                ? optionSet
+                                    .map((opt: any) => ({
+                                        label: opt?.Label?.UserLocalizedLabel?.Label || opt?.Label || String(opt?.Value),
+                                        value: opt?.Value,
+                                    }))
+                                    .filter((opt: { label: string; value: string | number }) => opt.value !== undefined && opt.value !== null)
+                                : undefined;
+
+                        const displayName = attr.DisplayName;
+                        const label = typeof displayName === 'string'
+                            ? displayName
+                            : (displayName?.UserLocalizedLabel?.Label || attr.SchemaName || attr.LogicalName);
+
+                        return {
+                            id: attr.LogicalName,
+                            label,
+                            schemaName: attr.SchemaName,
+                            dataType,
+                            options,
+                        };
+                    })
+                    .sort((a, b) => String(a.label).localeCompare(String(b.label), undefined, { sensitivity: 'base' }));
+
+                if (resolvedFields.length > 0) {
+                    // Auto-add a default condition if none exist
+                    const defaultCondition = createCondition(resolvedFields[0]);
+
+                    updateGroup(groupId, (group) => ({
+                        ...group,
+                        conditions: group.conditions.map((cond) =>
+                            cond.id === conditionId
+                                ? {
+                                    ...cond,
+                                    nestedFields: resolvedFields,
+                                    nestedConditions: (!cond.nestedConditions || cond.nestedConditions.length === 0)
+                                        ? [defaultCondition]
+                                        : cond.nestedConditions,
+                                }
+                                : cond
+                        ),
+                    }));
+                } else {
+                    console.warn('[QueryBuilder] No valid fields resolved for entity:', targetEntity);
+                }
+            } catch (error) {
+                console.error('[QueryBuilder] Error loading related entity fields:', error);
+            }
+        },
+        [updateGroup],
+    );
+
+    // Add a nested condition to a related entity
+    const addNestedCondition = React.useCallback(
+        (groupId: string, conditionId: string, nestedFields: QueryBuilderField[]) => {
+            const nestedDefault = nestedFields[0] || defaultField;
+            const newCondition = createCondition(nestedDefault);
+
+            updateGroup(groupId, (group) => ({
+                ...group,
+                conditions: group.conditions.map((cond) =>
+                    cond.id === conditionId
+                        ? { ...cond, nestedConditions: [...(cond.nestedConditions || []), newCondition] }
+                        : cond
+                ),
+            }));
+        },
+        [defaultField, updateGroup],
+    );
+
+    // Remove a nested condition from a related entity
+    const removeNestedCondition = React.useCallback(
+        (groupId: string, conditionId: string, nestedConditionId: string) => {
+            updateGroup(groupId, (group) => ({
+                ...group,
+                conditions: group.conditions.map((cond) =>
+                    cond.id === conditionId
+                        ? { ...cond, nestedConditions: (cond.nestedConditions || []).filter((nc) => nc.id !== nestedConditionId) }
+                        : cond
+                ),
+            }));
+        },
+        [updateGroup],
+    );
+
+    // Update a nested condition within a related entity
+    const updateNestedCondition = React.useCallback(
+        (groupId: string, conditionId: string, nestedConditionId: string, updater: (nc: QueryBuilderCondition) => QueryBuilderCondition) => {
+            updateGroup(groupId, (group) => ({
+                ...group,
+                conditions: group.conditions.map((cond) =>
+                    cond.id === conditionId
+                        ? {
+                            ...cond,
+                            nestedConditions: (cond.nestedConditions || []).map((nc) =>
+                                nc.id === nestedConditionId ? updater(nc) : nc
+                            ),
+                        }
+                        : cond
+                ),
+            }));
+        },
+        [updateGroup],
+    );
+
     const addItem = React.useCallback((action: 'group' | 'related') => {
         setBuilderState((previous) => {
             if (action === 'group') {
@@ -787,9 +493,9 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                     return previous;
                 }
 
-                const relatedName = props.relatedEntities?.[0]?.id;
+                const firstRelated = computedRelatedEntities[0];
                 const relatedGroup = createGroup(defaultField);
-                relatedGroup.conditions = [createRelatedCondition(relatedName)];
+                relatedGroup.conditions = [createRelatedCondition(firstRelated?.id, firstRelated?.targetEntity)];
 
                 return {
                     groups: [...previous.groups, relatedGroup],
@@ -798,7 +504,40 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
 
             return previous;
         });
-    }, [defaultField, props.allowGroups, props.allowRelatedEntity, props.relatedEntities]);
+    }, [computedRelatedEntities, defaultField, props.allowGroups, props.allowRelatedEntity]);
+
+    // Auto-load fields for related entity conditions that have a relatedEntityName but no nestedFields
+    // Also ensure relatedEntityTarget is set for existing conditions
+    React.useEffect(() => {
+        for (const group of builderState.groups) {
+            for (const condition of group.conditions) {
+                if (
+                    condition.kind === 'relatedEntity' &&
+                    condition.relatedEntityName
+                ) {
+                    // Find the related entity to get targetEntity
+                    const related = computedRelatedEntities.find(r => r.id === condition.relatedEntityName);
+
+                    // Set relatedEntityTarget if not set (migration for existing data)
+                    if (related?.targetEntity && !condition.relatedEntityTarget) {
+                        updateGroup(group.id, (current) => ({
+                            ...current,
+                            conditions: current.conditions.map((c) =>
+                                c.id === condition.id
+                                    ? { ...c, relatedEntityTarget: related.targetEntity, fieldId: condition.relatedEntityName || c.fieldId }
+                                    : c
+                            ),
+                        }));
+                    }
+
+                    // Load fields if not loaded
+                    if (related?.targetEntity && (!condition.nestedFields || condition.nestedFields.length === 0)) {
+                        loadRelatedEntityFields(group.id, condition.id, related.targetEntity);
+                    }
+                }
+            }
+        }
+    }, [builderState.groups, computedRelatedEntities, loadRelatedEntityFields, updateGroup]);
 
     const addRowToGroup = React.useCallback(
         (groupId: string) => {
@@ -823,7 +562,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
     }, [defaultField, props]);
 
     const onDownloadFetchXml = React.useCallback(() => {
-        const payload = serializeQueryBuilderState(builderState, availableFields, props.entityName);
+        const payload = serializeQueryBuilderState(builderState, availableFields, props.entityName, entitySetName);
         const blob = new Blob([payload.fetchXml], { type: 'application/xml' });
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement('a');
@@ -831,7 +570,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
         anchor.download = `${props.entityName}-filters.xml`;
         anchor.click();
         URL.revokeObjectURL(url);
-    }, [availableFields, builderState, props.entityName]);
+    }, [availableFields, builderState, entitySetName, props.entityName]);
 
     const [uploadDialogOpen, setUploadDialogOpen] = React.useState(false);
     const [uploadXmlText, setUploadXmlText] = React.useState('');
@@ -856,7 +595,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
 
     const onValidate = React.useCallback(async () => {
         const result = validateQueryBuilderState(builderState, availableFields);
-        
+
         // Add API validation info
         if (!isXrmAvailable) {
             result.apiValidation = {
@@ -886,11 +625,13 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
 
         try {
             const Xrm = (window as any).Xrm;
-            const { odataFilter } = serializeQueryBuilderState(builderState, availableFields, props.entityName);
+            const { odataFilter } = serializeQueryBuilderState(builderState, availableFields, props.entityName, entitySetName);
             const options = odataFilter ? `?$filter=${odataFilter}&$top=1&$count=true` : '?$top=1&$count=true';
-            
-            const response = await Xrm.WebApi.retrieveMultipleRecords(props.entityName, options);
-            
+
+            // Use entitySetName for WebApi (OData requires plural name like "accounts")
+            const entitySetForApi = entitySetName || props.entityName;
+            const response = await Xrm.WebApi.retrieveMultipleRecords(entitySetForApi, options);
+
             setValidationResult({
                 ...result,
                 apiValidation: {
@@ -913,7 +654,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
         } finally {
             setApiValidating(false);
         }
-    }, [builderState, availableFields, isXrmAvailable, props.entityName]);
+    }, [builderState, availableFields, entitySetName, isXrmAvailable, props.entityName]);
 
     const onOpenUploadDialog = React.useCallback(() => {
         setUploadXmlText('');
@@ -932,7 +673,176 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
         }
     }, [uploadXmlText, availableFields]);
 
-    const serialized = serializeQueryBuilderState(builderState, availableFields, props.entityName);
+    const serialized = serializeQueryBuilderState(builderState, availableFields, props.entityName, entitySetName);
+
+    const renderValueInput = React.useCallback(
+        (
+            field: QueryBuilderField,
+            condition: QueryBuilderCondition,
+            isNullOperator: boolean,
+            onValueChange: (value: string | number | boolean | (string | number)[], displayName?: string) => void,
+        ) => {
+            // If we have valueDisplayName but field type is not detected as lookup,
+            // still render as lookup (this happens when parsing FetchXML where field metadata isn't loaded yet)
+            const hasLookupDisplayName = condition.valueDisplayName && condition.valueDisplayName.trim() !== '';
+            const shouldRenderAsLookup = field.dataType === 'lookup' || hasLookupDisplayName;
+            
+            if (shouldRenderAsLookup) {
+                return (
+                    <LookupValueInput
+                        fieldId={condition.fieldId}
+                        value={String(condition.value ?? '')}
+                        displayName={condition.valueDisplayName ?? ''}
+                        disabled={isNullOperator}
+                        targets={field.targets}
+                        onLookupSearch={props.onLookupSearch}
+                        onValueChange={(value, displayName) => onValueChange(value, displayName)}
+                    />
+                );
+            }
+
+            switch (field.dataType) {
+                case 'optionset': {
+                    if (!field.options) return null;
+
+                    const isMultiSelect = condition.operator === 'in' || condition.operator === 'not-in';
+
+                    if (isMultiSelect) {
+                        // Multi-select mode for in/not-in operators
+                        const currentValues: (string | number)[] = Array.isArray(condition.value)
+                            ? condition.value
+                            : (condition.value !== undefined && condition.value !== null && String(condition.value) !== ''
+                                ? [condition.value as string | number]
+                                : []);
+
+                        const selectedLabels = currentValues
+                            .map(v => field.options!.find(opt => String(opt.value) === String(v))?.label)
+                            .filter(Boolean)
+                            .join(', ') || 'Select values...';
+
+                        return (
+                            <Dropdown
+                                className={styles.compactControl}
+                                size="small"
+                                appearance="filled-darker"
+                                aria-label="Value"
+                                listbox={{ className: styles.optionsetListbox }}
+                                multiselect
+                                selectedOptions={currentValues.map(v => String(v))}
+                                value={selectedLabels}
+                                disabled={isNullOperator}
+                                onOptionSelect={(_, data) => {
+                                    const newValues = data.selectedOptions.map(v => {
+                                        // Try to preserve number type if original was number
+                                        const opt = field.options!.find(o => String(o.value) === v);
+                                        return opt ? opt.value : v;
+                                    });
+                                    onValueChange(newValues as (string | number)[]);
+                                }}
+                            >
+                                {field.options.map((option) => (
+                                    <Option key={String(option.value)} value={String(option.value)}>
+                                        {option.label}
+                                    </Option>
+                                ))}
+                            </Dropdown>
+                        );
+                    }
+
+                    // Single-select mode for eq/ne operators
+                    return (
+                        <Dropdown
+                            className={styles.compactControl}
+                            size="small"
+                            appearance="filled-darker"
+                            aria-label="Value"
+                            listbox={{ className: styles.optionsetListbox }}
+                            selectedOptions={[
+                                condition.value !== undefined && condition.value !== null && String(condition.value) !== ''
+                                    ? String(condition.value)
+                                    : String(field.options[0]?.value ?? '')
+                            ]}
+                            value={
+                                field.options.find(opt => String(opt.value) === String(condition.value))?.label
+                                || field.options[0]?.label
+                                || ''
+                            }
+                            disabled={isNullOperator}
+                            onOptionSelect={(_, data) => onValueChange(data.optionValue ?? String(condition.value ?? ''))}
+                        >
+                            {field.options.map((option) => (
+                                <Option key={String(option.value)} value={String(option.value)}>
+                                    {option.label}
+                                </Option>
+                            ))}
+                        </Dropdown>
+                    );
+                }
+
+                case 'datetime':
+                    return (
+                        <DatePicker
+                            className={styles.compactControl}
+                            size="small"
+                            appearance="filled-darker"
+                            aria-label="Value"
+                            value={condition.value ? new Date(String(condition.value)) : null}
+                            onSelectDate={(date) => onValueChange(date ? date.toISOString().split('T')[0] : '')}
+                            disabled={isNullOperator}
+                            placeholder="Select date..."
+                        />
+                    );
+
+                case 'boolean':
+                    return (
+                        <Dropdown
+                            className={styles.compactControl}
+                            size="small"
+                            appearance="filled-darker"
+                            aria-label="Value"
+                            selectedOptions={[String(condition.value ?? 'true')]}
+                            value={String(condition.value ?? 'true') === 'true' ? 'Yes' : 'No'}
+                            disabled={isNullOperator}
+                            onOptionSelect={(_, data) => onValueChange(data.optionValue ?? 'true')}
+                        >
+                            <Option value="true">Yes</Option>
+                            <Option value="false">No</Option>
+                        </Dropdown>
+                    );
+
+                case 'number':
+                    return (
+                        <Input
+                            className={styles.compactControl}
+                            size="small"
+                            appearance="filled-darker"
+                            aria-label="Value"
+                            type="number"
+                            value={String(condition.value ?? '')}
+                            onChange={(_, data) => onValueChange(data.value)}
+                            disabled={isNullOperator}
+                            placeholder="Value"
+                        />
+                    );
+
+                default: // 'string' and any other types
+                    return (
+                        <Input
+                            className={styles.compactControl}
+                            size="small"
+                            appearance="filled-darker"
+                            aria-label="Value"
+                            type="text"
+                            value={String(condition.value ?? '')}
+                            onChange={(_, data) => onValueChange(data.value)}
+                            disabled={isNullOperator}
+                            placeholder="Value"
+                        />
+                    );
+            }
+        },
+        [styles.compactControl, styles.optionsetListbox, props.onLookupSearch],
+    );
 
     const renderRowActions = React.useCallback(
         (onDelete: () => void) => (
@@ -1142,6 +1052,9 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                             hasBetweenOperator && styles.rowGridWithBetween,
                         );
                         const isLastGroup = groupIndex === builderState.groups.length - 1;
+                        // Hide group logic dropdown when the only condition is a related entity
+                        const isOnlySingleRelatedEntity = group.conditions.length === 1 && group.conditions[0].kind === 'relatedEntity';
+                        const showGroupLogic = !isOnlySingleRelatedEntity;
 
                         return (
                             <div className={styles.groupTreeRow} key={group.id}>
@@ -1155,23 +1068,25 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                 <div className={styles.groupCard} role="grid" aria-label={`Filter group ${groupIndex + 1}`}>
                                     <div className={styles.groupHeader}>
                                         <div className={styles.groupHeaderLeft}>
-                                            <Combobox
-                                                className={styles.groupLogicSelect}
-                                                size="small"
-                                                appearance="filled-darker"
-                                                selectedOptions={[group.logic]}
-                                                value={group.logic === 'or' ? 'OR' : 'AND'}
-                                                aria-label="Group logic"
-                                                onOptionSelect={(_, data) =>
-                                                    updateGroup(group.id, (current) => ({
-                                                        ...current,
-                                                        logic: data.optionValue === 'or' ? 'or' : 'and',
-                                                    }))
-                                                }
-                                            >
-                                                <Option value="and">AND</Option>
-                                                <Option value="or">OR</Option>
-                                            </Combobox>
+                                            {showGroupLogic && (
+                                                <Combobox
+                                                    className={styles.groupLogicSelect}
+                                                    size="small"
+                                                    appearance="filled-darker"
+                                                    selectedOptions={[group.logic]}
+                                                    value={group.logic === 'or' ? 'OR' : 'AND'}
+                                                    aria-label="Group logic"
+                                                    onOptionSelect={(_, data) =>
+                                                        updateGroup(group.id, (current) => ({
+                                                            ...current,
+                                                            logic: data.optionValue === 'or' ? 'or' : 'and',
+                                                        }))
+                                                    }
+                                                >
+                                                    <Option value="and">AND</Option>
+                                                    <Option value="or">OR</Option>
+                                                </Combobox>
+                                            )}
                                         </div>
 
                                         <div className={styles.groupHeaderRight}>
@@ -1212,59 +1127,219 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                     styles.conditionTreeRow,
                                                     invalidConditionIds.has(condition.id) && styles.conditionInvalid,
                                                 );
+                                                const selectedRelated = computedRelatedEntities.find(r => r.id === condition.relatedEntityName);
+                                                const nestedFields = condition.nestedFields || [];
+                                                const nestedConditions = condition.nestedConditions || [];
+                                                const nestedDefaultField = nestedFields[0] || defaultField;
+
+                                                // Handler to select related entity and load its fields
+                                                const handleRelatedEntitySelect = (_: any, data: { optionValue?: string }) => {
+                                                    const relatedId = data.optionValue;
+                                                    const related = computedRelatedEntities.find(r => r.id === relatedId);
+
+                                                    updateGroup(group.id, (current) => ({
+                                                        ...current,
+                                                        conditions: current.conditions.map((row) =>
+                                                            row.id === condition.id
+                                                                ? {
+                                                                    ...row,
+                                                                    relatedEntityName: relatedId,
+                                                                    relatedEntityTarget: related?.targetEntity,
+                                                                    fieldId: relatedId || '__related_entity__',
+                                                                    nestedConditions: [],
+                                                                    nestedFields: [],
+                                                                }
+                                                                : row,
+                                                        ),
+                                                    }));
+
+                                                    // Load fields for the related entity
+                                                    if (related?.targetEntity) {
+                                                        loadRelatedEntityFields(group.id, condition.id, related.targetEntity);
+                                                    }
+                                                };
+
                                                 return (
                                                     <div className={relatedEntityRowClass} key={condition.id}>
                                                         <div className={connectorClass}>
                                                             <div className={styles.conditionConnectorLine} />
                                                             <div className={styles.conditionConnectorBranch} />
                                                         </div>
-                                                        <div className={rowGridClass} role="row">
-                                                            <div className={styles.fieldCell} role="gridcell">
-                                                                <Select
-                                                                    className={styles.compactControl}
+                                                        <div className={styles.relatedEntityCard}>
+                                                            <div className={styles.relatedEntityHeader}>
+                                                                <Text className={styles.relatedEntityLabel}>Related:</Text>
+                                                                <Button
+                                                                    size="small"
+                                                                    appearance="subtle"
+                                                                    icon={<DismissRegular />}
+                                                                    aria-label="Remove related entity"
+                                                                    onClick={() => removeCondition(group.id, condition.id)}
+                                                                />
+                                                            </div>
+                                                            <Dropdown
+                                                                className={styles.relatedEntityDropdown}
+                                                                size="small"
+                                                                appearance="filled-darker"
+                                                                aria-label="Related entity"
+                                                                listbox={{ className: styles.optionsetListbox }}
+                                                                selectedOptions={condition.relatedEntityName ? [condition.relatedEntityName] : []}
+                                                                value={selectedRelated?.label || 'Select related entity...'}
+                                                                onOptionSelect={handleRelatedEntitySelect}
+                                                            >
+                                                                {computedRelatedEntities.length > 0 ? (
+                                                                    computedRelatedEntities.map((related) => (
+                                                                        <Option key={related.id} value={related.id}>
+                                                                            {related.label}
+                                                                        </Option>
+                                                                    ))
+                                                                ) : (
+                                                                    <Option value="">No related entities available</Option>
+                                                                )}
+                                                            </Dropdown>
+                                                            {nestedConditions.length > 1 && (
+                                                                <Combobox
                                                                     size="small"
                                                                     appearance="filled-darker"
-                                                                    aria-label="Related entity"
-                                                                    value={condition.relatedEntityName || ''}
-                                                                    onChange={(_, data) =>
+                                                                    className={styles.nestedLogicDropdown}
+                                                                    selectedOptions={[condition.nestedLogic || 'and']}
+                                                                    value={condition.nestedLogic === 'or' ? 'OR' : 'AND'}
+                                                                    aria-label="Nested logic"
+                                                                    onOptionSelect={(_, data) =>
                                                                         updateGroup(group.id, (current) => ({
                                                                             ...current,
                                                                             conditions: current.conditions.map((row) =>
-                                                                                row.id === condition.id ? { ...row, relatedEntityName: data.value } : row,
+                                                                                row.id === condition.id
+                                                                                    ? { ...row, nestedLogic: data.optionValue === 'or' ? 'or' : 'and' }
+                                                                                    : row,
                                                                             ),
                                                                         }))
                                                                     }
                                                                 >
-                                                                    {props.relatedEntities && props.relatedEntities.length > 0 ? (
-                                                                        props.relatedEntities.map((related) => (
-                                                                            <Option key={related.id} value={related.id}>
-                                                                                {related.label}
-                                                                            </Option>
-                                                                        ))
-                                                                    ) : (
-                                                                        <Option value="">Choose a related entity...</Option>
-                                                                    )}
-                                                                </Select>
-                                                            </div>
-
-                                                            <div className={styles.operatorCell} role="gridcell">
-                                                                <Combobox
-                                                                    className={styles.compactControl}
-                                                                    size="small"
-                                                                    appearance="filled-darker"
-                                                                    value="Contains data"
-                                                                    aria-label="Operator"
-                                                                    disabled
-                                                                >
-                                                                    <Option value="containsdata">Contains data</Option>
+                                                                    <Option value="and">AND</Option>
+                                                                    <Option value="or">OR</Option>
                                                                 </Combobox>
-                                                            </div>
-                                                            <div className={styles.valueCell} role="gridcell" />
-                                                            {hasBetweenOperator && <div className={styles.andCell} role="gridcell" />}
+                                                            )}
 
-                                                            <div className={styles.removeCell} role="gridcell">
-                                                                {renderRowActions(() => removeCondition(group.id, condition.id))}
-                                                            </div>
+                                                            {/* Nested conditions for the related entity */}
+                                                            {/* Show if: we have fields loaded, OR we have existing conditions (from parsed FetchXML) */}
+                                                            {selectedRelated && (nestedFields.length > 0 || nestedConditions.length > 0) && (
+                                                                <div className={styles.relatedEntityConditions}>
+                                                                    {/* Column headers for nested conditions */}
+                                                                    <div className={styles.nestedConditionHeader}>
+                                                                        <span>Field</span>
+                                                                        <span>Operator</span>
+                                                                        <span>Value</span>
+                                                                        <span />
+                                                                    </div>
+
+                                                                    {nestedConditions.map((nestedCond) => {
+                                                                        const nestedField = nestedFields.find(f => f.id === nestedCond.fieldId) || nestedDefaultField;
+                                                                        const nestedOperators = getOperatorsForType(nestedField.dataType);
+                                                                        const isNestedNullOp = nestedCond.operator === 'null' || nestedCond.operator === 'notnull';
+
+                                                                        // Build lookup options for nested field selector using same format as main field selector
+                                                                        const formatDataType = (dataType: QueryBuilderField['dataType']): string => {
+                                                                            const labels: Record<QueryBuilderField['dataType'], string> = {
+                                                                                string: 'Text',
+                                                                                number: 'Number',
+                                                                                datetime: 'Date/Time',
+                                                                                boolean: 'Yes/No',
+                                                                                optionset: 'Choice',
+                                                                                lookup: 'Lookup',
+                                                                            };
+                                                                            return labels[dataType] || dataType;
+                                                                        };
+
+                                                                        const nestedFieldLookupOptions: LookupOption[] = nestedFields.map((f) => ({
+                                                                            key: f.id,
+                                                                            text: f.label,
+                                                                            details: [
+                                                                                { label: 'Logical Name', value: f.id },
+                                                                                ...(f.schemaName ? [{ label: 'Schema Name', value: f.schemaName }] : []),
+                                                                                { label: 'Type', value: formatDataType(f.dataType) },
+                                                                            ],
+                                                                            data: f,
+                                                                        }));
+
+                                                                        return (
+                                                                            <div key={nestedCond.id} className={styles.nestedConditionRow}>
+                                                                                <Lookup
+                                                                                    className={styles.compactControl}
+                                                                                    size="small"
+                                                                                    appearance="filled-darker"
+                                                                                    aria-label="Field"
+                                                                                    options={nestedFieldLookupOptions}
+                                                                                    selectedKey={nestedCond.fieldId}
+                                                                                    clearable={false}
+                                                                                    placeholder="Select field..."
+                                                                                    onOptionSelect={(option) => {
+                                                                                        if (!option) return;
+                                                                                        const newField = (option.data as QueryBuilderField) || nestedFields.find(f => f.id === option.key) || nestedDefaultField;
+                                                                                        updateNestedCondition(group.id, condition.id, nestedCond.id, (nc) => ({
+                                                                                            ...nc,
+                                                                                            fieldId: newField.id,
+                                                                                            operator: getOperatorsForType(newField.dataType)[0].value as any,
+                                                                                            value: getDefaultValueForField(newField),
+                                                                                        }));
+                                                                                    }}
+                                                                                />
+
+                                                                                <Dropdown
+                                                                                    className={styles.compactControl}
+                                                                                    size="small"
+                                                                                    appearance="filled-darker"
+                                                                                    aria-label="Operator"
+                                                                                    selectedOptions={[nestedCond.operator]}
+                                                                                    value={nestedOperators.find(op => op.value === nestedCond.operator)?.label || ''}
+                                                                                    onOptionSelect={(_, data) =>
+                                                                                        updateNestedCondition(group.id, condition.id, nestedCond.id, (nc) => ({
+                                                                                            ...nc,
+                                                                                            operator: (data.optionValue as any) || nc.operator,
+                                                                                        }))
+                                                                                    }
+                                                                                >
+                                                                                    {nestedOperators.map(op => (
+                                                                                        <Option key={op.value} value={op.value}>{op.label}</Option>
+                                                                                    ))}
+                                                                                </Dropdown>
+
+                                                                                {renderValueInput(nestedField, nestedCond, isNestedNullOp, (value, displayName) => {
+                                                                                    updateNestedCondition(group.id, condition.id, nestedCond.id, (nc) => ({
+                                                                                        ...nc,
+                                                                                        value,
+                                                                                        valueDisplayName: displayName,
+                                                                                    }));
+                                                                                })}
+
+                                                                                {renderRowActions(() => removeNestedCondition(group.id, condition.id, nestedCond.id))}
+                                                                            </div>
+                                                                        );
+                                                                    })}
+
+                                                                    <div className={styles.relatedEntityAddRow}>
+                                                                        <Button
+                                                                            size="small"
+                                                                            appearance="outline"
+                                                                            icon={<AddRegular />}
+                                                                            onClick={() => addNestedCondition(group.id, condition.id, nestedFields)}
+                                                                        >
+                                                                            Add condition
+                                                                        </Button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Show loading state only when no conditions exist and fields are loading */}
+                                                            {selectedRelated && nestedFields.length === 0 && nestedConditions.length === 0 && (
+                                                                <div style={{ padding: '8px 0', color: 'var(--colorNeutralForeground3)', fontSize: '12px' }}>
+                                                                    <Spinner size="tiny" label="Loading fields..." />
+                                                                </div>
+                                                            )}
+                                                            {!selectedRelated && (
+                                                                <div style={{ padding: '8px 0', color: 'var(--colorNeutralForeground3)', fontSize: '12px' }}>
+                                                                    Select a related entity to add filter conditions.
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 );
@@ -1287,14 +1362,18 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                     </div>
                                                     <div className={rowGridClass} role="row">
                                                         <div className={styles.fieldCell} role="gridcell">
-                                                            <Select
+                                                            <Lookup
                                                                 className={styles.compactControl}
                                                                 size="small"
                                                                 appearance="filled-darker"
                                                                 aria-label="Field"
-                                                                value={condition.fieldId}
-                                                                onChange={(_, data) => {
-                                                                    const nextField = availableFields.find((field) => field.id === data.value) || defaultField;
+                                                                options={fieldLookupOptions}
+                                                                selectedKey={condition.fieldId}
+                                                                clearable={false}
+                                                                placeholder="Select field..."
+                                                                onOptionSelect={(option) => {
+                                                                    if (!option) return;
+                                                                    const nextField = (option.data as QueryBuilderField) || availableFields.find((field) => field.id === option.key) || defaultField;
                                                                     updateGroup(group.id, (current) => ({
                                                                         ...current,
                                                                         conditions: current.conditions.map((row) =>
@@ -1310,30 +1389,25 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                                         ),
                                                                     }));
                                                                 }}
-                                                            >
-                                                                {availableFields.map((field) => (
-                                                                    <Option key={field.id} value={field.id}>
-                                                                        {field.label}
-                                                                    </Option>
-                                                                ))}
-                                                            </Select>
+                                                            />
                                                         </div>
 
                                                         <div className={styles.operatorCell} role="gridcell">
-                                                            <Select
+                                                            <Dropdown
                                                                 className={styles.compactControl}
                                                                 size="small"
                                                                 appearance="filled-darker"
                                                                 aria-label="Operator"
-                                                                value={condition.operator}
-                                                                onChange={(_, data) =>
+                                                                value={operators.find((op) => op.value === condition.operator)?.label || ''}
+                                                                selectedOptions={[condition.operator]}
+                                                                onOptionSelect={(_, data) =>
                                                                     updateGroup(group.id, (current) => ({
                                                                         ...current,
                                                                         conditions: current.conditions.map((row) =>
                                                                             row.id === condition.id
                                                                                 ? {
                                                                                     ...row,
-                                                                                    operator: (data.value as any) || row.operator,
+                                                                                    operator: (data.optionValue as any) || row.operator,
                                                                                 }
                                                                                 : row,
                                                                         ),
@@ -1345,106 +1419,63 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                                         {operator.label}
                                                                     </Option>
                                                                 ))}
-                                                            </Select>
+                                                            </Dropdown>
                                                         </div>
 
-                                                        {selectedField.dataType === 'optionset' && selectedField.options ? (
-                                                            <div className={styles.valueCell} role="gridcell">
-                                                                <Select
-                                                                    className={styles.compactControl}
-                                                                    size="small"
-                                                                    appearance="filled-darker"
-                                                                    aria-label="Value"
-                                                                    value={
-                                                                        condition.value !== undefined && condition.value !== null && String(condition.value) !== ''
-                                                                            ? String(condition.value)
-                                                                            : String(selectedField.options[0]?.value ?? '')
-                                                                    }
-                                                                    disabled={isNullOperator}
-                                                                    onChange={(_, data) =>
-                                                                        updateGroup(group.id, (current) => ({
-                                                                            ...current,
-                                                                            conditions: current.conditions.map((row) =>
-                                                                                row.id === condition.id
-                                                                                    ? {
-                                                                                        ...row,
-                                                                                        value: data.value ?? row.value,
-                                                                                    }
-                                                                                    : row,
-                                                                            ),
-                                                                        }))
-                                                                    }
-                                                                >
-                                                                    {selectedField.options.map((option) => (
-                                                                        <Option key={String(option.value)} value={String(option.value)}>
-                                                                            {option.label}
-                                                                        </Option>
-                                                                    ))}
-                                                                </Select>
-                                                            </div>
-                                                        ) : selectedField.dataType === 'lookup' ? (
-                                                            <div className={styles.valueCell} role="gridcell">
-                                                                <LookupValueInput
-                                                                    fieldId={condition.fieldId}
-                                                                    value={String(condition.value ?? '')}
-                                                                    displayName={condition.valueDisplayName ?? ''}
-                                                                    disabled={isNullOperator}
-                                                                    onLookupSearch={props.onLookupSearch}
-                                                                    onValueChange={(value, displayName) =>
-                                                                        updateGroup(group.id, (current) => ({
-                                                                            ...current,
-                                                                            conditions: current.conditions.map((row) =>
-                                                                                row.id === condition.id
-                                                                                    ? { ...row, value, valueDisplayName: displayName }
-                                                                                    : row,
-                                                                            ),
-                                                                        }))
-                                                                    }
-                                                                />
-                                                            </div>
-                                                        ) : (
-                                                            <div className={styles.valueCell} role="gridcell">
-                                                                <Input
-                                                                    className={styles.compactControl}
-                                                                    size="small"
-                                                                    appearance="filled-darker"
-                                                                    aria-label="Value"
-                                                                    type={selectedField.dataType === 'datetime' ? 'date' : selectedField.dataType === 'number' ? 'number' : 'text'}
-                                                                    value={String(condition.value ?? '')}
-                                                                    onChange={(_, data) =>
-                                                                        updateGroup(group.id, (current) => ({
-                                                                            ...current,
-                                                                            conditions: current.conditions.map((row) =>
-                                                                                row.id === condition.id ? { ...row, value: data.value } : row,
-                                                                            ),
-                                                                        }))
-                                                                    }
-                                                                    disabled={isNullOperator}
-                                                                    placeholder={selectedField.dataType === 'boolean' ? 'true/false' : 'Value'}
-                                                                />
-                                                            </div>
-                                                        )}
+                                                        <div className={styles.valueCell} role="gridcell">
+                                                            {renderValueInput(selectedField, condition, isNullOperator, (value, displayName) => {
+                                                                updateGroup(group.id, (current) => ({
+                                                                    ...current,
+                                                                    conditions: current.conditions.map((row) =>
+                                                                        row.id === condition.id
+                                                                            ? { ...row, value, valueDisplayName: displayName }
+                                                                            : row,
+                                                                    ),
+                                                                }));
+                                                            })}
+                                                        </div>
 
                                                         {hasBetweenOperator && (
                                                             isBetween ? (
                                                                 <div className={styles.andCell} role="gridcell">
-                                                                    <Input
-                                                                        className={styles.compactControl}
-                                                                        size="small"
-                                                                        appearance="filled-darker"
-                                                                        aria-label="Second value"
-                                                                        type={selectedField.dataType === 'datetime' ? 'date' : selectedField.dataType === 'number' ? 'number' : 'text'}
-                                                                        value={String(condition.value2 ?? '')}
-                                                                        onChange={(_, data) =>
-                                                                            updateGroup(group.id, (current) => ({
-                                                                                ...current,
-                                                                                conditions: current.conditions.map((row) =>
-                                                                                    row.id === condition.id ? { ...row, value2: data.value } : row,
-                                                                                ),
-                                                                            }))
-                                                                        }
-                                                                        placeholder="And"
-                                                                    />
+                                                                    {selectedField.dataType === 'datetime' ? (
+                                                                        <DatePicker
+                                                                            className={styles.compactControl}
+                                                                            size="small"
+                                                                            appearance="filled-darker"
+                                                                            aria-label="Second value"
+                                                                            value={condition.value2 ? new Date(String(condition.value2)) : null}
+                                                                            onSelectDate={(date) =>
+                                                                                updateGroup(group.id, (current) => ({
+                                                                                    ...current,
+                                                                                    conditions: current.conditions.map((row) =>
+                                                                                        row.id === condition.id
+                                                                                            ? { ...row, value2: date ? date.toISOString().split('T')[0] : '' }
+                                                                                            : row,
+                                                                                    ),
+                                                                                }))
+                                                                            }
+                                                                            placeholder="And"
+                                                                        />
+                                                                    ) : (
+                                                                        <Input
+                                                                            className={styles.compactControl}
+                                                                            size="small"
+                                                                            appearance="filled-darker"
+                                                                            aria-label="Second value"
+                                                                            type={selectedField.dataType === 'number' ? 'number' : 'text'}
+                                                                            value={String(condition.value2 ?? '')}
+                                                                            onChange={(_, data) =>
+                                                                                updateGroup(group.id, (current) => ({
+                                                                                    ...current,
+                                                                                    conditions: current.conditions.map((row) =>
+                                                                                        row.id === condition.id ? { ...row, value2: data.value } : row,
+                                                                                    ),
+                                                                                }))
+                                                                            }
+                                                                            placeholder="And"
+                                                                        />
+                                                                    )}
                                                                 </div>
                                                             ) : (
                                                                 <div className={styles.andCell} role="gridcell" />
@@ -1459,14 +1490,14 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                             );
                                         })}
 
-                                        {/* Add row button */}
+                                        {/* Add condition button */}
                                         <div className={styles.addButtonRow}>
                                             <div className={styles.addButtonConnector}>
                                                 <div className={styles.addButtonConnectorLine} />
                                                 <div className={styles.addButtonConnectorBranch} />
                                             </div>
                                             <Button appearance="outline" size="small" icon={<AddRegular />} onClick={() => addRowToGroup(group.id)}>
-                                                Add row
+                                                Add condition
                                             </Button>
                                         </div>
                                     </div>
@@ -1494,7 +1525,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                             Add group
                                         </MenuItem>
                                     )}
-                                    {props.allowRelatedEntity !== false && (
+                                    {props.allowRelatedEntity !== false && computedRelatedEntities.length > 0 && (
                                         <MenuItem icon={<span className={styles.menuGlyph}>▦</span>} onClick={() => addItem('related')}>
                                             Add related entity
                                         </MenuItem>

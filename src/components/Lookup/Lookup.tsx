@@ -257,7 +257,13 @@ export const Lookup: React.FC<LookupProps> = ({
       return;
     }
 
-    const closeOnScroll = () => {
+    const closeOnScroll = (event: Event) => {
+      // Don't close if scrolling inside the dropdown or input wrapper
+      const target = event.target as Node | null;
+      if (target && (dropdownRef.current?.contains(target) || inputWrapperRef.current?.contains(target))) {
+        return;
+      }
+      
       setIsOpen(false);
       setSearchText('');
       setHighlightedIndex(-1);

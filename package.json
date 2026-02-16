@@ -26,7 +26,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "demo": "vite demo",
+    "harness": "vite --config testHarness/vite.config.ts",
     "lint": "eslint src --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -51,12 +51,15 @@
   "license": "MIT",
   "peerDependencies": {
     "@fluentui/react-components": "^9.0.0",
+    "@fluentui/react-datepicker-compat": "^0.4.0",
     "@fluentui/react-icons": "^2.0.0",
     "react": "^16.8.0 || ^17.0.0 || ^18.0.0",
     "react-dom": "^16.8.0 || ^17.0.0 || ^18.0.0"
   },
   "devDependencies": {
+    "@azure/msal-browser": "^5.2.0",
     "@fluentui/react-components": "^9.56.0",
+    "@fluentui/react-datepicker-compat": "^0.6.23",
     "@fluentui/react-icons": "^2.0.258",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
