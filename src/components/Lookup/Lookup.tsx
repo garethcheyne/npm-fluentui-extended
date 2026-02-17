@@ -154,6 +154,11 @@ export const Lookup: React.FC<LookupProps> = ({
       if (disabled) return;
 
       switch (e.key) {
+        case ' ':
+          // Allow space key in the input - prevent PopoverTrigger from intercepting
+          e.stopPropagation();
+          break;
+
         case 'ArrowDown':
           e.preventDefault();
           if (!isOpen) {

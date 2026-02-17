@@ -12,6 +12,7 @@ import type {
     QueryBuilderGroup,
     QueryBuilderLookupOption,
     QueryBuilderLookupTarget,
+    QueryBuilderOption,
     QueryBuilderProps,
     QueryBuilderRelatedEntity,
     QueryBuilderState,
@@ -36,6 +37,7 @@ import {
 } from './QueryBuilder.utils';
 import { LookupValueInput } from './QueryBuilder.LookupInput';
 import { loadEntityFields, useEntityFields, extractAttributesArray, isValidAttribute, parseAttributeToField } from './QueryBuilder.hooks';
+import { enrichLookupFields, enrichOptionsetFields } from './QueryBuilder.enrichment';
 
 // Re-export for backward compatibility
 export type { QueryBuilderValidationError, QueryBuilderValidationResult };
@@ -44,6 +46,18 @@ export type { ParseFetchXmlResult };
 
 export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
     const styles = useQueryBuilderStyles();
+    
+    // Helper function for debug tracing with purple background
+    const trace = React.useCallback((message: string, data?: any) => {
+        console.debug(
+            '%c FluentUI-Extended ',
+            'background: #845EF7; color: white; padding: 2px 4px; border-radius: 2px; font-weight: bold;',
+            message,
+            data || ''
+        );
+        props.onTrace?.(message, data);
+    }, [props]);
+    
     const [loading, setLoading] = React.useState(false);
     const [availableFields, setAvailableFields] = React.useState<QueryBuilderField[]>(
         props.fields && props.fields.length > 0 ? props.fields : FALLBACK_FIELDS,
@@ -67,7 +81,15 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
             return labels[dataType] || dataType;
         };
 
-        return availableFields.map((field) => ({
+        // Deduplicate fields by id (take first occurrence)
+        const uniqueFields = availableFields.reduce((acc, field) => {
+            if (!acc.some(f => f.id === field.id)) {
+                acc.push(field);
+            }
+            return acc;
+        }, [] as QueryBuilderField[]);
+
+        return uniqueFields.map((field) => ({
             key: field.id,
             text: field.label,
             details: [
@@ -390,39 +412,69 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
     // Load metadata for a related entity and store fields in nestedFields
     const loadRelatedEntityFields = React.useCallback(
         async (groupId: string, conditionId: string, targetEntity: string) => {
+            trace('[QueryBuilder] Loading related entity fields', { groupId, conditionId, targetEntity });
+            
             try {
                 let resolvedFields: QueryBuilderField[] = [];
 
                 // Use callback if provided, otherwise use native Web API
                 if (props.onFetchEntityFields) {
+                    trace('[QueryBuilder] Using custom onFetchEntityFields callback');
                     resolvedFields = await props.onFetchEntityFields(targetEntity);
                 } else {
                     // Use native Web API directly (same origin)
-                    const response = await fetch(
-                        `/api/data/v9.2/EntityDefinitions(LogicalName='${targetEntity}')/Attributes?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName`,
-                        {
-                            headers: {
-                                'OData-MaxVersion': '4.0',
-                                'OData-Version': '4.0',
-                                'Accept': 'application/json',
-                            },
-                        }
-                    );
+                    // Note: Cannot select Targets or expand OptionSet on base Attributes collection
+                    const url = `/api/data/v9.2/EntityDefinitions(LogicalName='${targetEntity}')/Attributes?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName`;
+                    trace('[QueryBuilder] Fetching entity metadata', { url });
+                    
+                    const response = await fetch(url, {
+                        headers: {
+                            'OData-MaxVersion': '4.0',
+                            'OData-Version': '4.0',
+                            'Accept': 'application/json',
+                        },
+                    });
 
                     if (!response.ok) {
-                        console.warn('[QueryBuilder] Failed to fetch entity metadata:', response.status, response.statusText);
+                        // Try to get error details from response
+                        let errorDetails: any = null;
+                        try {
+                            errorDetails = await response.json();
+                        } catch {
+                            // Ignore if response isn't JSON
+                        }
+                        
+                        const errorMsg = `Failed to fetch entity metadata: ${response.status} ${response.statusText}`;
+                        console.warn('[QueryBuilder]', errorMsg);
+                        trace('[QueryBuilder] Metadata fetch failed', { 
+                            status: response.status, 
+                            statusText: response.statusText,
+                            url,
+                            targetEntity,
+                            error: errorDetails?.error || errorDetails
+                        });
+                        
+                        // Log specific error message if available
+                        if (errorDetails?.error?.message) {
+                            console.warn('[QueryBuilder] API Error:', errorDetails.error.message);
+                            trace('[QueryBuilder] API Error Message', { message: errorDetails.error.message });
+                        }
+                        
                         return;
                     }
 
                     const data = await response.json();
                     const attributesArray = data.value || [];
+                    trace('[QueryBuilder] Received attributes', { count: attributesArray.length });
 
                     if (attributesArray.length === 0) {
                         console.warn('[QueryBuilder] No attributes found for entity:', targetEntity);
+                        trace('[QueryBuilder] No attributes found', { targetEntity });
                         return;
                     }
 
-                    resolvedFields = attributesArray
+                    // Map attributes to fields
+                    const fieldsWithoutOptions = attributesArray
                         .filter((attr: any) => {
                             if (!attr?.LogicalName) return false;
                             const attrType = attr.AttributeType || attr.AttributeTypeName?.Value;
@@ -442,14 +494,37 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                 label,
                                 schemaName: attr.SchemaName,
                                 dataType,
+                                // Store raw attribute for metadata fetching
+                                _raw: attr,
                             };
-                        })
-                        .sort((a: QueryBuilderField, b: QueryBuilderField) => String(a.label).localeCompare(String(b.label), undefined, { sensitivity: 'base' }));
+                        });
+
+                    // Enrich lookup fields with target metadata
+                    await enrichLookupFields(fieldsWithoutOptions, targetEntity, trace);
+                    
+                    // Enrich optionset fields with option values
+                    await enrichOptionsetFields(fieldsWithoutOptions, targetEntity, trace);
+                    
+                    // Remove _raw property before returning
+                    resolvedFields = fieldsWithoutOptions.map((f: any) => {
+                        const { _raw, ...field } = f;
+                        return field;
+                    }).sort((a: QueryBuilderField, b: QueryBuilderField) => String(a.label).localeCompare(String(b.label), undefined, { sensitivity: 'base' }));
+                    
+                    trace('[QueryBuilder] Resolved fields', { 
+                        count: resolvedFields.length,
+                        fields: resolvedFields.map(f => ({ id: f.id, dataType: f.dataType, hasOptions: !!f.options }))
+                    });
                 }
 
                 if (resolvedFields.length > 0) {
                     // Auto-add a default condition if none exist
                     const defaultCondition = createCondition(resolvedFields[0]);
+                    trace('[QueryBuilder] Creating default nested condition', { 
+                        field: resolvedFields[0].id,
+                        dataType: resolvedFields[0].dataType,
+                        hasOptions: !!resolvedFields[0].options
+                    });
 
                     updateGroup(groupId, (group) => ({
                         ...group,
@@ -467,12 +542,18 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                     }));
                 } else {
                     console.warn('[QueryBuilder] No valid fields resolved for entity:', targetEntity);
+                    trace('[QueryBuilder] No valid fields resolved', { targetEntity });
                 }
             } catch (error) {
                 console.error('[QueryBuilder] Error loading related entity fields:', error);
+                trace('[QueryBuilder] Exception in loadRelatedEntityFields', { 
+                    targetEntity,
+                    error: error instanceof Error ? error.message : String(error),
+                    stack: error instanceof Error ? error.stack : undefined
+                });
             }
         },
-        [props.onFetchEntityFields, updateGroup],
+        [props.onFetchEntityFields, updateGroup, trace],
     );
 
     // Add a nested condition to a related entity

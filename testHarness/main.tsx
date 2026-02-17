@@ -603,6 +603,14 @@ function App() {
               showDataSourceToggle
               onStateChange={(state) => setQueryBuilderState(state)}
               onSerializedChange={(result) => setQueryBuilderResult(result)}
+              onTrace={(message, data) => {
+                console.debug(
+                  '%c FluentUI-Extended ',
+                  'background: #845EF7; color: white; padding: 2px 4px; border-radius: 2px; font-weight: bold;',
+                  message,
+                  data || ''
+                );
+              }}
             />
           </div>
 

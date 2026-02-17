@@ -222,7 +222,11 @@ const quoteODataValue = (val: any, field: QueryBuilderField): string => {
     if (field.dataType === 'number') return String(val ?? 0);
     if (field.dataType === 'optionset') return String(parseInt(val, 10) || 0);
     if (field.dataType === 'boolean') return val === true || val === 'true' || val === 1 || val === '1' ? 'true' : 'false';
-    if (isLookup) return String(val ?? '');
+    if (isLookup) {
+        // Lookup GUIDs must be quoted as strings in OData
+        const guidVal = String(val ?? '').replace(/'/g, "''");
+        return guidVal ? `'${guidVal}'` : "''";
+    }
     if (field.dataType === 'datetime') {
         const dateVal = String(val ?? '');
         if (dateVal.match(/^\d{4}-\d{2}-\d{2}/)) {
@@ -246,6 +250,8 @@ export const conditionToOData = (condition: QueryBuilderCondition, field: QueryB
     const isLookup = field.dataType === 'lookup';
     const odataFieldName = isLookup ? `_${condition.fieldId}_value` : condition.fieldId;
     const quote = (val: any) => quoteODataValue(val, field);
+    // Helper to always quote as string (for string functions like contains/startswith/endswith)
+    const quoteAsString = (val: any) => `'${String(val ?? '').replace(/'/g, "''")}'`;
     const operatorDef = getOperatorByValue(condition.operator);
 
     // FetchXML-only operators cannot be converted to OData
@@ -262,13 +268,13 @@ export const conditionToOData = (condition: QueryBuilderCondition, field: QueryB
                 } else if (likeVal.startsWith('%')) {
                     return `endswith(${odataFieldName}, '${likeVal.slice(1).replace(/'/g, "''")}')`;
                 }
-                return `contains(${odataFieldName}, ${quote(condition.value)})`;
+                return `contains(${odataFieldName}, ${quoteAsString(condition.value)})`;
             case 'not-like':
                 const notLikeVal = String(condition.value ?? '');
                 if (notLikeVal.startsWith('%') && notLikeVal.endsWith('%')) {
                     return `not contains(${odataFieldName}, '${notLikeVal.slice(1, -1).replace(/'/g, "''")}')`;
                 }
-                return `not contains(${odataFieldName}, ${quote(condition.value)})`;
+                return `not contains(${odataFieldName}, ${quoteAsString(condition.value)})`;
             case 'not-in':
                 // OData doesn't have "not in", use multiple "ne" conditions with "and"
                 const values = Array.isArray(condition.value) ? condition.value : [condition.value];
@@ -306,20 +312,20 @@ export const conditionToOData = (condition: QueryBuilderCondition, field: QueryB
         case 'notnull': // Legacy format
             return `${odataFieldName} ne null`;
         case 'contains':
-            return `contains(${odataFieldName}, ${quote(condition.value)})`;
+            return `contains(${odataFieldName}, ${quoteAsString(condition.value)})`;
         case 'notcontains':
         case 'not-contain':
-            return `not contains(${odataFieldName}, ${quote(condition.value)})`;
+            return `not contains(${odataFieldName}, ${quoteAsString(condition.value)})`;
         case 'startswith':
         case 'begins-with':
-            return `startswith(${odataFieldName}, ${quote(condition.value)})`;
+            return `startswith(${odataFieldName}, ${quoteAsString(condition.value)})`;
         case 'not-begin-with':
-            return `not startswith(${odataFieldName}, ${quote(condition.value)})`;
+            return `not startswith(${odataFieldName}, ${quoteAsString(condition.value)})`;
         case 'endswith':
         case 'ends-with':
-            return `endswith(${odataFieldName}, ${quote(condition.value)})`;
+            return `endswith(${odataFieldName}, ${quoteAsString(condition.value)})`;
         case 'not-end-with':
-            return `not endswith(${odataFieldName}, ${quote(condition.value)})`;
+            return `not endswith(${odataFieldName}, ${quoteAsString(condition.value)})`;
         case 'on':
             return `${odataFieldName} eq ${quote(condition.value)}`;
         case 'on-or-before':

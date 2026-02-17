@@ -40,6 +40,7 @@ export { parseFetchXmlToState as parseFetchXml, validateFetchXmlSyntax } from '.
 
 // Helper utilities
 export { FALLBACK_FIELDS, dataTypeFromAttribute, getDefaultValueForField, createCondition, createRelatedCondition, createGroup, cloneState, getOperatorOptionsForType } from './QueryBuilder.utils';
+export { enrichLookupFields, enrichOptionsetFields } from './QueryBuilder.enrichment';
 
 // Hooks for field loading and metadata
 export {

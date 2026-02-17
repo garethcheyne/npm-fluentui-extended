@@ -245,4 +245,6 @@ export interface QueryBuilderProps {
   onLookupSearch?: (fieldId: string, searchText: string) => Promise<QueryBuilderLookupOption[]> | QueryBuilderLookupOption[];
   /** Callback to fetch fields for a related entity. If provided, this is used instead of the native Web API. */
   onFetchEntityFields?: (entityLogicalName: string) => Promise<QueryBuilderField[]>;
+  /** Debug/trace callback for logging component behavior */
+  onTrace?: (message: string, data?: any) => void;
 }

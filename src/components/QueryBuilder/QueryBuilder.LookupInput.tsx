@@ -5,7 +5,7 @@
  */
 
 import * as React from 'react';
-import { Text } from '@fluentui/react-components';
+import { Input, Text } from '@fluentui/react-components';
 import { Lookup, type LookupOption } from '../Lookup';
 import type { QueryBuilderLookupOption, QueryBuilderLookupTarget } from './QueryBuilder.types';
 
@@ -163,6 +163,26 @@ export const LookupValueInput: React.FC<LookupValueInputProps> = ({
     // Determine if lookup is usable (has either onLookupSearch or valid targets)
     const hasValidTargets = targets && targets.length > 0 && targets.some(t => t.entitySetName && t.primaryNameAttribute);
     const isUsable = !disabled && (onLookupSearch || hasValidTargets);
+
+    // If lookup metadata isn't available, show a plain input for manual GUID entry
+    if (!isUsable && !disabled) {
+        return (
+            <Input
+                size="small"
+                appearance="filled-darker"
+                aria-label="Lookup GUID"
+                type="text"
+                value={value || ''}
+                onChange={(_, data) => onValueChange(data.value, displayName)}
+                placeholder="Enter GUID..."
+                contentAfter={
+                    <Text size={100} style={{ whiteSpace: 'nowrap', color: 'var(--colorNeutralForeground3)' }}>
+                        Manual entry
+                    </Text>
+                }
+            />
+        );
+    }
 
     // Build selected option for display
     const selectedOption: LookupOption | null = value

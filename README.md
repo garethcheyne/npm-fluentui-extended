@@ -378,6 +378,31 @@ const handleLookupSearch = async (fieldId: string, searchText: string) => {
 />
 ```
 
+#### Debug Tracing
+
+Enable debug tracing to see what's happening inside the component:
+
+```tsx
+<QueryBuilder
+  entityName="account"
+  fields={fields}
+  onTrace={(message, data) => {
+    console.debug(
+      '%c FluentUI-Extended ',
+      'background: #845EF7; color: white; padding: 2px 4px; border-radius: 2px; font-weight: bold;',
+      message,
+      data || ''
+    );
+  }}
+/>
+```
+
+This is useful for:
+- Debugging related entity field loading
+- Tracking optionset metadata fetching
+- Understanding when API calls are made
+- Troubleshooting field resolution issues
+
 ### Standalone Usage (Outside Dynamics 365)
 
 When not running in Dynamics 365, provide fields manually:
@@ -417,6 +442,7 @@ const fields: QueryBuilderField[] = [
 | `showUploadFetchXmlButton` | `boolean` | `true` | Show Import FetchXML button |
 | `showValidateButton` | `boolean` | `true` | Show Validate button |
 | `showDeleteAllFiltersButton` | `boolean` | `true` | Show Delete All button |
+| `onTrace` | `(message: string, data?: any) => void` | - | Debug/trace callback for component behavior |
 
 ### QueryBuilderField
 
