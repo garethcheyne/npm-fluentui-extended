@@ -308,10 +308,12 @@ export const Lookup: React.FC<LookupProps> = ({
       <Popover
         open={isOpen && !disabled}
         onOpenChange={(_e, data) => {
-          if (!data.open) {
-            setIsOpen(false);
-            setSearchText('');
-            setHighlightedIndex(-1);
+          // Only allow Popover-initiated opens; closing is handled by our own
+          // handlers (Escape, Tab, outside click, scroll, option selection).
+          // Without this guard the PopoverTrigger click-toggle fires AFTER
+          // handleFocus has already opened the dropdown, immediately closing it.
+          if (data.open && !disabled) {
+            setIsOpen(true);
           }
         }}
         trapFocus={false}

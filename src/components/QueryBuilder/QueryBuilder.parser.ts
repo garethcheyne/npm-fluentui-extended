@@ -161,20 +161,14 @@ export const parseFetchXmlToState = (xml: string, fields: QueryBuilderField[]): 
         }
 
         const groups: QueryBuilderGroup[] = [];
+        let groupCounter = 0;
 
-        // Find the entity element
-        const entityEl = doc.querySelector('fetch > entity, entity');
-        if (!entityEl) {
-            return { state: null, error: 'No <entity> element found in the FetchXML.' };
-        }
-
-        // Find filter elements DIRECTLY under entity (not inside link-entity)
-        const filterElements = entityEl.querySelectorAll(':scope > filter');
-
-        // Also gather any standalone condition elements not inside a filter
-        const topLevelConditions: QueryBuilderCondition[] = [];
-
-        filterElements.forEach((filterEl, idx) => {
+        /**
+         * Recursively process a filter element.
+         * If it has direct conditions, create a group from them.
+         * If it has child filters, recurse into them.
+         */
+        const processFilterElement = (filterEl: Element) => {
             const logic = (filterEl.getAttribute('type') || 'and').toLowerCase() as 'and' | 'or';
             const conditions: QueryBuilderCondition[] = [];
 
@@ -183,46 +177,88 @@ export const parseFetchXmlToState = (xml: string, fields: QueryBuilderField[]): 
                 conditions.push(parseConditionElement(condEl, fields));
             });
 
-            // Only add groups that have actual conditions - skip empty filters
             if (conditions.length > 0) {
                 groups.push({
-                    id: `grp_${Date.now()}_${idx}`,
+                    id: `grp_${Date.now()}_${groupCounter++}`,
                     logic,
                     conditions,
                 });
             }
-        });
 
-        // If no filter elements, look for conditions directly under entity
-        if (filterElements.length === 0) {
-            const entityConditions = entityEl.querySelectorAll(':scope > condition');
-            entityConditions.forEach((condEl) => {
-                topLevelConditions.push(parseConditionElement(condEl, fields));
+            // Recurse into nested filters (handles the wrapper pattern from serializer)
+            const nestedFilters = filterEl.querySelectorAll(':scope > filter');
+            nestedFilters.forEach((nestedFilterEl) => {
+                processFilterElement(nestedFilterEl);
             });
 
-            if (topLevelConditions.length > 0) {
+            // If filter has no conditions AND no nested filters, create a default group
+            if (conditions.length === 0 && nestedFilters.length === 0) {
+                const defaultFieldId = fields.length > 0 ? fields[0].id : 'name';
                 groups.push({
-                    id: `grp_${Date.now()}_0`,
-                    logic: 'and',
-                    conditions: topLevelConditions,
+                    id: `grp_${Date.now()}_${groupCounter++}`,
+                    logic,
+                    conditions: [{
+                        id: `cond_${Date.now()}_default`,
+                        kind: 'field',
+                        fieldId: defaultFieldId,
+                        operator: 'eq',
+                        value: '',
+                    }],
                 });
             }
-        }
+        };
 
-        // Parse link-entity elements for related entity conditions (direct children of entity only)
-        // Each link-entity becomes its own separate group
-        const linkEntities = entityEl.querySelectorAll(':scope > link-entity');
-        linkEntities.forEach((linkEl, idx) => {
-            const relatedEntityCondition = parseLinkEntity(linkEl, fields);
-            if (relatedEntityCondition) {
-                // Create a separate group for each link-entity
-                groups.push({
-                    id: `grp_${Date.now()}_link_${idx}`,
-                    logic: 'and',
-                    conditions: [relatedEntityCondition],
+        // Find the entity element
+        const entityEl = doc.querySelector('fetch > entity, entity');
+
+        if (entityEl) {
+            // Find filter elements DIRECTLY under entity (not inside link-entity)
+            const filterElements = entityEl.querySelectorAll(':scope > filter');
+
+            // Also gather any standalone condition elements not inside a filter
+            const topLevelConditions: QueryBuilderCondition[] = [];
+
+            filterElements.forEach((filterEl) => {
+                processFilterElement(filterEl);
+            });
+
+            // If no filter elements, look for conditions directly under entity
+            if (filterElements.length === 0) {
+                const entityConditions = entityEl.querySelectorAll(':scope > condition');
+                entityConditions.forEach((condEl) => {
+                    topLevelConditions.push(parseConditionElement(condEl, fields));
                 });
+
+                if (topLevelConditions.length > 0) {
+                    groups.push({
+                        id: `grp_${Date.now()}_0`,
+                        logic: 'and',
+                        conditions: topLevelConditions,
+                    });
+                }
             }
-        });
+
+            // Parse link-entity elements for related entity conditions (direct children of entity only)
+            // Each link-entity becomes its own separate group
+            const linkEntities = entityEl.querySelectorAll(':scope > link-entity');
+            linkEntities.forEach((linkEl, idx) => {
+                const relatedEntityCondition = parseLinkEntity(linkEl, fields);
+                if (relatedEntityCondition) {
+                    // Create a separate group for each link-entity
+                    groups.push({
+                        id: `grp_${Date.now()}_link_${idx}`,
+                        logic: 'and',
+                        conditions: [relatedEntityCondition],
+                    });
+                }
+            });
+        } else {
+            // No entity element - try to parse bare <filter> fragments
+            const filterElements = doc.querySelectorAll('filter');
+            filterElements.forEach((filterEl) => {
+                processFilterElement(filterEl);
+            });
+        }
 
         // If still no groups, inform user no filter conditions were found
         if (groups.length === 0) {

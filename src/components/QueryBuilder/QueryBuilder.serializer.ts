@@ -223,9 +223,8 @@ const quoteODataValue = (val: any, field: QueryBuilderField): string => {
     if (field.dataType === 'optionset') return String(parseInt(val, 10) || 0);
     if (field.dataType === 'boolean') return val === true || val === 'true' || val === 1 || val === '1' ? 'true' : 'false';
     if (isLookup) {
-        // Lookup GUIDs must be quoted as strings in OData
-        const guidVal = String(val ?? '').replace(/'/g, "''");
-        return guidVal ? `'${guidVal}'` : "''";
+        // Lookup GUIDs are not quoted in OData v4
+        return String(val ?? '');
     }
     if (field.dataType === 'datetime') {
         const dateVal = String(val ?? '');

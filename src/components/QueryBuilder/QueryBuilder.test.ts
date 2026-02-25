@@ -146,8 +146,9 @@ describe('serializeQueryBuilderState', () => {
 
             const result = serializeQueryBuilderState(state, testFields, 'account');
 
-            expect(result.fetchXmlFilter).toContain('operator="ge" value="1000"');
-            expect(result.fetchXmlFilter).toContain('operator="le" value="5000"');
+            expect(result.fetchXmlFilter).toContain('operator="between"');
+            expect(result.fetchXmlFilter).toContain('<value>1000</value>');
+            expect(result.fetchXmlFilter).toContain('<value>5000</value>');
         });
 
         it('serializes boolean field as 1 or 0', () => {
@@ -598,7 +599,7 @@ describe('parseFetchXmlToState', () => {
 
             const result = parseFetchXmlToState(xml, testFields);
 
-            expect(result.state!.groups[0].conditions[0].operator).toBe('startswith');
+            expect(result.state!.groups[0].conditions[0].operator).toBe('begins-with');
             expect(result.state!.groups[0].conditions[0].value).toBe('A');
         });
 
@@ -615,7 +616,7 @@ describe('parseFetchXmlToState', () => {
 
             const result = parseFetchXmlToState(xml, testFields);
 
-            expect(result.state!.groups[0].conditions[0].operator).toBe('endswith');
+            expect(result.state!.groups[0].conditions[0].operator).toBe('ends-with');
             expect(result.state!.groups[0].conditions[0].value).toBe('Inc');
         });
 
@@ -632,7 +633,7 @@ describe('parseFetchXmlToState', () => {
 
             const result = parseFetchXmlToState(xml, testFields);
 
-            expect(result.state!.groups[0].conditions[0].operator).toBe('notnull');
+            expect(result.state!.groups[0].conditions[0].operator).toBe('not-null');
         });
 
         it('parses OR filter logic', () => {

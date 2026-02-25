@@ -850,7 +850,15 @@ export const getOperatorByValue = (value: string): OperatorDefinition | undefine
  * Check if an operator requires a value input
  */
 export const operatorRequiresValue = (operator: string): boolean => {
-    const def = ALL_OPERATORS[operator];
+    // Handle legacy aliases
+    const legacyAliases: Record<string, string> = {
+        'notnull': 'not-null',
+        'startswith': 'begins-with',
+        'endswith': 'ends-with',
+        'notcontains': 'not-contain',
+    };
+    const normalized = legacyAliases[operator] || operator;
+    const def = ALL_OPERATORS[normalized];
     return def?.requiresValue ?? true;
 };
 
