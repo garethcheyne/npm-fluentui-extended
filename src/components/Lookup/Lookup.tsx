@@ -307,6 +307,13 @@ export const Lookup: React.FC<LookupProps> = ({
     <div className={styles.root}>
       <Popover
         open={isOpen && !disabled}
+        onOpenChange={(_e, data) => {
+          if (!data.open) {
+            setIsOpen(false);
+            setSearchText('');
+            setHighlightedIndex(-1);
+          }
+        }}
         trapFocus={false}
         withArrow={false}
         positioning="below-start"
@@ -403,8 +410,8 @@ export const Lookup: React.FC<LookupProps> = ({
                         id={`${lookupId}-option-${option.key}`}
                         role="option"
                         data-index={index}
-                        aria-selected={option.key === selectedOption?.key}
-                        aria-disabled={option.disabled}
+                        aria-selected={option.key === selectedOption?.key ? "true" : "false"}
+                        aria-disabled={option.disabled ? "true" : undefined}
                         className={mergeClasses(
                           styles.option,
                           index === highlightedIndex && styles.optionHighlighted,
