@@ -39,11 +39,17 @@ export const useLookupStyles = makeStyles({
     height: '20px',
   },
 
-  dropdownSurface: {
+  dropdownPortal: {
+    position: 'absolute',
     padding: 0,
-    marginTop: '4px',
     minWidth: '220px',
-    zIndex: 1000,
+    zIndex: 1000000,
+    backgroundColor: tokens.colorNeutralBackground1,
+    borderRadius: tokens.borderRadiusXLarge,
+    boxShadow: tokens.shadow16,
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
+    boxSizing: 'border-box',
+    overflow: 'hidden',
   },
 
   dropdownContent: {
@@ -208,7 +214,8 @@ export const useLookupStyles = makeStyles({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderRadius: tokens.borderRadiusMedium,
-    padding: '4px 12px',
+    padding: '6px 12px',
+    minHeight: '24px',
     backgroundColor: tokens.colorNeutralBackground3,
     backgroundImage: `repeating-linear-gradient(
       -45deg,
@@ -231,6 +238,7 @@ export const useLookupStyles = makeStyles({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '6px 12px',
+    minHeight: '24px',
     borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
     backgroundColor: tokens.colorNeutralBackground1,
     fontSize: tokens.fontSizeBase200,

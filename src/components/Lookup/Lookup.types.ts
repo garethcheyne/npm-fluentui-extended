@@ -58,9 +58,3 @@ export interface LookupProps extends Omit<InputProps, 'onChange' | 'value'> {
   footer?: React.ReactNode;
 }
 
-export interface LookupState {
-  isOpen: boolean;
-  searchText: string;
-  highlightedIndex: number;
-  filteredOptions: LookupOption[];
-}

@@ -4,9 +4,7 @@ import {
   Spinner,
   mergeClasses,
   Button,
-  Popover,
-  PopoverSurface,
-  PopoverTrigger,
+  Portal,
   useId,
 } from '@fluentui/react-components';
 import { DismissRegular, ChevronDownRegular } from '@fluentui/react-icons';
@@ -51,7 +49,7 @@ export const Lookup: React.FC<LookupProps> = ({
   const dropdownRef = React.useRef<HTMLDivElement>(null);
   const debounceRef = React.useRef<ReturnType<typeof setTimeout>>();
   const justSelectedRef = React.useRef(false);
-  const [dropdownWidth, setDropdownWidth] = React.useState<number>();
+  const [dropdownPosition, setDropdownPosition] = React.useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
 
   // Find the selected option - prefer props, fallback to internal state
   const selectedOption = React.useMemo(
@@ -88,6 +86,18 @@ export const Lookup: React.FC<LookupProps> = ({
     return selectedOption?.text ?? '';
   }, [isOpen, searchText, selectedOption]);
 
+  // ─── Open / close helpers ────────────────────────────────────────
+  const openDropdown = React.useCallback(() => {
+    if (disabled) return;
+    setIsOpen(true);
+  }, [disabled]);
+
+  const closeDropdown = React.useCallback(() => {
+    setIsOpen(false);
+    setSearchText('');
+    setHighlightedIndex(-1);
+  }, []);
+
   // Handle search text change with debounce
   const handleSearchChange = React.useCallback(
     (value: string) => {
@@ -113,10 +123,10 @@ export const Lookup: React.FC<LookupProps> = ({
       const value = e.target.value;
       handleSearchChange(value);
       if (!isOpen) {
-        setIsOpen(true);
+        openDropdown();
       }
     },
-    [handleSearchChange, isOpen]
+    [handleSearchChange, isOpen, openDropdown]
   );
 
   // Handle option selection
@@ -154,15 +164,10 @@ export const Lookup: React.FC<LookupProps> = ({
       if (disabled) return;
 
       switch (e.key) {
-        case ' ':
-          // Allow space key in the input - prevent PopoverTrigger from intercepting
-          e.stopPropagation();
-          break;
-
         case 'ArrowDown':
           e.preventDefault();
           if (!isOpen) {
-            setIsOpen(true);
+            openDropdown();
           } else {
             setHighlightedIndex((prev) =>
               prev < filteredOptions.length - 1 ? prev + 1 : 0
@@ -188,31 +193,42 @@ export const Lookup: React.FC<LookupProps> = ({
 
         case 'Escape':
           e.preventDefault();
-          setIsOpen(false);
-          setSearchText('');
-          setHighlightedIndex(-1);
+          closeDropdown();
           break;
 
         case 'Tab':
-          setIsOpen(false);
-          setSearchText('');
+          closeDropdown();
           break;
       }
     },
-    [disabled, isOpen, highlightedIndex, filteredOptions, handleSelectOption]
+    [disabled, isOpen, highlightedIndex, filteredOptions, handleSelectOption, openDropdown, closeDropdown]
   );
 
-  // Handle input focus
-  const handleFocus = React.useCallback(() => {
-    if (!disabled) {
-      // Don't reopen if we just selected an option
-      if (justSelectedRef.current) {
-        justSelectedRef.current = false;
-        return;
+  // Handle input focus — open the dropdown
+  const handleFocus = React.useCallback(
+    (e: React.FocusEvent<HTMLInputElement>) => {
+      if (!disabled) {
+        // Don't reopen if we just selected an option
+        if (justSelectedRef.current) {
+          justSelectedRef.current = false;
+          return;
+        }
+        openDropdown();
       }
-      setIsOpen(true);
+      // Forward to consumer's onFocus if provided
+      inputProps.onFocus?.(e);
+    },
+    [disabled, openDropdown, inputProps.onFocus]
+  );
+
+  // Handle click on the wrapper — also opens (in case focus doesn't fire
+  // because the input is already focused, e.g. clicking the chevron area)
+  const handleWrapperClick = React.useCallback(() => {
+    if (!disabled && !isOpen) {
+      openDropdown();
+      inputRef.current?.focus();
     }
-  }, [disabled]);
+  }, [disabled, isOpen, openDropdown]);
 
   // Cleanup debounce on unmount
   React.useEffect(() => {
@@ -233,251 +249,242 @@ export const Lookup: React.FC<LookupProps> = ({
     }
   }, [highlightedIndex]);
 
+  // ─── Position the dropdown below the input ─────────────────────
   React.useEffect(() => {
-    if (!isOpen || !matchInputWidth) {
-      return;
-    }
+    if (!isOpen) return;
 
-    const updateWidth = () => {
-      const width = inputWrapperRef.current?.getBoundingClientRect().width;
-      if (width && width > 0) {
-        setDropdownWidth(width);
+    const updatePosition = () => {
+      const rect = inputWrapperRef.current?.getBoundingClientRect();
+      if (rect) {
+        setDropdownPosition({
+          top: rect.bottom + 4 + window.scrollY,
+          left: rect.left + window.scrollX,
+          width: matchInputWidth ? rect.width : 0,
+        });
       }
     };
 
-    updateWidth();
+    updatePosition();
 
+    // Track input resize (e.g. flex/grid layout changes)
+    let resizeObserver: ResizeObserver | undefined;
     if (typeof ResizeObserver !== 'undefined' && inputWrapperRef.current) {
-      const resizeObserver = new ResizeObserver(() => updateWidth());
+      resizeObserver = new ResizeObserver(() => updatePosition());
       resizeObserver.observe(inputWrapperRef.current);
-      return () => resizeObserver.disconnect();
     }
 
-    window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
+    // Track window resize
+    window.addEventListener('resize', updatePosition);
+
+    // Track any scroll so the portal follows the input
+    window.addEventListener('scroll', updatePosition, true);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
   }, [isOpen, matchInputWidth]);
 
+  // ─── Close when clicking outside ───────────────────────────────
   React.useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const closeOnScroll = (event: Event) => {
-      // Don't close if scrolling inside the dropdown or input wrapper
-      const target = event.target as Node | null;
-      if (target && (dropdownRef.current?.contains(target) || inputWrapperRef.current?.contains(target))) {
-        return;
-      }
-      
-      setIsOpen(false);
-      setSearchText('');
-      setHighlightedIndex(-1);
-    };
-
-    window.addEventListener('scroll', closeOnScroll, true);
-    return () => window.removeEventListener('scroll', closeOnScroll, true);
-  }, [isOpen]);
-
-  React.useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
+    if (!isOpen) return;
 
     const handlePointerDownOutside = (event: MouseEvent) => {
       const target = event.target as Node | null;
-      if (!target) {
-        return;
-      }
-
+      if (!target) return;
       const insideInput = inputWrapperRef.current?.contains(target);
       const insideDropdown = dropdownRef.current?.contains(target);
-
       if (!insideInput && !insideDropdown) {
-        setIsOpen(false);
-        setSearchText('');
-        setHighlightedIndex(-1);
+        closeDropdown();
       }
     };
 
-    document.addEventListener('mousedown', handlePointerDownOutside);
-    return () => document.removeEventListener('mousedown', handlePointerDownOutside);
-  }, [isOpen]);
+    // Use a microtask delay so the current click that opened the dropdown
+    // does not immediately close it.
+    const rafId = requestAnimationFrame(() => {
+      document.addEventListener('mousedown', handlePointerDownOutside);
+    });
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      document.removeEventListener('mousedown', handlePointerDownOutside);
+    };
+  }, [isOpen, closeDropdown]);
+
+  const showDropdown = isOpen && !disabled;
 
   return (
     <div className={styles.root}>
-      <Popover
-        open={isOpen && !disabled}
-        onOpenChange={(_e, data) => {
-          // Only allow Popover-initiated opens; closing is handled by our own
-          // handlers (Escape, Tab, outside click, scroll, option selection).
-          // Without this guard the PopoverTrigger click-toggle fires AFTER
-          // handleFocus has already opened the dropdown, immediately closing it.
-          if (data.open && !disabled) {
-            setIsOpen(true);
-          }
-        }}
-        trapFocus={false}
-        withArrow={false}
-        positioning="below-start"
+      <div
+        className={styles.inputWrapper}
+        ref={inputWrapperRef}
+        onClick={handleWrapperClick}
       >
-        <PopoverTrigger disableButtonEnhancement>
-          <div className={styles.inputWrapper} ref={inputWrapperRef}>
-            <Input
-              {...inputProps}
-              id={lookupId}
-              ref={inputRef}
-              className={mergeClasses(styles.input, inputProps.className)}
-              value={displayValue}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              onFocus={handleFocus}
-              placeholder={placeholder}
-              disabled={disabled}
-              aria-expanded={isOpen}
-              aria-haspopup="listbox"
-              aria-controls={isOpen ? `${lookupId}-listbox` : undefined}
-              aria-autocomplete="list"
-              aria-activedescendant={highlightedOptionId}
-              aria-label={ariaLabelledBy ? undefined : ariaLabel ?? placeholder ?? 'Lookup'}
-              contentAfter={
-                <span className={styles.iconContainer}>
-                  {clearable && selectedOption && !disabled && (
-                    <Button
-                      appearance="subtle"
-                      size="small"
-                      icon={<DismissRegular />}
-                      onClick={handleClear}
-                      className={styles.iconButton}
-                      aria-label="Clear selection"
-                    />
-                  )}
-                  {loading ? (
-                    <Spinner size="tiny" />
-                  ) : (
-                    <span className={styles.chevronIcon}>
-                      <ChevronDownRegular />
-                    </span>
-                  )}
+        <Input
+          {...inputProps}
+          id={lookupId}
+          ref={inputRef}
+          className={mergeClasses(styles.input, inputProps.className)}
+          value={displayValue}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          onFocus={handleFocus}
+          placeholder={placeholder}
+          disabled={disabled}
+          aria-expanded={isOpen}
+          aria-haspopup="listbox"
+          aria-controls={isOpen ? `${lookupId}-listbox` : undefined}
+          aria-autocomplete="list"
+          aria-activedescendant={highlightedOptionId}
+          aria-label={ariaLabelledBy ? undefined : ariaLabel ?? placeholder ?? 'Lookup'}
+          contentAfter={
+            <span className={styles.iconContainer}>
+              {clearable && selectedOption && !disabled && (
+                <Button
+                  appearance="subtle"
+                  size="small"
+                  icon={<DismissRegular />}
+                  onClick={handleClear}
+                  className={styles.iconButton}
+                  aria-label="Clear selection"
+                />
+              )}
+              {loading ? (
+                <Spinner size="tiny" />
+              ) : (
+                <span className={styles.chevronIcon}>
+                  <ChevronDownRegular />
                 </span>
-              }
-            />
-          </div>
-        </PopoverTrigger>
+              )}
+            </span>
+          }
+        />
+      </div>
 
-        <PopoverSurface
-          className={styles.dropdownSurface}
-          style={matchInputWidth && dropdownWidth ? { width: `${dropdownWidth}px` } : undefined}
-        >
+      {showDropdown && (
+        <Portal>
           <div
-            id={`${lookupId}-listbox`}
-            className={styles.dropdownContent}
-            ref={dropdownRef}
-            role="listbox"
-            aria-labelledby={lookupId}
+            className={styles.dropdownPortal}
+            style={{
+              top: dropdownPosition.top,
+              left: dropdownPosition.left,
+              ...(matchInputWidth && dropdownPosition.width > 0
+                ? { width: dropdownPosition.width }
+                : { minWidth: 220 }),
+            }}
           >
-            {header && (
-              <div className={styles.headerWrapper}>
-                <div className={styles.header}>{header}</div>
-              </div>
-            )}
-            {loading ? (
-              <div className={styles.loadingContainer}>
-                <Spinner size="small" label="Loading..." />
-              </div>
-            ) : filteredOptions.length === 0 ? (
-              <div className={styles.noResults}>{noResultsMessage}</div>
-            ) : (
-              <div className={styles.optionsContainer}>
-                <div className={styles.optionsList}>
-                  {filteredOptions.map((option, index) => {
-                    const isExpanded = expandedKeys.has(option.key);
-                    const hasDetails = option.details && option.details.length > 0;
+            <div
+              id={`${lookupId}-listbox`}
+              className={styles.dropdownContent}
+              ref={dropdownRef}
+              role="listbox"
+              aria-labelledby={lookupId}
+            >
+              {header && (
+                <div className={styles.headerWrapper}>
+                  <div className={styles.header}>{header}</div>
+                </div>
+              )}
+              {loading ? (
+                <div className={styles.loadingContainer}>
+                  <Spinner size="small" label="Loading..." />
+                </div>
+              ) : filteredOptions.length === 0 ? (
+                <div className={styles.noResults}>{noResultsMessage}</div>
+              ) : (
+                <div className={styles.optionsContainer}>
+                  <div className={styles.optionsList}>
+                    {filteredOptions.map((option, index) => {
+                      const isExpanded = expandedKeys.has(option.key);
+                      const hasDetails = option.details && option.details.length > 0;
 
-                    const handleExpandClick = (e: React.MouseEvent) => {
-                      e.stopPropagation();
-                      setExpandedKeys((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(option.key)) {
-                          next.delete(option.key);
-                        } else {
-                          next.add(option.key);
-                        }
-                        return next;
-                      });
-                    };
+                      const handleExpandClick = (e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        setExpandedKeys((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(option.key)) {
+                            next.delete(option.key);
+                          } else {
+                            next.add(option.key);
+                          }
+                          return next;
+                        });
+                      };
 
-                    return (
-                      <div
-                        key={option.key}
-                        id={`${lookupId}-option-${option.key}`}
-                        role="option"
-                        data-index={index}
-                        aria-selected={option.key === selectedOption?.key ? "true" : "false"}
-                        aria-disabled={option.disabled ? "true" : undefined}
-                        className={mergeClasses(
-                          styles.option,
-                          index === highlightedIndex && styles.optionHighlighted,
-                          option.key === selectedOption?.key && styles.optionSelected,
-                          option.disabled && styles.optionDisabled
-                        )}
-                        onClick={() => handleSelectOption(option)}
-                        onMouseEnter={() => setHighlightedIndex(index)}
-                      >
-                        {option.icon && (
-                          <span className={styles.optionIcon}>{option.icon}</span>
-                        )}
-                        <span className={styles.optionContent}>
-                          <span className={styles.optionText}>{option.text}</span>
-                          {option.secondaryText && (
-                            <span className={styles.optionSecondaryText}>
-                              {option.secondaryText}
+                      return (
+                        <div
+                          key={option.key}
+                          id={`${lookupId}-option-${option.key}`}
+                          role="option"
+                          data-index={index}
+                          aria-selected={option.key === selectedOption?.key ? true : false}
+                          aria-disabled={option.disabled === true ? true : undefined}
+                          className={mergeClasses(
+                            styles.option,
+                            index === highlightedIndex && styles.optionHighlighted,
+                            option.key === selectedOption?.key && styles.optionSelected,
+                            option.disabled && styles.optionDisabled
+                          )}
+                          onClick={() => handleSelectOption(option)}
+                          onMouseEnter={() => setHighlightedIndex(index)}
+                        >
+                          {option.icon && (
+                            <span className={styles.optionIcon}>{option.icon}</span>
+                          )}
+                          <span className={styles.optionContent}>
+                            <span className={styles.optionText}>{option.text}</span>
+                            {option.secondaryText && (
+                              <span className={styles.optionSecondaryText}>
+                                {option.secondaryText}
+                              </span>
+                            )}
+                            {isExpanded && hasDetails && (
+                              <div className={styles.optionDetails}>
+                                {option.details!.map((detail, detailIndex) => (
+                                  <div key={detailIndex} className={styles.optionDetailRow}>
+                                    {detail.label && (
+                                      <span className={styles.optionDetailLabel}>
+                                        {detail.label}:
+                                      </span>
+                                    )}
+                                    <span className={styles.optionDetailValue}>
+                                      {detail.value}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </span>
+                          {hasDetails && (
+                            <span
+                              role="button"
+                              tabIndex={-1}
+                              className={mergeClasses(
+                                styles.optionExpandButton,
+                                isExpanded && styles.optionExpandButtonExpanded
+                              )}
+                              onClick={handleExpandClick}
+                              aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+                            >
+                              <ChevronDownRegular />
                             </span>
                           )}
-                          {isExpanded && hasDetails && (
-                            <div className={styles.optionDetails}>
-                              {option.details!.map((detail, detailIndex) => (
-                                <div key={detailIndex} className={styles.optionDetailRow}>
-                                  {detail.label && (
-                                    <span className={styles.optionDetailLabel}>
-                                      {detail.label}:
-                                    </span>
-                                  )}
-                                  <span className={styles.optionDetailValue}>
-                                    {detail.value}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </span>
-                        {hasDetails && (
-                          <span
-                            role="button"
-                            tabIndex={-1}
-                            className={mergeClasses(
-                              styles.optionExpandButton,
-                              isExpanded && styles.optionExpandButtonExpanded
-                            )}
-                            onClick={handleExpandClick}
-                            aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
-                          >
-                            <ChevronDownRegular />
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
-            {footer && (
-              <div className={styles.footerWrapper}>
-                <div className={styles.footer}>{footer}</div>
-              </div>
-            )}
+              )}
+              {footer && (
+                <div className={styles.footerWrapper}>
+                  <div className={styles.footer}>{footer}</div>
+                </div>
+              )}
+            </div>
           </div>
-        </PopoverSurface>
-      </Popover>
+        </Portal>
+      )}
     </div>
   );
 };
