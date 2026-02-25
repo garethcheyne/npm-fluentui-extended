@@ -56,5 +56,15 @@ export interface LookupProps extends Omit<InputProps, 'onChange' | 'value'> {
   header?: React.ReactNode;
   /** Footer content rendered at the bottom of the dropdown */
   footer?: React.ReactNode;
+  /**
+   * Controlled open state. When provided, the component will use this value
+   * instead of its internal state. Use together with `onOpenChange`.
+   */
+  open?: boolean;
+  /**
+   * Callback fired when the dropdown open state changes.
+   * Use together with `open` for controlled mode, or standalone to observe changes.
+   */
+  onOpenChange?: (open: boolean) => void;
 }
 

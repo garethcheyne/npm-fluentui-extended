@@ -28,6 +28,8 @@ export const Lookup: React.FC<LookupProps> = ({
   disabled,
   header,
   footer,
+  open: controlledOpen,
+  onOpenChange,
   ...inputProps
 }) => {
   const styles = useLookupStyles();
@@ -38,7 +40,22 @@ export const Lookup: React.FC<LookupProps> = ({
   const autoId = useId('lookup-');
   const lookupId = id ?? autoId;
 
-  const [isOpen, setIsOpen] = React.useState(false);
+  const [internalOpen, setInternalOpen] = React.useState(false);
+
+  // Controlled vs uncontrolled open state
+  const isControlled = controlledOpen !== undefined;
+  const isOpen = isControlled ? controlledOpen : internalOpen;
+
+  const setIsOpen = React.useCallback(
+    (value: boolean | ((prev: boolean) => boolean)) => {
+      const nextValue = typeof value === 'function' ? value(isOpen) : value;
+      if (!isControlled) {
+        setInternalOpen(nextValue);
+      }
+      onOpenChange?.(nextValue);
+    },
+    [isControlled, isOpen, onOpenChange]
+  );
   const [searchText, setSearchText] = React.useState('');
   const [highlightedIndex, setHighlightedIndex] = React.useState(-1);
   const [expandedKeys, setExpandedKeys] = React.useState<Set<string>>(new Set());
@@ -300,14 +317,13 @@ export const Lookup: React.FC<LookupProps> = ({
       }
     };
 
-    // Use a microtask delay so the current click that opened the dropdown
-    // does not immediately close it.
-    const rafId = requestAnimationFrame(() => {
-      document.addEventListener('mousedown', handlePointerDownOutside);
-    });
+    // Register immediately — useEffect already runs after the browser paints,
+    // so the mousedown that opened the dropdown is fully processed.
+    // NOTE: Previously used requestAnimationFrame which caused the handler
+    // to never register in D365's re-render-heavy environment.
+    document.addEventListener('mousedown', handlePointerDownOutside);
 
     return () => {
-      cancelAnimationFrame(rafId);
       document.removeEventListener('mousedown', handlePointerDownOutside);
     };
   }, [isOpen, closeDropdown]);
