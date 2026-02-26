@@ -319,12 +319,12 @@ export const Lookup: React.FC<LookupProps> = ({
 
     // Register immediately — useEffect already runs after the browser paints,
     // so the mousedown that opened the dropdown is fully processed.
-    // NOTE: Previously used requestAnimationFrame which caused the handler
-    // to never register in D365's re-render-heavy environment.
-    document.addEventListener('mousedown', handlePointerDownOutside);
+    // NOTE: Uses capture phase (true) so that stopPropagation() calls by host
+    // applications (e.g., Dynamics 365) cannot prevent the handler from firing.
+    document.addEventListener('mousedown', handlePointerDownOutside, true);
 
     return () => {
-      document.removeEventListener('mousedown', handlePointerDownOutside);
+      document.removeEventListener('mousedown', handlePointerDownOutside, true);
     };
   }, [isOpen, closeDropdown]);
 
