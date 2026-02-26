@@ -167,6 +167,7 @@ import { AddRegular, PersonSearchRegular } from '@fluentui/react-icons';
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
+| `id` | `string` | auto-generated | Unique identifier for the lookup |
 | `options` | `LookupOption[]` | `[]` | Options to display in the dropdown |
 | `selectedKey` | `string \| null` | - | Selected option key (controlled) |
 | `selectedOption` | `LookupOption \| null` | - | Selected option object (recommended for async) |
@@ -178,9 +179,20 @@ import { AddRegular, PersonSearchRegular } from '@fluentui/react-icons';
 | `clearable` | `boolean` | `true` | Show clear button |
 | `minSearchLength` | `number` | `0` | Min chars before search fires |
 | `searchDebounceMs` | `number` | `300` | Search debounce delay (ms) |
+| `matchInputWidth` | `boolean` | `true` | Match dropdown width to input width |
 | `header` | `ReactNode` | - | Header content |
 | `footer` | `ReactNode` | - | Footer content |
 | `disabled` | `boolean` | `false` | Disable the lookup |
+| `open` | `boolean` | - | Controlled open state for the dropdown |
+| `onOpenChange` | `(open: boolean) => void` | - | Callback when dropdown open state changes |
+
+### Cross-Document Support (Dynamics 365 Iframes)
+
+The Lookup component automatically detects when it's rendered inside a cross-document context (e.g., a React tree mounted into a parent window's document from an iframe). It uses `ownerDocument` and `ownerDocument.defaultView` instead of the global `document` and `window` to ensure:
+
+- **Dismiss on click outside** works correctly (mousedown listener on the correct document)
+- **Scroll/resize tracking** responds to the correct window's events
+- **Dropdown positioning** uses the correct scroll offsets
 
 ### Inherited Input Props
 
