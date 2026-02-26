@@ -273,9 +273,11 @@ export const Lookup: React.FC<LookupProps> = ({
     const updatePosition = () => {
       const rect = inputWrapperRef.current?.getBoundingClientRect();
       if (rect) {
+        // Use ownerDocument's window for scroll offsets (cross-document safe)
+        const ownerWin = inputWrapperRef.current?.ownerDocument?.defaultView ?? window;
         setDropdownPosition({
-          top: rect.bottom + 4 + window.scrollY,
-          left: rect.left + window.scrollX,
+          top: rect.bottom + 4 + ownerWin.scrollY,
+          left: rect.left + ownerWin.scrollX,
           width: matchInputWidth ? rect.width : 0,
         });
       }
@@ -290,16 +292,22 @@ export const Lookup: React.FC<LookupProps> = ({
       resizeObserver.observe(inputWrapperRef.current);
     }
 
+    // Use the ownerDocument's window for event listeners.
+    // In cross-document scenarios (e.g., D365 iframes where React mounts
+    // into the top window's document), the global `window` refers to the
+    // iframe window, but events fire on the top window where the DOM lives.
+    const ownerWin = inputWrapperRef.current?.ownerDocument?.defaultView ?? window;
+
     // Track window resize
-    window.addEventListener('resize', updatePosition);
+    ownerWin.addEventListener('resize', updatePosition);
 
     // Track any scroll so the portal follows the input
-    window.addEventListener('scroll', updatePosition, true);
+    ownerWin.addEventListener('scroll', updatePosition, true);
 
     return () => {
       resizeObserver?.disconnect();
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, true);
+      ownerWin.removeEventListener('resize', updatePosition);
+      ownerWin.removeEventListener('scroll', updatePosition, true);
     };
   }, [isOpen, matchInputWidth]);
 
@@ -317,14 +325,20 @@ export const Lookup: React.FC<LookupProps> = ({
       }
     };
 
-    // Register immediately — useEffect already runs after the browser paints,
-    // so the mousedown that opened the dropdown is fully processed.
-    // NOTE: Uses capture phase (true) so that stopPropagation() calls by host
+    // Use ownerDocument instead of the global `document`.
+    // In cross-document scenarios (e.g., D365 iframes where React renders
+    // into the top window's document), the global `document` refers to the
+    // iframe's document, but mousedown events fire on the top document
+    // where the actual DOM elements live. Using ownerDocument ensures the
+    // listener is on the correct document.
+    //
+    // Uses capture phase (true) so that stopPropagation() calls by host
     // applications (e.g., Dynamics 365) cannot prevent the handler from firing.
-    document.addEventListener('mousedown', handlePointerDownOutside, true);
+    const ownerDoc = inputWrapperRef.current?.ownerDocument ?? document;
+    ownerDoc.addEventListener('mousedown', handlePointerDownOutside, true);
 
     return () => {
-      document.removeEventListener('mousedown', handlePointerDownOutside, true);
+      ownerDoc.removeEventListener('mousedown', handlePointerDownOutside, true);
     };
   }, [isOpen, closeDropdown]);
 
