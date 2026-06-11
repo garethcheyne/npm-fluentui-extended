@@ -1,6 +1,6 @@
 {
   "name": "fluentui-extended",
-  "version": "2026.2.19",
+  "version": "2026.6.11",
   "description": "Extended Fluent UI v9 components styled after Dynamics 365 - Lookup with async search, expandable details, and more",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -53,8 +53,8 @@
     "@fluentui/react-components": "^9.0.0",
     "@fluentui/react-datepicker-compat": "^0.6.0",
     "@fluentui/react-icons": "^2.0.0",
-    "react": "^16.8.0 || ^17.0.0 || ^18.0.0",
-    "react-dom": "^16.8.0 || ^17.0.0 || ^18.0.0"
+    "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0",
+    "react-dom": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0"
   },
   "devDependencies": {
     "@azure/msal-browser": "^5.2.0",
@@ -64,8 +64,8 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
-    "@types/react": "^18.3.0",
-    "@types/react-dom": "^18.3.0",
+    "@types/react": "^18.3.0 || ^19.0.0",
+    "@types/react-dom": "^18.3.0 || ^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",
     "jsdom": "^28.0.0",
     "react": "^18.3.0",
