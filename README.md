@@ -38,6 +38,7 @@ An Advanced Find-style query builder for Dynamics 365. Build complex filter cond
 ## Quick Start
 
 ```tsx
+import { useState } from 'react';
 import { Lookup, LookupOption } from 'fluentui-extended';
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
 
@@ -161,6 +162,113 @@ import { AddRegular, PersonSearchRegular } from '@fluentui/react-icons';
 />
 ```
 
+### Multi-Entity Lookup with Filter Buttons
+
+Replicate the native Dynamics 365 lookup pattern where users can filter between entity types:
+
+```tsx
+import { Text, Button, Link, ToggleButton } from '@fluentui/react-components';
+import { BuildingRegular, PersonRegular, ArrowLeftRegular } from '@fluentui/react-icons';
+
+function MultiEntityLookup() {
+  const [showAccounts, setShowAccounts] = useState(true);
+  const [showContacts, setShowContacts] = useState(true);
+
+  const options: LookupOption[] = [
+    { key: 'acc-1', text: 'Contoso Ltd', icon: <BuildingRegular />, details: [...] },
+    { key: 'con-1', text: 'John Smith', icon: <PersonRegular />, details: [...] },
+  ];
+
+  // Filter based on key prefix
+  const filteredOptions = useMemo(() => 
+    options.filter(opt => {
+      if (opt.key.startsWith('acc-')) return showAccounts;
+      if (opt.key.startsWith('con-')) return showContacts;
+      return true;
+    }), [showAccounts, showContacts]
+  );
+
+  return (
+    <Lookup
+      options={filteredOptions}
+      header={
+        // Drill-down view when single entity selected
+        showAccounts !== showContacts ? (
+          <>
+            <Link onClick={() => { setShowAccounts(true); setShowContacts(true); }}>
+              <ArrowLeftRegular /> All
+            </Link>
+            <Text weight="semibold">{showAccounts ? 'Accounts' : 'Contacts'}</Text>
+          </>
+        ) : (
+          // Filter toggles when showing all
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Text size={200}>Results from:</Text>
+              <ToggleButton size="small" checked={showAccounts}
+                onClick={() => { setShowAccounts(true); setShowContacts(false); }}>
+                Accounts
+              </ToggleButton>
+              <ToggleButton size="small" checked={showContacts}
+                onClick={() => { setShowAccounts(false); setShowContacts(true); }}>
+                Contacts
+              </ToggleButton>
+            </div>
+            <Button size="small">Recent records</Button>
+          </>
+        )
+      }
+    />
+  );
+}
+```
+
+### Rich Secondary Text with React Elements
+
+Both `secondaryText` and `details` support React elements, not just strings:
+
+```tsx
+import { Badge } from '@fluentui/react-components';
+import { CheckmarkCircleRegular } from '@fluentui/react-icons';
+
+const options: LookupOption[] = [
+  {
+    key: '1',
+    text: 'John Smith',
+    secondaryText: (
+      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Badge appearance="tint" color="success" size="small" icon={<CheckmarkCircleRegular />}>
+          Active
+        </Badge>
+        <span>john.smith@contoso.com</span>
+      </span>
+    ),
+    icon: <PersonRegular />,
+    details: [
+      { label: 'Status', value: <Badge appearance="filled" color="success" size="small">Verified</Badge> },
+      { label: 'Role', value: <Badge appearance="tint" color="brand" size="small">Decision Maker</Badge> },
+      { value: <span style={{ color: '#0078d4' }}>View full profile →</span> },
+    ],
+  },
+];
+```
+
+---
+
+## Test Harness Examples
+
+Run the test harness with `npm run harness` to see all examples in action.
+
+| Example | Description |
+|---------|-------------|
+| **Basic Lookup** | Simple lookup with expandable details, no header/footer |
+| **Header & Footer** | D365-style with "Accounts" header and "New" / "Advanced" footer links |
+| **Details Only (No Secondary Text)** | Options with icons + details but no secondary text; demonstrates icon centering on single-line text |
+| **Multi-Entity Filter** | Toggle between Accounts/Contacts with drill-down header pattern (← All) |
+| **Dynamic Search (Async API)** | Simulated 800ms API delay with loading spinner; auto-loads top 5 on open |
+| **Live Dynamics Lookup** | Connects to real D365 environment via Xrm.WebApi (when connected) |
+| **QueryBuilder** | Full Advanced Find-style query builder with FetchXML serialization |
+
 ## API Reference
 
 ### Lookup Props
@@ -216,20 +324,22 @@ The Lookup component extends Fluent UI's `Input` and supports these standard pro
 
 ```ts
 interface LookupOption {
-  key: string;                    // Unique identifier (required)
-  text: string;                   // Display text (required)
-  secondaryText?: string;         // Secondary line of text
-  icon?: ReactNode;               // Icon component
-  details?: LookupOptionDetail[]; // Expandable details (chevron appears)
-  data?: unknown;                 // Custom data payload
-  disabled?: boolean;             // Disable this option
+  key: string;                      // Unique identifier (required)
+  text: string;                     // Display text (required)
+  secondaryText?: ReactNode;        // Secondary line - string, Badge, or JSX
+  icon?: ReactNode;                 // Icon component (e.g., <BuildingRegular />)
+  details?: LookupOptionDetail[];   // Expandable details (chevron appears)
+  data?: unknown;                   // Custom data payload for your app
+  disabled?: boolean;               // Disable this option
 }
 
 interface LookupOptionDetail {
-  label?: string;  // Optional label (e.g., "Phone:")
-  value: string;   // Detail value
+  label?: ReactNode;  // Optional label (e.g., "Phone:" or a Badge)
+  value: ReactNode;   // Detail value - string or JSX element
 }
 ```
+
+> **Note:** Both `secondaryText` and `details` support React elements, not just strings. See [Rich Secondary Text](#rich-secondary-text-with-react-elements) for examples.
 
 ## Keyboard Navigation
 
@@ -526,14 +636,6 @@ if (!result.isValid) {
 
 ---
 
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
 ## Acknowledgments
 
 This library extends [Microsoft's Fluent UI React v9](https://react.fluentui.dev/) components. Thank you to Microsoft and the Fluent UI team for creating and maintaining such an excellent design system.
@@ -541,6 +643,83 @@ This library extends [Microsoft's Fluent UI React v9](https://react.fluentui.dev
 - [Fluent UI React](https://react.fluentui.dev/)
 - [Fluent UI GitHub](https://github.com/microsoft/fluentui)
 - [Fluent 2 Design System](https://fluent2.microsoft.design/)
+
+---
+
+## Changelog
+
+> Version format: `YYYY.M.DD` (e.g., `2026.8.30` = August 30, 2026)
+
+### 2026.8.30
+
+- ✨ Added multi-entity filter pattern with drill-down header ("← All" back button) in test harness
+- ✨ Added "Details Only (No Secondary Text)" example to test harness
+- ✨ Support for React elements in `secondaryText` and `details[].value` (Badges, icons, styled text)
+- ♻️ Improved `aria-selected`/`aria-disabled` attribute handling
+- 📝 Documentation overhaul with complete API reference and examples
+
+### 2026.6.12
+
+- ✨ Added React 19 support to peerDependencies
+- 📝 Updated README with cross-document support documentation
+
+### 2026.2.19
+
+- 🐛 Fixed cross-document dismiss in Dynamics 365 iframes using `ownerDocument`
+
+### 2026.2.17
+
+- 🐛 Removed `requestAnimationFrame` — handler registers immediately
+- 🐛 Switched to capture phase for dismiss handler to prevent D365 DOM interference
+
+### 2026.2.15
+
+- ✨ Added controlled `open` and `onOpenChange` props for programmatic dropdown control
+- 🐛 Removed `requestAnimationFrame` from dismiss handler
+
+### 2026.2.13
+
+- ♻️ Rebuilt popup from scratch using custom element (Fluent UI Popover had unexpected behavior)
+
+### 2026.2.11
+
+- 🐛 Added `onOpenChange` callback to sync internal state with Popover dismiss events (outside click, Escape, focus loss)
+
+### 2026.2.10
+
+- 🐛 Fixed Lookup not allowing space character in search input
+
+### 2026.2.8
+
+- ✨ **QueryBuilder**: Native API integration for field metadata
+- ✨ **QueryBuilder**: Lookup field support with related entity validation
+
+### 2026.2.7
+
+- ♻️ Removed `Xrm` global dependency — now uses native `/api/data/v9.2/` fetch calls
+
+### 2026.2.6
+
+- ♻️ **QueryBuilder**: Refactored to reuse shared components and styles
+
+### 2026.2.5
+
+- ✨ **QueryBuilder**: Initial release (beta) — Advanced Find-style query builder
+- ♻️ **Lookup**: Changed from options-only to popup-based rendering
+
+### 2026.2.3
+
+- ✨ Added `id` prop — auto-generated if not provided
+
+### 2026.2.2
+
+- 🐛 Fixed classic JSX transform for React 16 compatibility
+- ✨ Added React 16.8+ support
+
+### 2026.2.1
+
+- 🎉 Initial release
+- ✨ Lookup component with async search, expandable details, header/footer
 
 ## License
 

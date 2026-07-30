@@ -71,15 +71,19 @@ export const useLookupStyles = makeStyles({
     flexDirection: 'row',
     alignItems: 'flex-start',
     boxSizing: 'border-box',
-    padding: '8px 12px',
+    paddingTop: '6px',
+    paddingBottom: '6px',
+    paddingLeft: '12px',
+    paddingRight: '8px',
     cursor: 'pointer',
-    borderRadius: tokens.borderRadiusSmall,
+    borderRadius: tokens.borderRadiusNone,
     backgroundColor: 'transparent',
     border: 'none',
     width: '100%',
     overflow: 'hidden',
     textAlign: 'left',
-    gap: '8px',
+    gap: '10px',
+    minHeight: '40px',
 
     '&:hover': {
       backgroundColor: tokens.colorNeutralBackground1Hover,
@@ -96,10 +100,16 @@ export const useLookupStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '20px',
-    height: '20px',
+    width: '24px',
+    height: '24px',
+    fontSize: '20px',
     flexShrink: 0,
-    color: tokens.colorNeutralForeground3,
+    color: tokens.colorNeutralForeground1,
+    marginTop: '0px', // Centered on single text row
+  },
+
+  optionIconWithSecondary: {
+    marginTop: '6px', // Centered between text + secondaryText rows
   },
 
   optionContent: {
@@ -107,6 +117,7 @@ export const useLookupStyles = makeStyles({
     flexDirection: 'column',
     flex: '1 1 auto',
     minWidth: 0,
+    gap: '2px',
   },
 
   optionExpandButton: {
@@ -116,6 +127,7 @@ export const useLookupStyles = makeStyles({
     width: '24px',
     height: '24px',
     marginLeft: 'auto',
+    marginTop: '2px',
     flexShrink: 0,
     cursor: 'pointer',
     borderRadius: tokens.borderRadiusSmall,
@@ -155,15 +167,16 @@ export const useLookupStyles = makeStyles({
 
   optionText: {
     fontSize: tokens.fontSizeBase300,
-    fontWeight: tokens.fontWeightRegular,
+    fontWeight: tokens.fontWeightSemibold,
     color: tokens.colorNeutralForeground1,
+    lineHeight: tokens.lineHeightBase300,
   },
 
   optionSecondaryText: {
     fontSize: tokens.fontSizeBase200,
     fontWeight: tokens.fontWeightRegular,
-    color: tokens.colorNeutralForeground3,
-    marginTop: '2px',
+    color: tokens.colorNeutralForeground2,
+    lineHeight: tokens.lineHeightBase200,
   },
 
   optionDetails: {

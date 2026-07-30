@@ -2,10 +2,10 @@ import type { InputProps } from '@fluentui/react-components';
 import type * as React from 'react';
 
 export interface LookupOptionDetail {
-  /** Label for the detail row */
-  label?: string;
-  /** Value for the detail row */
-  value: string;
+  /** Label for the detail row - can be a string or React element */
+  label?: React.ReactNode;
+  /** Value for the detail row - can be a string or React element */
+  value: React.ReactNode;
 }
 
 export interface LookupOption {
@@ -13,8 +13,8 @@ export interface LookupOption {
   key: string;
   /** Display text for the option */
   text: string;
-  /** Optional secondary text */
-  secondaryText?: string;
+  /** Optional secondary text - can be a string or React element */
+  secondaryText?: React.ReactNode;
   /** Optional icon to display */
   icon?: React.ReactNode;
   /** Optional expandable details */

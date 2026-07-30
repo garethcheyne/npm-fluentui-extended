@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { FluentProvider, webLightTheme, Button, Link, Text, Badge } from '@fluentui/react-components';
+import { FluentProvider, webLightTheme, Button, Link, Text, Badge, ToggleButton } from '@fluentui/react-components';
 import { Lookup, LookupOption, QueryBuilder, QueryBuilderApplyResult, QueryBuilderState } from '../src';
-import { BuildingRegular, AddRegular, PersonSearchRegular, PlugConnectedRegular, PlugDisconnectedRegular, PersonRegular } from '@fluentui/react-icons';
+import { BuildingRegular, AddRegular, PersonSearchRegular, PlugConnectedRegular, PlugDisconnectedRegular, PersonRegular, CheckmarkCircleRegular, ClockRegular, ArrowLeftRegular } from '@fluentui/react-icons';
 import { installDynamicsMock, loginToDynamics, isDynamicsAuthenticated, logoutFromDynamics, getDynamicsUser } from './dynamics-mock';
 
 // Helper to search Dynamics records via native API (fetch)
@@ -148,11 +148,11 @@ const staticOptions: LookupOption[] = [
     secondaryText: 'COD007PR777',
     icon: <BuildingRegular />,
     details: [
-      { value: '0409072075' },
+      { label: 'Status', value: <Badge appearance="filled" color="success" size="small">Active</Badge> },
+      { label: 'Type', value: <Badge appearance="tint" color="brand" size="small">Enterprise</Badge> },
       { label: 'Phone', value: '32682915877' },
-      { value: 'Yes' },
-      { value: '29/01/2026 2:48 PM' },
-      { label: 'Server', value: 'srv_DYN365_NSW' },
+      { label: 'Mobile', value: '0409072075' },
+      { label: 'Server', value: <Badge appearance="outline" size="small">srv_DYN365_NSW</Badge> },
     ],
   },
   {
@@ -161,8 +161,9 @@ const staticOptions: LookupOption[] = [
     secondaryText: '1DECKSPT777',
     icon: <BuildingRegular />,
     details: [
+      { label: 'Status', value: <Badge appearance="tint" color="warning" size="small">Pending Review</Badge> },
       { label: 'Phone', value: '0412345678' },
-      { value: '15/01/2026 10:30 AM' },
+      { value: <span style={{ color: '#666', fontSize: 11 }}>Last updated: 15/01/2026 10:30 AM</span> },
     ],
   },
   {
@@ -177,9 +178,203 @@ const staticOptions: LookupOption[] = [
     secondaryText: 'ABCHOLD001',
     icon: <BuildingRegular />,
     details: [
-      { label: 'Contact', value: 'John Smith' },
-      { label: 'Email', value: 'john@abcholdings.com' },
+      { label: <Badge appearance="outline" size="small">Contact</Badge>, value: 'John Smith' },
+      { label: <Badge appearance="outline" size="small">Email</Badge>, value: <a href="mailto:john@abcholdings.com" style={{ color: '#0078d4' }}>john@abcholdings.com</a> },
+      { value: <Badge appearance="filled" color="danger" size="small">VIP Customer</Badge> },
     ],
+  },
+];
+
+// Details-only options (no secondaryText) - accounts and contacts mixed
+const detailsOnlyOptions: LookupOption[] = [
+  {
+    key: 'do-acc-1',
+    text: 'Contoso Ltd',
+    icon: <BuildingRegular />,
+    details: [
+      { label: 'Industry', value: 'Technology' },
+      { label: 'Revenue', value: '$50M' },
+      { label: 'Employees', value: '250' },
+    ],
+  },
+  {
+    key: 'do-con-1',
+    text: 'John Smith',
+    icon: <PersonRegular />,
+    details: [
+      { label: 'Title', value: 'CEO' },
+      { label: 'Company', value: 'Contoso Ltd' },
+      { label: 'Phone', value: '+1 (555) 123-4567' },
+    ],
+  },
+  {
+    key: 'do-acc-2',
+    text: 'Fabrikam Inc',
+    icon: <BuildingRegular />,
+    details: [
+      { label: 'Industry', value: 'Manufacturing' },
+      { label: 'Revenue', value: '$120M' },
+      { label: 'Location', value: 'Seattle, WA' },
+    ],
+  },
+  {
+    key: 'do-con-2',
+    text: 'Sarah Johnson',
+    icon: <PersonRegular />,
+    details: [
+      { label: 'Title', value: 'VP Sales' },
+      { label: 'Company', value: 'Fabrikam Inc' },
+      { label: 'Email', value: 'sarah.j@fabrikam.com' },
+    ],
+  },
+  {
+    key: 'do-acc-3',
+    text: 'Adventure Works',
+    icon: <BuildingRegular />,
+    details: [
+      { label: 'Industry', value: 'Retail' },
+      { label: 'Status', value: <Badge appearance="filled" color="success" size="small">Active</Badge> },
+    ],
+  },
+  {
+    key: 'do-con-3',
+    text: 'Michael Chen',
+    icon: <PersonRegular />,
+    details: [
+      { label: 'Title', value: 'CTO' },
+      { label: 'Status', value: <Badge appearance="tint" color="warning" size="small">On Leave</Badge> },
+    ],
+  },
+];
+
+// Multi-entity options demonstrating React elements in secondaryText
+const multiEntityAccounts: LookupOption[] = [
+  {
+    key: 'me-acc-1',
+    text: 'NEIL WILSON ELECTRICAL CONTRACTOR',
+    secondaryText: (
+      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span style={{ color: '#0078d4', fontWeight: 600 }}>NEW</span>IELCO555
+      </span>
+    ),
+    icon: <BuildingRegular />,
+  },
+  {
+    key: 'me-acc-2',
+    text: 'NEW AIM',
+    secondaryText: 'ADMIN@NEWAIM.COM.AU',
+    icon: <BuildingRegular />,
+  },
+  {
+    key: 'me-acc-3',
+    text: 'NEW APOSTOLIC CHURCH',
+    secondaryText: (
+      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span style={{ color: '#0078d4', fontWeight: 600 }}>NEW</span>APOST555
+      </span>
+    ),
+    icon: <BuildingRegular />,
+  },
+  {
+    key: 'me-acc-4',
+    text: 'NEW BLACK DESIGNS',
+    secondaryText: (
+      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span style={{ color: '#0078d4', fontWeight: 600 }}>NEW</span>BLACK555
+      </span>
+    ),
+    icon: <BuildingRegular />,
+  },
+  {
+    key: 'me-acc-5',
+    text: 'NEW CASTLE CITY COUNCIL',
+    secondaryText: (
+      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span style={{ color: '#0078d4', fontWeight: 600 }}>NEW</span>CCITY888
+      </span>
+    ),
+    icon: <BuildingRegular />,
+  },
+];
+
+const multiEntityContacts: LookupOption[] = [
+  {
+    key: 'me-con-1',
+    text: 'John Smith',
+    secondaryText: (
+      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Badge appearance="tint" color="success" size="small" icon={<CheckmarkCircleRegular />}>Active</Badge>
+        <span>john.smith@contoso.com</span>
+      </span>
+    ),
+    icon: <PersonRegular />,
+    details: [
+      { label: 'Status', value: <Badge appearance="filled" color="success" size="small">Verified</Badge> },
+      { label: 'Role', value: <Badge appearance="tint" color="brand" size="small">Decision Maker</Badge> },
+      { label: 'Phone', value: '+1 (555) 123-4567' },
+      { value: <span style={{ color: '#0078d4' }}>View full profile →</span> },
+    ],
+  },
+  {
+    key: 'me-con-2',
+    text: 'Sarah Johnson',
+    secondaryText: (
+      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Badge appearance="tint" color="informative" size="small" icon={<ClockRegular />}>Pending</Badge>
+        <span>sarah.j@adventure-works.com</span>
+      </span>
+    ),
+    icon: <PersonRegular />,
+    details: [
+      { label: 'Status', value: <Badge appearance="tint" color="warning" size="small">Pending Verification</Badge> },
+      { label: 'Company', value: 'Adventure Works' },
+    ],
+  },
+  {
+    key: 'me-con-3',
+    text: 'Michael Chen',
+    secondaryText: 'CEO at Fabrikam Inc',
+    icon: <PersonRegular />,
+    details: [
+      { label: <Badge appearance="outline" size="small">Title</Badge>, value: 'Chief Executive Officer' },
+      { label: <Badge appearance="outline" size="small">Dept</Badge>, value: 'Executive' },
+    ],
+  },
+];
+
+const multiEntityRecent: LookupOption[] = [
+  {
+    key: 'me-rec-1',
+    text: 'Contoso Ltd',
+    secondaryText: (
+      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Badge appearance="outline" size="small">Account</Badge>
+        <span style={{ color: '#666' }}>Viewed 5 min ago</span>
+      </span>
+    ),
+    icon: <BuildingRegular />,
+  },
+  {
+    key: 'me-rec-2',
+    text: 'John Smith',
+    secondaryText: (
+      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Badge appearance="outline" size="small">Contact</Badge>
+        <span style={{ color: '#666' }}>Viewed 1 hour ago</span>
+      </span>
+    ),
+    icon: <PersonRegular />,
+  },
+  {
+    key: 'me-rec-3',
+    text: 'Adventure Works',
+    secondaryText: (
+      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Badge appearance="outline" size="small">Account</Badge>
+        <span style={{ color: '#666' }}>Viewed yesterday</span>
+      </span>
+    ),
+    icon: <BuildingRegular />,
   },
 ];
 
@@ -212,7 +407,7 @@ const searchAccountsApi = (searchText: string): Promise<LookupOption[]> => {
         const filtered = mockDatabase.filter(
           (opt) =>
             opt.text.toLowerCase().includes(searchText.toLowerCase()) ||
-            opt.secondaryText?.toLowerCase().includes(searchText.toLowerCase())
+            (typeof opt.secondaryText === 'string' && opt.secondaryText.toLowerCase().includes(searchText.toLowerCase()))
         );
         resolve(filtered);
       }
@@ -223,6 +418,20 @@ const searchAccountsApi = (searchText: string): Promise<LookupOption[]> => {
 function App() {
   const [selectedKey1, setSelectedKey1] = useState<string | null>(null);
   const [selectedKey2, setSelectedKey2] = useState<string | null>(null);
+  const [selectedKeyDetailsOnly, setSelectedKeyDetailsOnly] = useState<string | null>(null);
+
+  // Entity filter state for Details Only lookup
+  const [showAccounts, setShowAccounts] = useState(true);
+  const [showContacts, setShowContacts] = useState(true);
+
+  // Filtered options based on entity toggles - memoized to avoid recalculating on every render
+  const filteredDetailsOnlyOptions = React.useMemo(() => 
+    detailsOnlyOptions.filter(opt => {
+      if (opt.key.startsWith('do-acc-')) return showAccounts;
+      if (opt.key.startsWith('do-con-')) return showContacts;
+      return true;
+    }), [showAccounts, showContacts]
+  );
 
   // Dynamic search state - store full option to persist display and access data
   const [selectedOption3, setSelectedOption3] = useState<LookupOption | null>(null);
@@ -246,6 +455,24 @@ function App() {
   const [liveContactOptions, setLiveContactOptions] = useState<LookupOption[]>([]);
   const [liveContactLoading, setLiveContactLoading] = useState(false);
   const [selectedLiveContact, setSelectedLiveContact] = useState<LookupOption | null>(null);
+
+  // Multi-entity lookup state
+  const [multiEntityFilter, setMultiEntityFilter] = useState<'accounts' | 'contacts' | 'recent'>('accounts');
+  const [selectedMultiEntity, setSelectedMultiEntity] = useState<LookupOption | null>(null);
+
+  // Get options based on selected filter
+  const multiEntityOptions = React.useMemo(() => {
+    switch (multiEntityFilter) {
+      case 'accounts':
+        return multiEntityAccounts;
+      case 'contacts':
+        return multiEntityContacts;
+      case 'recent':
+        return multiEntityRecent;
+      default:
+        return multiEntityAccounts;
+    }
+  }, [multiEntityFilter]);
 
   // Initialize Dynamics mock on mount
   useEffect(() => {
@@ -311,7 +538,6 @@ function App() {
           'accountnumber',
           ['telephone1', 'address1_city'],
           searchText ? 25 : 5
-          ['telephone1', 'address1_city']
         );
       } else {
         // Use mock data when not connected
@@ -496,6 +722,76 @@ function App() {
           </p>
         </section>
 
+        {/* Lookup with Details Only (No Secondary Text) */}
+        <section style={{ marginBottom: 40 }}>
+          <h2>Lookup with Details Only (No Secondary Text)</h2>
+          <p style={{ color: '#666', marginBottom: 12 }}>
+            Toggle buttons filter by entity type like native Dynamics 365 - icon centers on single text row
+          </p>
+          <Lookup
+            appearance="filled-darker"
+            options={filteredDetailsOnlyOptions}
+            selectedKey={selectedKeyDetailsOnly}
+            onOptionSelect={(opt) => setSelectedKeyDetailsOnly(opt?.key ?? null)}
+            placeholder="Search accounts & contacts..."
+            header={
+              // When single entity selected, show drill-down view with back button
+              showAccounts !== showContacts ? (
+                <>
+                  <Link
+                    as="button"
+                    onClick={() => { setShowAccounts(true); setShowContacts(true); }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12 }}
+                  >
+                    <ArrowLeftRegular fontSize={14} />
+                    All
+                  </Link>
+                  <Text size={300} weight="semibold">{showAccounts ? 'Accounts' : 'Contacts'}</Text>
+                </>
+              ) : (
+                // When all entities shown, display filter toggles
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Text size={200} style={{ color: '#666' }}>Results from:</Text>
+                    <ToggleButton
+                      appearance="subtle"
+                      size="small"
+                      checked={showAccounts}
+                      onClick={() => { setShowAccounts(true); setShowContacts(false); }}
+                    >
+                      Accounts
+                    </ToggleButton>
+                    <ToggleButton
+                      appearance="subtle"
+                      size="small"
+                      checked={showContacts}
+                      onClick={() => { setShowAccounts(false); setShowContacts(true); }}
+                    >
+                      Contacts
+                    </ToggleButton>
+                  </div>
+                  <Button appearance="subtle" size="small">Recent records</Button>
+                </>
+              )
+            }
+            footer={
+              <>
+                <Link as="button" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                  <AddRegular fontSize={14} />
+                  New
+                </Link>
+                <Link as="button" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                  <PersonSearchRegular fontSize={14} />
+                  Advanced
+                </Link>
+              </>
+            }
+          />
+          <p style={{ marginTop: 12, fontSize: 14 }}>
+            Selected: <strong>{selectedKeyDetailsOnly ? detailsOnlyOptions.find(o => o.key === selectedKeyDetailsOnly)?.text : 'None'}</strong>
+          </p>
+        </section>
+
         {/* Dynamic Search Lookup */}
         <section style={{ marginBottom: 40 }}>
           <h2>Dynamic Search (Async API)</h2>
@@ -629,6 +925,69 @@ function App() {
               </pre>
             </div>
           </div>
+        </section>
+
+        {/* Multi-Entity Lookup with React Elements */}
+        <section style={{ marginBottom: 40 }}>
+          <h2>Multi-Entity Lookup with React Elements</h2>
+          <p style={{ color: '#666', marginBottom: 12 }}>
+            Demonstrates: selectable filter tabs in header, React elements in <code>secondaryText</code>, 
+            and React elements (Badges) in expandable <code>details</code>.
+          </p>
+          <Lookup
+            appearance="filled-darker"
+            options={multiEntityOptions}
+            selectedOption={selectedMultiEntity}
+            onOptionSelect={setSelectedMultiEntity}
+            placeholder="Search records..."
+            header={
+              <div style={{ display: 'flex', gap: 0 }}>
+                <Button
+                  appearance={multiEntityFilter === 'accounts' ? 'primary' : 'subtle'}
+                  size="small"
+                  onClick={(e) => { e.stopPropagation(); setMultiEntityFilter('accounts'); }}
+                  style={{ borderRadius: '4px 0 0 4px' }}
+                >
+                  Accounts
+                </Button>
+                <Button
+                  appearance={multiEntityFilter === 'contacts' ? 'primary' : 'subtle'}
+                  size="small"
+                  onClick={(e) => { e.stopPropagation(); setMultiEntityFilter('contacts'); }}
+                  style={{ borderRadius: 0 }}
+                >
+                  Contacts
+                </Button>
+                <Button
+                  appearance={multiEntityFilter === 'recent' ? 'primary' : 'subtle'}
+                  size="small"
+                  onClick={(e) => { e.stopPropagation(); setMultiEntityFilter('recent'); }}
+                  style={{ borderRadius: '0 4px 4px 0' }}
+                >
+                  Recent
+                </Button>
+              </div>
+            }
+            footer={
+              <>
+                <Link as="button" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                  <AddRegular fontSize={14} />
+                  New Record
+                </Link>
+                <Link as="button" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                  <PersonSearchRegular fontSize={14} />
+                  Advanced
+                </Link>
+              </>
+            }
+          />
+          <p style={{ marginTop: 12, fontSize: 14 }}>
+            Selected: <strong>{selectedMultiEntity?.text ?? 'None'}</strong>
+          </p>
+          <p style={{ marginTop: 4, fontSize: 12, color: '#666' }}>
+            Active filter: <code>{multiEntityFilter}</code> — Click tabs in header to switch entity types.
+            Expand contacts to see Badges in details.
+          </p>
         </section>
 
         {/* Dynamics 365 Live Connection */}

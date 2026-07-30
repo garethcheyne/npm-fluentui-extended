@@ -80,11 +80,16 @@ export const Lookup: React.FC<LookupProps> = ({
       return options;
     }
     const lowerSearch = searchText.toLowerCase();
-    return options.filter(
-      (opt) =>
-        opt.text.toLowerCase().includes(lowerSearch) ||
-        opt.secondaryText?.toLowerCase().includes(lowerSearch)
-    );
+    return options.filter((opt) => {
+      if (opt.text.toLowerCase().includes(lowerSearch)) {
+        return true;
+      }
+      // Only search secondaryText if it's a string
+      if (typeof opt.secondaryText === 'string') {
+        return opt.secondaryText.toLowerCase().includes(lowerSearch);
+      }
+      return false;
+    });
   }, [options, searchText, minSearchLength]);
 
   const highlightedOptionId = React.useMemo(() => {
@@ -448,8 +453,8 @@ export const Lookup: React.FC<LookupProps> = ({
                           id={`${lookupId}-option-${option.key}`}
                           role="option"
                           data-index={index}
-                          aria-selected={option.key === selectedOption?.key ? true : false}
-                          aria-disabled={option.disabled === true ? true : undefined}
+                          aria-selected={option.key === selectedOption?.key}
+                          aria-disabled={option.disabled || undefined}
                           className={mergeClasses(
                             styles.option,
                             index === highlightedIndex && styles.optionHighlighted,
@@ -460,7 +465,10 @@ export const Lookup: React.FC<LookupProps> = ({
                           onMouseEnter={() => setHighlightedIndex(index)}
                         >
                           {option.icon && (
-                            <span className={styles.optionIcon}>{option.icon}</span>
+                            <span className={mergeClasses(
+                              styles.optionIcon,
+                              !!option.secondaryText && styles.optionIconWithSecondary
+                            )}>{option.icon}</span>
                           )}
                           <span className={styles.optionContent}>
                             <span className={styles.optionText}>{option.text}</span>
