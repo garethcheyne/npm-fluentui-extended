@@ -30,6 +30,7 @@ export const Lookup: React.FC<LookupProps> = ({
   footer,
   open: controlledOpen,
   onOpenChange,
+  disableClientFilter = false,
   ...inputProps
 }) => {
   const styles = useLookupStyles();
@@ -74,23 +75,32 @@ export const Lookup: React.FC<LookupProps> = ({
     [selectedOptionProp, options, selectedKey, internalSelectedOption]
   );
 
-  // Filter options based on search text
+  // Filter options based on search text (skip if disableClientFilter is true)
   const filteredOptions = React.useMemo(() => {
+    // When server-side filtering is used, skip client-side filter
+    if (disableClientFilter) {
+      return options;
+    }
     if (!searchText || searchText.length < minSearchLength) {
       return options;
     }
     const lowerSearch = searchText.toLowerCase();
     return options.filter((opt) => {
+      // Check primary text
       if (opt.text.toLowerCase().includes(lowerSearch)) {
         return true;
       }
-      // Only search secondaryText if it's a string
+      // Check searchFields (hidden searchable content)
+      if (opt.searchFields && opt.searchFields.toLowerCase().includes(lowerSearch)) {
+        return true;
+      }
+      // Check secondaryText only if it's a string
       if (typeof opt.secondaryText === 'string') {
         return opt.secondaryText.toLowerCase().includes(lowerSearch);
       }
       return false;
     });
-  }, [options, searchText, minSearchLength]);
+  }, [options, searchText, minSearchLength, disableClientFilter]);
 
   const highlightedOptionId = React.useMemo(() => {
     if (!isOpen || highlightedIndex < 0 || highlightedIndex >= filteredOptions.length) {

@@ -15,6 +15,13 @@ export interface LookupOption {
   text: string;
   /** Optional secondary text - can be a string or React element */
   secondaryText?: React.ReactNode;
+  /**
+   * Optional searchable text that is never rendered. Use this to include
+   * additional searchable content (codes, IDs, etc.) without affecting display.
+   * Client-side filtering will search this field in addition to `text` and
+   * string `secondaryText`.
+   */
+  searchFields?: string;
   /** Optional icon to display */
   icon?: React.ReactNode;
   /** Optional expandable details */
@@ -66,5 +73,11 @@ export interface LookupProps extends Omit<InputProps, 'onChange' | 'value'> {
    * Use together with `open` for controlled mode, or standalone to observe changes.
    */
   onOpenChange?: (open: boolean) => void;
+  /**
+   * Disable client-side filtering of options. Use this when filtering is
+   * performed server-side via `onSearchChange` and the returned options are
+   * already filtered. Defaults to `false` (client-side filtering enabled).
+   */
+  disableClientFilter?: boolean;
 }
 

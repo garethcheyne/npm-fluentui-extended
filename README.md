@@ -293,6 +293,45 @@ Run the test harness with `npm run harness` to see all examples in action.
 | `disabled` | `boolean` | `false` | Disable the lookup |
 | `open` | `boolean` | - | Controlled open state for the dropdown |
 | `onOpenChange` | `(open: boolean) => void` | - | Callback when dropdown open state changes |
+| `disableClientFilter` | `boolean` | `false` | Disable client-side filtering of options. Use this when filtering is performed server-side via `onSearchChange` |
+| `searchFields` | `string` | - | Hidden searchable text (never rendered). Use this to include additional searchable content (codes, IDs) while displaying JSX in `secondaryText` |
+
+### Client-Side Filtering
+
+By default, the Lookup component filters options client-side as the user types. The filtering logic works as follows:
+
+1. **Primary field (`text`)** — Always searched, regardless of other props
+2. **Search fields (`searchFields`)** — If provided, this hidden text is searched (useful when `secondaryText` is JSX)
+3. **Secondary text (`secondaryText`)** — Only searched if it's a string (JSX elements are skipped)
+
+This allows you to use rich JSX (badges, icons) in `secondaryText` while still providing searchable text via `searchFields`:
+
+```tsx
+const options: LookupOption[] = [
+  {
+    key: 'PROD-001',
+    text: 'Acme Widget',                           // Always searchable
+    searchFields: 'PROD-001 SKU-12345 acme-widget', // Hidden searchable text
+    secondaryText: (                               // Rich display (not searchable)
+      <span style={{ display: 'flex', gap: 4 }}>
+        <Badge size="small">PROD-001</Badge>
+        <Badge size="small" color="brand">SKU-12345</Badge>
+      </span>
+    ),
+  },
+];
+```
+
+**Server-Side Filtering:** When using `onSearchChange` to fetch results from an API, set `disableClientFilter={true}` to prevent the client from re-filtering server results:
+
+```tsx
+<Lookup
+  options={apiResults}
+  onSearchChange={(searchText) => fetchFromApi(searchText)}
+  disableClientFilter={true}  // API already filtered the results
+  loading={isLoading}
+/>
+```
 
 ### Cross-Document Support (Dynamics 365 Iframes)
 
@@ -327,6 +366,7 @@ interface LookupOption {
   key: string;                      // Unique identifier (required)
   text: string;                     // Display text (required)
   secondaryText?: ReactNode;        // Secondary line - string, Badge, or JSX
+  searchFields?: string;            // Hidden searchable text (never rendered)
   icon?: ReactNode;                 // Icon component (e.g., <BuildingRegular />)
   details?: LookupOptionDetail[];   // Expandable details (chevron appears)
   data?: unknown;                   // Custom data payload for your app
@@ -339,7 +379,7 @@ interface LookupOptionDetail {
 }
 ```
 
-> **Note:** Both `secondaryText` and `details` support React elements, not just strings. See [Rich Secondary Text](#rich-secondary-text-with-react-elements) for examples.
+> **Note:** Both `secondaryText` and `details` support React elements, not just strings. See [Rich Secondary Text](#rich-secondary-text-with-react-elements) for examples. When using JSX in `secondaryText`, use `searchFields` to provide hidden searchable text (see [Client-Side Filtering](#client-side-filtering)).
 
 ## Keyboard Navigation
 
