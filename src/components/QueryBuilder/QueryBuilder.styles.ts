@@ -334,6 +334,72 @@ export const useQueryBuilderStyles = makeStyles({
     backgroundColor: tokens.colorPaletteRedBackground1,
     borderRadius: tokens.borderRadiusSmall,
   },
+  conditionUnknownBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    paddingTop: '2px',
+    paddingBottom: '2px',
+    paddingLeft: tokens.spacingHorizontalXS,
+    paddingRight: tokens.spacingHorizontalXS,
+    marginBottom: tokens.spacingVerticalXS,
+    backgroundColor: tokens.colorStatusWarningBackground1,
+    borderRadius: tokens.borderRadiusSmall,
+    fontSize: tokens.fontSizeBase100,
+    color: tokens.colorStatusWarningForeground3,
+  },
+  conditionUnknownText: {
+    flex: '1 1 auto',
+  },
+  conditionUnknownButton: {
+    fontSize: tokens.fontSizeBase100,
+    minWidth: '0',
+    paddingTop: '0',
+    paddingBottom: '0',
+    paddingLeft: tokens.spacingHorizontalXS,
+    paddingRight: tokens.spacingHorizontalXS,
+    height: '20px',
+    color: tokens.colorStatusWarningForeground3,
+  },
+  dialogSurfaceNarrow: {
+    maxWidth: '600px',
+  },
+  dialogSurfaceCompact: {
+    maxWidth: '500px',
+  },
+  dialogUploadContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+  },
+  dialogValidationContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalL,
+  },
+  monacoTextarea: {
+    minHeight: '200px',
+    fontFamily: tokens.fontFamilyMonospace,
+  },
+  uploadErrorText: {
+    color: tokens.colorStatusDangerForeground1,
+  },
+  validationSectionTitle: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXXS,
+  },
+  validationApiRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+  },
+  emptyRelatedEntity: {
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+    color: tokens.colorNeutralForeground3,
+    fontSize: tokens.fontSizeBase200,
+  },
   validationIcon: {
     marginRight: tokens.spacingHorizontalXS,
   },

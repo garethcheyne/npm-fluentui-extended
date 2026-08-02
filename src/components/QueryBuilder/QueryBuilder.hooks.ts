@@ -170,16 +170,51 @@ export const useEntityFields = (
                 const lookupData = lookupResponse.ok ? await lookupResponse.json() : { value: [] };
                 const lookupAttributes = lookupData.value || [];
 
+                // Fetch picklist/state/status attributes with OptionSet Options
+                const picklistTypes = [
+                    'Microsoft.Dynamics.CRM.PicklistAttributeMetadata',
+                    'Microsoft.Dynamics.CRM.StatusAttributeMetadata',
+                    'Microsoft.Dynamics.CRM.StateAttributeMetadata',
+                ];
+                const optionSetMaps: Map<string, any>[] = await Promise.all(
+                    picklistTypes.map(async (castType) => {
+                        try {
+                            const res = await fetch(
+                                `/api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes/${castType}?$select=LogicalName&$expand=OptionSet($select=Options)`,
+                                {
+                                    headers: {
+                                        'OData-MaxVersion': '4.0',
+                                        'OData-Version': '4.0',
+                                        'Accept': 'application/json',
+                                    },
+                                }
+                            );
+                            if (!res.ok) return new Map();
+                            const data = await res.json();
+                            return new Map<string, any>(
+                                (data.value || []).map((a: any) => [a.LogicalName, a.OptionSet])
+                            );
+                        } catch {
+                            return new Map<string, any>();
+                        }
+                    })
+                );
+                // Merge all optionset maps (picklist, status, state)
+                const optionSetMap = new Map<string, any>();
+                for (const m of optionSetMaps) m.forEach((v, k) => optionSetMap.set(k, v));
+
                 // Create a map of lookup attributes by LogicalName
                 const lookupMap = new Map<string, any>(lookupAttributes.map((attr: any) => [attr.LogicalName, attr]));
 
-                // Merge lookup Targets into the main attributes array
+                // Merge lookup Targets and OptionSet data into the main attributes array
                 const mergedAttributes = attributesArray.map((attr: any) => {
                     const lookupAttr = lookupMap.get(attr.LogicalName);
-                    if (lookupAttr?.Targets) {
-                        return { ...attr, Targets: lookupAttr.Targets };
-                    }
-                    return attr;
+                    const optionSet = optionSetMap.get(attr.LogicalName);
+                    return {
+                        ...attr,
+                        ...(lookupAttr?.Targets ? { Targets: lookupAttr.Targets } : {}),
+                        ...(optionSet ? { OptionSet: optionSet } : {}),
+                    };
                 });
 
                 // First pass: collect all unique target entity names from lookup fields

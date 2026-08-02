@@ -58,6 +58,7 @@ const createParsedCondition = (
     value2: value2 ?? '',
     ...(valueDisplayName ? { valueDisplayName } : {}),
     ...(entityAlias ? { entityAlias } : {}),
+    ...(!fieldMatch ? { isUnknownField: true } : {}),
 });
 
 /**

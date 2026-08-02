@@ -518,10 +518,6 @@ function App() {
   // Handle selection - receives full option with all data
   const handleOptionSelect = useCallback((option: LookupOption | null) => {
     setSelectedOption3(option);
-    // Access additional data from the option
-    if (option?.data) {
-      console.log('Selected option data:', option.data);
-    }
   }, []);
 
   // Handle dynamic search - uses native API when connected, mock otherwise
@@ -849,6 +845,38 @@ function App() {
 
         {/* Query Builder */}
         <section style={{ marginBottom: 40 }}>
+          <h2>QueryBuilder — Unknown / Invalid Fields</h2>
+          <p style={{ color: '#666', marginBottom: 12 }}>
+            When existing FetchXML is loaded and contains attributes that don't match any known field,
+            each unmatched condition is preserved and flagged with a warning banner so the user knows
+            what needs to be fixed before saving.
+          </p>
+          <QueryBuilder
+            entityName="product"
+            entityDisplayName="Products"
+            fields={[
+              { id: 'name', label: 'Product Name', dataType: 'string' },
+              { id: 'productnumber', label: 'Product Number', dataType: 'string' },
+              { id: 'statecode', label: 'Status', dataType: 'optionset', options: [
+                { label: 'Active', value: 0 },
+                { label: 'Inactive', value: 1 },
+              ]},
+            ]}
+            initialFetchXml={`<fetch version="1.0" output-format="xml-platform" mapping="logical" distinct="false">
+  <entity name="product">
+    <filter type="and">
+      <condition attribute="name" operator="like" value="%Widget%" />
+      <condition attribute="sample_unknownfield" operator="eq" value="1" />
+      <condition attribute="statecode" operator="eq" value="0" />
+      <condition attribute="sample_custom_obsolete_flag" operator="eq" value="true" />
+    </filter>
+  </entity>
+</fetch>`}
+            showFetchXmlPreview
+          />
+        </section>
+
+        <section style={{ marginBottom: 40 }}>
           <h2>Query Builder</h2>
           <p style={{ color: '#666', marginBottom: 12 }}>
             {dynamicsConnected
@@ -897,16 +925,9 @@ function App() {
               showODataPreview
               showFetchXmlPreview
               showDataSourceToggle
+              debug
               onStateChange={(state) => setQueryBuilderState(state)}
               onSerializedChange={(result) => setQueryBuilderResult(result)}
-              onTrace={(message, data) => {
-                console.debug(
-                  '%c FluentUI-Extended ',
-                  'background: #845EF7; color: white; padding: 2px 4px; border-radius: 2px; font-weight: bold;',
-                  message,
-                  data || ''
-                );
-              }}
             />
           </div>
 

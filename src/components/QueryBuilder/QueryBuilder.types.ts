@@ -165,6 +165,8 @@ export interface QueryBuilderCondition {
   nestedLogic?: 'and' | 'or';
   /** Fields available for the related entity (loaded dynamically) */
   nestedFields?: QueryBuilderField[];
+  /** True when the attribute from parsed FetchXML didn't match any known field */
+  isUnknownField?: boolean;
 }
 
 export interface QueryBuilderGroup {
@@ -247,4 +249,6 @@ export interface QueryBuilderProps {
   onFetchEntityFields?: (entityLogicalName: string) => Promise<QueryBuilderField[]>;
   /** Debug/trace callback for logging component behavior */
   onTrace?: (message: string, data?: any) => void;
+  /** Enable verbose console.debug tracing (disabled by default) */
+  debug?: boolean;
 }

@@ -47,16 +47,18 @@ export type { ParseFetchXmlResult };
 export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
     const styles = useQueryBuilderStyles();
     
-    // Helper function for debug tracing with purple background
+    // Debug tracing — only logs to console when debug={true}; always calls onTrace if provided
     const trace = React.useCallback((message: string, data?: any) => {
-        console.debug(
-            '%c FluentUI-Extended ',
-            'background: #845EF7; color: white; padding: 2px 4px; border-radius: 2px; font-weight: bold;',
-            message,
-            data || ''
-        );
+        if (props.debug) {
+            console.debug(
+                '%c FluentUI-Extended ',
+                'background: #845EF7; color: white; padding: 2px 4px; border-radius: 2px; font-weight: bold;',
+                message,
+                data || ''
+            );
+        }
         props.onTrace?.(message, data);
-    }, [props]);
+    }, [props.debug, props.onTrace]);
     
     const [loading, setLoading] = React.useState(false);
     const [availableFields, setAvailableFields] = React.useState<QueryBuilderField[]>(
@@ -349,6 +351,11 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
             const groups = previous.groups.map((group) => {
                 const conditions = group.conditions.map((condition) => {
                     if (condition.kind === 'relatedEntity') {
+                        return condition;
+                    }
+
+                    // Skip normalization for unknown fields — preserve original fieldId so it round-trips correctly
+                    if (condition.isUnknownField && !availableFields.some((f) => f.id === condition.fieldId)) {
                         return condition;
                     }
 
@@ -1027,20 +1034,20 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                     )}
 
                     <Dialog open={uploadDialogOpen} onOpenChange={(_, data) => setUploadDialogOpen(data.open)}>
-                        <DialogSurface style={{ maxWidth: '600px' }}>
+                        <DialogSurface className={styles.dialogSurfaceNarrow}>
                             <DialogBody>
                                 <DialogTitle>Import FetchXML</DialogTitle>
-                                <DialogContent style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <DialogContent className={styles.dialogUploadContent}>
                                     <Text>Paste your FetchXML below to rebuild the query:</Text>
                                     <Textarea
                                         placeholder="<fetch><entity name='account'><filter>...</filter></entity></fetch>"
                                         value={uploadXmlText}
                                         onChange={(_, data) => setUploadXmlText(data.value)}
-                                        style={{ minHeight: '200px', fontFamily: 'monospace' }}
+                                        className={styles.monacoTextarea}
                                         resize="vertical"
                                     />
                                     {uploadError && (
-                                        <Text style={{ color: 'var(--colorStatusDangerForeground1)' }}>{uploadError}</Text>
+                                        <Text className={styles.uploadErrorText}>{uploadError}</Text>
                                     )}
                                 </DialogContent>
                                 <DialogActions>
@@ -1066,13 +1073,13 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                     )}
 
                     <Dialog open={validationDialogOpen} onOpenChange={(_, data) => setValidationDialogOpen(data.open)}>
-                        <DialogSurface style={{ maxWidth: '500px' }}>
+                        <DialogSurface className={styles.dialogSurfaceCompact}>
                             <DialogBody>
                                 <DialogTitle>Query Validation</DialogTitle>
-                                <DialogContent style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <DialogContent className={styles.dialogValidationContent}>
                                     {/* Local Validation Section */}
                                     <div>
-                                        <Text weight="semibold" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <Text weight="semibold" className={styles.validationSectionTitle}>
                                             {validationResult?.isValid ? (
                                                 <span className={styles.validationSuccess}>
                                                     <CheckmarkCircleRegular className={styles.validationIcon} />
@@ -1098,7 +1105,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
 
                                     {/* API Validation Section */}
                                     <div className={styles.apiValidationSection}>
-                                        <Text weight="semibold" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <Text weight="semibold" className={styles.validationSectionTitle}>
                                             Dynamics 365 API Test
                                         </Text>
                                         {!validationResult?.apiValidation?.available ? (
@@ -1110,7 +1117,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                 Fix query structure errors before testing against the API.
                                             </Text>
                                         ) : apiValidating ? (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <div className={styles.validationApiRow}>
                                                 <Spinner size="tiny" />
                                                 <Text>Testing query against Dynamics 365...</Text>
                                             </div>
@@ -1453,13 +1460,12 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
 
                                                             {/* Show loading state only when no conditions exist and fields are loading */}
                                                             {selectedRelated && nestedFields.length === 0 && nestedConditions.length === 0 && (
-                                                                <div style={{ padding: '8px 0', color: 'var(--colorNeutralForeground3)', fontSize: '12px' }}>
+                                                                <div className={styles.emptyRelatedEntity}>
                                                                     <Spinner size="tiny" label="Loading fields..." />
                                                                 </div>
                                                             )}
                                                             {!selectedRelated && (
-                                                                <div style={{ padding: '8px 0', color: 'var(--colorNeutralForeground3)', fontSize: '12px' }}>
-                                                                    Select a related entity to add filter conditions.
+                                                                <div className={styles.emptyRelatedEntity}>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -1467,13 +1473,14 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                 );
                                             }
 
+                                            const isFieldUnknown = condition.isUnknownField && !availableFields.some(f => f.id === condition.fieldId);
                                             const selectedField = availableFields.find((field) => field.id === condition.fieldId) || defaultField;
                                             const operators = getOperatorsForType(selectedField.dataType);
                                             const isNullOperator = condition.operator === 'null' || condition.operator === 'notnull';
                                             const isBetween = condition.operator === 'between';
                                             const conditionRowClass = mergeClasses(
                                                 styles.conditionTreeRow,
-                                                invalidConditionIds.has(condition.id) && styles.conditionInvalid,
+                                                (invalidConditionIds.has(condition.id) || isFieldUnknown) && styles.conditionInvalid,
                                             );
 
                                             return (
@@ -1482,6 +1489,20 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                         <div className={styles.conditionConnectorLine} />
                                                         <div className={styles.conditionConnectorBranch} />
                                                     </div>
+                                                    {isFieldUnknown ? (
+                                                        <div className={styles.conditionUnknownBanner}>
+                                                            <span>⚠</span>
+                                                            <span className={styles.conditionUnknownText}>Unknown field <strong>{condition.fieldId}</strong> — not found in entity metadata. Update or remove this condition before saving.</span>
+                                                            <Button
+                                                                appearance="subtle"
+                                                                size="small"
+                                                                className={styles.conditionUnknownButton}
+                                                                onClick={() => removeCondition(group.id, condition.id)}
+                                                            >
+                                                                Remove
+                                                            </Button>
+                                                        </div>
+                                                    ) : (
                                                     <div className={rowGridClass} role="row">
                                                         <div className={styles.fieldCell} role="gridcell">
                                                             <Lookup
@@ -1608,6 +1629,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                             {renderRowActions(() => removeCondition(group.id, condition.id))}
                                                         </div>
                                                     </div>
+                                                    )}
                                                 </div>
                                             );
                                         })}
