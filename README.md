@@ -473,21 +473,31 @@ const handleChange = (result: QueryBuilderApplyResult) => {
 
 ### Features
 
-#### Import/Export FetchXML
+#### Import/Edit/Export FetchXML
 
-Users can download the current query as FetchXML or import existing FetchXML:
+Download the current query as FetchXML, import FetchXML from elsewhere, or open the current
+query as editable FetchXML:
 
 ```tsx
 <QueryBuilder
   entityName="account"
   showDownloadFetchXmlButton={true}  // Default: true
   showUploadFetchXmlButton={true}    // Default: true
+  showEditFetchXmlButton={true}      // Default: true
 />
 ```
 
+**Import FetchXML** opens an empty dialog for pasting in a query from elsewhere.
+
+**Edit FetchXML** opens the same dialog prefilled with the current query's FetchXML, so you can
+tweak it in place or select-all and paste a different query over it. Applying rebuilds the
+builder from whatever is in the box. If the XML doesn't parse, your text is kept and the error
+is shown inline.
+
 #### Live Preview
 
-Show real-time preview of the generated queries:
+Show real-time preview of the generated queries. The previews can also be toggled from the
+toolbar, so these props set the *initial* visibility rather than hiding the previews outright:
 
 ```tsx
 <QueryBuilder
@@ -495,8 +505,39 @@ Show real-time preview of the generated queries:
   fields={fields}
   showODataPreview={true}
   showFetchXmlPreview={true}
+  showPreviewToggleButtons={true}  // Default: true
 />
 ```
+
+#### Queries That OData Cannot Express
+
+FetchXML has operators the OData `$filter` syntax has no equivalent for — relative dates
+(`last-x-days`, `this-month`), fiscal periods, user context (`eq-userid`) and hierarchy
+operators (`under`, `above`). These are evaluated by the FetchXML engine itself.
+
+When a query uses one, it is **omitted from the OData filter** and reported on the result:
+
+```tsx
+<QueryBuilder
+  entityName="account"
+  fields={fields}
+  onSerializedChange={(result) => {
+    if (result.odataUnsupported.length > 0) {
+      // The OData filter is NOT equivalent to the FetchXML - use result.fetchXml instead
+      console.warn('Not expressible in OData:', result.odataUnsupported);
+    }
+  }}
+/>
+```
+
+Each entry gives the field and operator that could not be translated:
+
+```ts
+{ fieldId: 'createdon', fieldLabel: 'Created On', operator: 'last-x-days', operatorLabel: 'Last X Days' }
+```
+
+The OData preview shows the same information as a warning. Use `isOperatorConvertibleToOData`
+to check a single operator yourself.
 
 #### Validation with Dynamics 365 API
 
@@ -597,11 +638,13 @@ const fields: QueryBuilderField[] = [
 | `initialState` | `QueryBuilderState` | - | Initial query state object |
 | `onSerializedChange` | `(result: QueryBuilderApplyResult) => void` | - | Called when query changes |
 | `onLookupSearch` | `(fieldId: string, searchText: string) => Promise<LookupOption[]>` | - | Lookup field search handler |
-| `showODataPreview` | `boolean` | `false` | Show OData filter preview |
-| `showFetchXmlPreview` | `boolean` | `false` | Show FetchXML preview |
+| `showODataPreview` | `boolean` | `false` | Initial visibility of the OData filter preview |
+| `showFetchXmlPreview` | `boolean` | `false` | Initial visibility of the FetchXML preview |
+| `showPreviewToggleButtons` | `boolean` | `true` | Show toolbar buttons that toggle the previews |
 | `showResetToDefaultButton` | `boolean` | `true` | Show Reset button |
 | `showDownloadFetchXmlButton` | `boolean` | `true` | Show Download FetchXML button |
 | `showUploadFetchXmlButton` | `boolean` | `true` | Show Import FetchXML button |
+| `showEditFetchXmlButton` | `boolean` | `true` | Show Edit FetchXML button |
 | `showValidateButton` | `boolean` | `true` | Show Validate button |
 | `showDeleteAllFiltersButton` | `boolean` | `true` | Show Delete All button |
 | `onTrace` | `(message: string, data?: any) => void` | - | Debug/trace callback for component behavior |
@@ -613,9 +656,13 @@ interface QueryBuilderField {
   id: string;           // Logical attribute name
   label: string;        // Display label
   dataType: 'string' | 'number' | 'datetime' | 'boolean' | 'optionset' | 'lookup';
-  options?: Array<{ label: string; value: number }>;  // For optionset fields
+  options?: Array<{ label: string; value: string | number }>;  // Optionset and boolean fields
 }
 ```
+
+Options are loaded automatically from entity metadata when `fields` is omitted. Boolean fields
+pick up their Dynamics labels (for example "Allowed" / "Not Allowed" rather than Yes / No), with
+values `'1'` and `'0'` to match the FetchXML representation.
 
 ### QueryBuilderApplyResult
 
@@ -625,8 +672,20 @@ interface QueryBuilderApplyResult {
   fetchXmlFilter: string;        // Just the <filter> element
   fetchXml: string;              // Complete FetchXML document
   odataFilter: string;           // OData $filter value
+  odataQuery?: string;           // Full OData query URL (requires entitySetName)
+  odataUnsupported: QueryBuilderODataUnsupported[];  // Conditions OData cannot express
+}
+
+interface QueryBuilderODataUnsupported {
+  fieldId: string;        // e.g. "createdon"
+  fieldLabel: string;     // e.g. "Created On"
+  operator: string;       // e.g. "last-x-days"
+  operatorLabel: string;  // e.g. "Last X Days"
 }
 ```
+
+When `odataUnsupported` is non-empty, `odataFilter` is **not** equivalent to `fetchXml` — the
+untranslatable conditions have been left out. Use `fetchXml` to run the query.
 
 ### Programmatic API
 
@@ -670,9 +729,21 @@ if (!result.isValid) {
 
 | Data Type | Operators |
 |-----------|-----------|
-| `string` | Contains, Does Not Contain, Starts With, Ends With, Equals, Not Equals, Is Empty, Has Value |
-| `number`, `datetime` | Greater Than, Greater Than Or Equal, Less Than, Less Than Or Equal, Between, Equals, Not Equals, Is Empty, Has Value |
-| `optionset`, `lookup`, `boolean` | Equals, Not Equals, Is Empty, Has Value |
+| `string` | Contains, Does Not Contain, Begins With, Does Not Begin With, Ends With, Does Not End With, Like, Not Like, Equals, Not Equals, Is Empty, Has Value |
+| `number` | Greater Than, Greater Than Or Equal, Less Than, Less Than Or Equal, Between, Not Between, Equals, Not Equals, Is One Of, Is Not One Of, Is Empty, Has Value |
+| `datetime` | All number comparisons, plus On / On Or Before / On Or After, relative dates (Today, This Month, Last X Days, Older Than X Months, ...) and fiscal period operators |
+| `optionset` | Equals, Not Equals, Is One Of, Is Not One Of, Is Empty, Has Value |
+| `lookup` | Equals, Not Equals, Is One Of, Is Not One Of, Is Empty, Has Value, plus user-context (Equals Current User, ...) and hierarchy (Under, Above, ...) operators |
+| `boolean` | Equals, Not Equals, Is Empty, Has Value |
+
+Operators map to the [FetchXML condition operators][fetchxml-operators]. Note that FetchXML has
+no `contains` operator — "Contains" and "Does Not Contain" are serialized as `like` / `not-like`
+with `%` wildcards around the value.
+
+Relative date, fiscal period, user-context and hierarchy operators are FetchXML-only and cannot
+be expressed in OData — see [Queries That OData Cannot Express](#queries-that-odata-cannot-express).
+
+[fetchxml-operators]: https://learn.microsoft.com/en-us/power-apps/developer/data-platform/fetchxml/reference/operators
 
 ---
 
@@ -689,6 +760,42 @@ This library extends [Microsoft's Fluent UI React v9](https://react.fluentui.dev
 ## Changelog
 
 > Version format: `YYYY.M.DD` (e.g., `2026.8.30` = August 30, 2026)
+
+### 2026.8.36
+
+QueryBuilder field-type and FetchXML correctness pass.
+
+- 🐛 **Every field resolved as `string`.** `dataTypeFromAttribute` compared `AttributeTypeName.Value`
+  (which is suffixed — `MoneyType`, `PicklistType`, `BooleanType`) against unsuffixed names, so only
+  lookups were typed correctly. Money fields offered "Contains", optionsets rendered a text box, and
+  booleans never reached their branch.
+- 🐛 **Optionset and boolean options were never loaded** for main-entity fields. The component's field
+  loader fetched attributes and lookup targets but no option metadata.
+- 🐛 **Global option sets returned no options** — only `OptionSet` was expanded, never `GlobalOptionSet`.
+- 🐛 **Boolean fields** now use their Dynamics labels ("Allowed" / "Not Allowed") instead of hardcoded
+  Yes/No, and match on truthiness so a saved `value="1"` no longer displays as "No".
+- 🐛 **"Does Not Contain" produced invalid FetchXML** (`operator="not-contain"`, which does not exist).
+  Now serialized as `not-like` with `%` wildcards.
+- 🐛 **Date picker shifted the day** in UTC+ timezones — `toISOString()` converted local midnight to
+  the previous UTC day.
+- 🐛 **`IsValidForAdvancedFind` was never requested**, so the filter meant to hide non-filterable
+  attributes did nothing.
+- 🐛 **"Has Value" left the value box enabled**; no-value operators now disable it correctly.
+- 🐛 **"Last X Days" rendered a date picker** instead of a number input.
+- 🐛 **`not-between` and fiscal period-and-year operators had no second value input.**
+- 🐛 **`link-entity` guessed `from="<entity>id"`**, which is wrong for activity entities
+  (`email`, `task`, `appointment` all use `activityid`). Now uses `PrimaryIdAttribute`.
+- 🐛 **Invalid OData output.** Untranslatable operators were emitted as a `/* comment */` in the filter
+  string; nested related-entity conditions were silently coerced to `eq`. Both are now omitted.
+- ✨ **Edit FetchXML** toolbar button — opens the current query as editable FetchXML to tweak or paste
+  over (`showEditFetchXmlButton`).
+- ✨ **Show/Hide OData and FetchXML** toolbar toggles (`showPreviewToggleButtons`).
+- ✨ `QueryBuilderApplyResult.odataUnsupported` reports conditions OData cannot express, surfaced as a
+  warning in the OData preview. New `isOperatorConvertibleToOData` helper.
+- ✨ Option metadata is fetched once per attribute type rather than once per field.
+- 💄 Softer, more rounded containers matching other Dynamics surfaces.
+- ⚠️ **Breaking:** `odataUnsupported` is a required field on `QueryBuilderApplyResult`. Consumers only
+  reading the result are unaffected; anyone constructing the type will need to add it.
 
 ### 2026.8.30
 

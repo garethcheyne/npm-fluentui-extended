@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { serializeQueryBuilderState, parseFetchXmlToState, validateQueryBuilderState } from './QueryBuilder';
+import { buildFieldOptions, dataTypeFromAttribute, formatDateOnly, getDefaultValueForField, isTrueValue } from './QueryBuilder.utils';
 import type { QueryBuilderField, QueryBuilderState } from './QueryBuilder.types';
 
 const testFields: QueryBuilderField[] = [
@@ -1983,5 +1984,313 @@ describe('XML and OData validation - complex scenarios', () => {
         expect(result.odataFilter).toContain("contains(ownerid/fullname, 'Admin')");
         expect(result.odataFilter).toContain("endswith(ownerid/emailaddress1, '@contoso.com')");
         expect(result.odataFilter).toContain(' or '); // nested OR logic
+    });
+});
+
+describe('dataTypeFromAttribute', () => {
+    // The Web API returns both properties; AttributeTypeName suffixes the type with "Type"
+    it('maps AttributeTypeName values, which carry a "Type" suffix', () => {
+        expect(dataTypeFromAttribute({ AttributeTypeName: { Value: 'MoneyType' } })).toBe('number');
+        expect(dataTypeFromAttribute({ AttributeTypeName: { Value: 'DecimalType' } })).toBe('number');
+        expect(dataTypeFromAttribute({ AttributeTypeName: { Value: 'IntegerType' } })).toBe('number');
+        expect(dataTypeFromAttribute({ AttributeTypeName: { Value: 'PicklistType' } })).toBe('optionset');
+        expect(dataTypeFromAttribute({ AttributeTypeName: { Value: 'StateType' } })).toBe('optionset');
+        expect(dataTypeFromAttribute({ AttributeTypeName: { Value: 'StatusType' } })).toBe('optionset');
+        expect(dataTypeFromAttribute({ AttributeTypeName: { Value: 'BooleanType' } })).toBe('boolean');
+        expect(dataTypeFromAttribute({ AttributeTypeName: { Value: 'DateTimeType' } })).toBe('datetime');
+        expect(dataTypeFromAttribute({ AttributeTypeName: { Value: 'LookupType' } })).toBe('lookup');
+        expect(dataTypeFromAttribute({ AttributeTypeName: { Value: 'CustomerType' } })).toBe('lookup');
+        expect(dataTypeFromAttribute({ AttributeTypeName: { Value: 'StringType' } })).toBe('string');
+    });
+
+    it('maps unsuffixed AttributeType values', () => {
+        expect(dataTypeFromAttribute({ AttributeType: 'Money' })).toBe('number');
+        expect(dataTypeFromAttribute({ AttributeType: 'Picklist' })).toBe('optionset');
+        expect(dataTypeFromAttribute({ AttributeType: 'Boolean' })).toBe('boolean');
+        expect(dataTypeFromAttribute({ AttributeType: 'DateTime' })).toBe('datetime');
+        expect(dataTypeFromAttribute({ AttributeType: 'Memo' })).toBe('string');
+    });
+
+    it('treats an attribute with Targets as a lookup', () => {
+        expect(dataTypeFromAttribute({ AttributeType: 'Owner', Targets: ['systemuser'] })).toBe('lookup');
+    });
+});
+
+describe('buildFieldOptions', () => {
+    const label = (text: string) => ({ UserLocalizedLabel: { Label: text } });
+
+    it('builds options from a local option set', () => {
+        const attr = {
+            OptionSet: {
+                Options: [
+                    { Value: 1, Label: label('Hot') },
+                    { Value: 2, Label: label('Warm') },
+                ],
+            },
+        };
+
+        expect(buildFieldOptions(attr, 'optionset')).toEqual([
+            { label: 'Hot', value: 1 },
+            { label: 'Warm', value: 2 },
+        ]);
+    });
+
+    it('falls back to the global option set', () => {
+        const attr = { GlobalOptionSet: { Options: [{ Value: 10, Label: label('Shared') }] } };
+
+        expect(buildFieldOptions(attr, 'optionset')).toEqual([{ label: 'Shared', value: 10 }]);
+    });
+
+    it('builds boolean options from TrueOption/FalseOption using their Dynamics labels', () => {
+        const attr = {
+            OptionSet: {
+                TrueOption: { Value: 1, Label: label('Allowed') },
+                FalseOption: { Value: 0, Label: label('Not Allowed') },
+            },
+        };
+
+        expect(buildFieldOptions(attr, 'boolean')).toEqual([
+            { label: 'Allowed', value: '1' },
+            { label: 'Not Allowed', value: '0' },
+        ]);
+    });
+
+    it('returns undefined when there is no option metadata', () => {
+        expect(buildFieldOptions({}, 'optionset')).toBeUndefined();
+        expect(buildFieldOptions({ OptionSet: {} }, 'boolean')).toBeUndefined();
+    });
+});
+
+describe('boolean condition values', () => {
+    it('recognizes every shape a boolean value arrives in', () => {
+        expect(isTrueValue(true)).toBe(true);
+        expect(isTrueValue('1')).toBe(true);
+        expect(isTrueValue('true')).toBe(true);
+        expect(isTrueValue('True')).toBe(true);
+        expect(isTrueValue(false)).toBe(false);
+        expect(isTrueValue('0')).toBe(false);
+        expect(isTrueValue('false')).toBe(false);
+        expect(isTrueValue('')).toBe(false);
+        expect(isTrueValue(undefined)).toBe(false);
+    });
+
+    it('defaults a boolean field to a concrete value so it cannot serialize as an unintended No', () => {
+        const field: QueryBuilderField = { id: 'isactive', label: 'Is Active', dataType: 'boolean' };
+        expect(getDefaultValueForField(field)).toBe('1');
+    });
+
+    it('round-trips a true condition through FetchXML', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [{ id: 'cond1', fieldId: 'isactive', operator: 'eq', value: '1' }],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFields, 'account');
+        expect(result.fetchXmlFilter).toContain('<condition attribute="isactive" operator="eq" value="1" />');
+        expect(result.odataFilter).toBe('isactive eq true');
+
+        const reparsed = parseFetchXmlToState(result.fetchXml, testFields);
+        expect(reparsed.state?.groups[0].conditions[0].value).toBe('1');
+    });
+});
+
+describe('FetchXML operator correctness', () => {
+    const stringCondition = (operator: string, value: string): QueryBuilderState => ({
+        groups: [
+            {
+                id: 'grp1',
+                logic: 'and',
+                conditions: [{ id: 'cond1', fieldId: 'name', operator, value }],
+            },
+        ],
+    });
+
+    // FetchXML has no "contains" operator - substring matching is like/not-like with wildcards
+    // https://learn.microsoft.com/power-apps/developer/data-platform/fetchxml/reference/operators
+    it('emits Contains as a wildcard LIKE', () => {
+        const result = serializeQueryBuilderState(stringCondition('contains', 'Contoso'), testFields, 'account');
+        expect(result.fetchXmlFilter).toContain('operator="like"');
+        expect(result.fetchXmlFilter).toContain('value="%Contoso%"');
+    });
+
+    it('emits Does Not Contain as a wildcard NOT-LIKE, not an invalid not-contain operator', () => {
+        const result = serializeQueryBuilderState(stringCondition('not-contain', 'Contoso'), testFields, 'account');
+        expect(result.fetchXmlFilter).toContain('operator="not-like"');
+        expect(result.fetchXmlFilter).toContain('value="%Contoso%"');
+        expect(result.fetchXmlFilter).not.toContain('not-contain"');
+    });
+
+    it('passes through operators that are already valid FetchXML', () => {
+        for (const operator of ['begins-with', 'not-begin-with', 'ends-with', 'not-end-with', 'like', 'not-like']) {
+            const result = serializeQueryBuilderState(stringCondition(operator, 'X'), testFields, 'account');
+            expect(result.fetchXmlFilter).toContain(`operator="${operator}"`);
+        }
+    });
+});
+
+describe('OData translatability reporting', () => {
+    const dateCondition = (operator: string, value?: string): QueryBuilderState => ({
+        groups: [
+            {
+                id: 'grp1',
+                logic: 'and',
+                conditions: [{ id: 'cond1', fieldId: 'createdon', operator, value }],
+            },
+        ],
+    });
+
+    it('reports relative date operators as untranslatable', () => {
+        const result = serializeQueryBuilderState(dateCondition('last-x-days', '7'), testFields, 'account');
+
+        expect(result.odataUnsupported).toHaveLength(1);
+        expect(result.odataUnsupported[0]).toMatchObject({
+            fieldId: 'createdon',
+            fieldLabel: 'Created On',
+            operator: 'last-x-days',
+            operatorLabel: 'Last X Days',
+        });
+    });
+
+    it('never emits a comment into the OData filter', () => {
+        const result = serializeQueryBuilderState(dateCondition('this-fiscal-year'), testFields, 'account');
+        expect(result.odataFilter).not.toContain('/*');
+        expect(result.odataFilter).toBe('');
+    });
+
+    it('still produces valid FetchXML for untranslatable operators', () => {
+        const result = serializeQueryBuilderState(dateCondition('this-fiscal-year'), testFields, 'account');
+        expect(result.fetchXmlFilter).toContain('operator="this-fiscal-year"');
+    });
+
+    it('reports nothing when every operator converts', () => {
+        const result = serializeQueryBuilderState(dateCondition('on-or-after', '2026-08-05'), testFields, 'account');
+        expect(result.odataUnsupported).toEqual([]);
+        expect(result.odataFilter).toContain('createdon ge');
+    });
+
+    it('treats approximated operators as convertible', () => {
+        const state: QueryBuilderState = {
+            groups: [
+                {
+                    id: 'grp1',
+                    logic: 'and',
+                    conditions: [{ id: 'cond1', fieldId: 'revenue', operator: 'between', value: 1, value2: 10 }],
+                },
+            ],
+        };
+
+        const result = serializeQueryBuilderState(state, testFields, 'account');
+        expect(result.odataUnsupported).toEqual([]);
+        expect(result.odataFilter).toBe('(revenue ge 1 and revenue le 10)');
+    });
+});
+
+describe('link-entity from attribute', () => {
+    const relatedState = (primaryId?: string): QueryBuilderState => ({
+        groups: [
+            {
+                id: 'grp1',
+                logic: 'and',
+                conditions: [
+                    {
+                        id: 'rel1',
+                        kind: 'relatedEntity',
+                        fieldId: 'regardingobjectid',
+                        operator: 'containsdata',
+                        relatedEntityName: 'regardingobjectid',
+                        relatedEntityTarget: 'email',
+                        relatedEntityPrimaryId: primaryId,
+                        nestedLogic: 'and',
+                        nestedConditions: [
+                            { id: 'n1', fieldId: 'subject', operator: 'eq', value: 'Hi' },
+                        ],
+                        nestedFields: [{ id: 'subject', label: 'Subject', dataType: 'string' }],
+                    },
+                ],
+            },
+        ],
+    });
+
+    // Activity entities (email, task, appointment...) all use "activityid", not "<entity>id"
+    it('uses the primary key from metadata when available', () => {
+        const result = serializeQueryBuilderState(relatedState('activityid'), testFields, 'account');
+        expect(result.fetchXml).toContain('from="activityid"');
+    });
+
+    it('falls back to the entity-name convention when metadata is missing', () => {
+        const result = serializeQueryBuilderState(relatedState(undefined), testFields, 'account');
+        expect(result.fetchXml).toContain('from="emailid"');
+    });
+});
+
+describe('formatDateOnly', () => {
+    // toISOString() would convert local midnight to UTC and roll the date back a day
+    // anywhere east of Greenwich, filtering on the day before the one picked
+    it('keeps the local calendar date regardless of timezone offset', () => {
+        expect(formatDateOnly(new Date(2026, 7, 5, 0, 0, 0))).toBe('2026-08-05');
+        expect(formatDateOnly(new Date(2026, 0, 1, 0, 0, 0))).toBe('2026-01-01');
+        expect(formatDateOnly(new Date(2026, 11, 31, 23, 59, 59))).toBe('2026-12-31');
+    });
+
+    it('returns an empty string for missing or invalid dates', () => {
+        expect(formatDateOnly(null)).toBe('');
+        expect(formatDateOnly(undefined)).toBe('');
+        expect(formatDateOnly(new Date('nonsense'))).toBe('');
+    });
+});
+
+describe('OData translatability inside related entities', () => {
+    const nestedState = (operator: string, value?: string): QueryBuilderState => ({
+        groups: [
+            {
+                id: 'grp1',
+                logic: 'and',
+                conditions: [
+                    {
+                        id: 'rel1',
+                        kind: 'relatedEntity',
+                        fieldId: 'ownerid',
+                        operator: 'containsdata',
+                        relatedEntityName: 'ownerid',
+                        relatedEntityTarget: 'systemuser',
+                        nestedLogic: 'and',
+                        nestedConditions: [{ id: 'n1', fieldId: 'createdon', operator, value }],
+                        nestedFields: [{ id: 'createdon', label: 'Created On', dataType: 'datetime' }],
+                    },
+                ],
+            },
+        ],
+    });
+
+    // The default branch used to coerce any unrecognized operator to `eq`, producing a filter
+    // that quietly meant something different from the FetchXML
+    it('omits an untranslatable nested operator instead of coercing it to eq', () => {
+        const result = serializeQueryBuilderState(nestedState('last-x-days', '7'), testFields, 'account');
+
+        expect(result.odataFilter).not.toContain('eq');
+        expect(result.odataFilter).toBe('');
+    });
+
+    it('reports the untranslatable nested condition', () => {
+        const result = serializeQueryBuilderState(nestedState('last-x-days', '7'), testFields, 'account');
+
+        expect(result.odataUnsupported).toHaveLength(1);
+        expect(result.odataUnsupported[0]).toMatchObject({
+            fieldId: 'createdon',
+            fieldLabel: 'Created On',
+            operator: 'last-x-days',
+        });
+    });
+
+    it('still translates nested operators that have an OData equivalent', () => {
+        const result = serializeQueryBuilderState(nestedState('eq', '2026-08-05'), testFields, 'account');
+
+        expect(result.odataUnsupported).toEqual([]);
+        expect(result.odataFilter).toContain('ownerid/createdon eq');
     });
 });

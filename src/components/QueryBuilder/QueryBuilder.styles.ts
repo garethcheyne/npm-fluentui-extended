@@ -18,7 +18,8 @@ export const useQueryBuilderStyles = makeStyles({
     width: '100%',
     backgroundColor: tokens.colorNeutralBackground1,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusSmall,
+    // Softer, card-like surface matching other Dynamics containers
+    borderRadius: tokens.borderRadiusLarge,
     overflow: 'hidden',
   },
   headerRow: {
@@ -118,8 +119,9 @@ export const useQueryBuilderStyles = makeStyles({
     },
   },
   groupCard: {
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusSmall,
+    // Lighter stroke than the outer container so nested cards recede rather than compete
+    border: `1px solid ${tokens.colorNeutralStroke3}`,
+    borderRadius: tokens.borderRadiusLarge,
     backgroundColor: tokens.colorNeutralBackground2,
     padding: tokens.spacingHorizontalS,
     display: 'flex',
@@ -228,7 +230,7 @@ export const useQueryBuilderStyles = makeStyles({
     minWidth: 0,
     backgroundColor: tokens.colorNeutralBackground1,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusSmall,
+    borderRadius: tokens.borderRadiusMedium,
     padding: tokens.spacingHorizontalXS,
     boxSizing: 'border-box',
   },
@@ -317,7 +319,7 @@ export const useQueryBuilderStyles = makeStyles({
   },
   previewCard: {
     border: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusSmall,
+    borderRadius: tokens.borderRadiusLarge,
     backgroundColor: tokens.colorNeutralBackground1,
     padding: tokens.spacingHorizontalS,
     marginTop: tokens.spacingVerticalS,
@@ -332,7 +334,7 @@ export const useQueryBuilderStyles = makeStyles({
   },
   conditionInvalid: {
     backgroundColor: tokens.colorPaletteRedBackground1,
-    borderRadius: tokens.borderRadiusSmall,
+    borderRadius: tokens.borderRadiusMedium,
   },
   conditionUnknownBanner: {
     display: 'flex',
@@ -344,7 +346,7 @@ export const useQueryBuilderStyles = makeStyles({
     paddingRight: tokens.spacingHorizontalXS,
     marginBottom: tokens.spacingVerticalXS,
     backgroundColor: tokens.colorStatusWarningBackground1,
-    borderRadius: tokens.borderRadiusSmall,
+    borderRadius: tokens.borderRadiusMedium,
     fontSize: tokens.fontSizeBase100,
     color: tokens.colorStatusWarningForeground3,
   },
@@ -426,6 +428,28 @@ export const useQueryBuilderStyles = makeStyles({
     fontStyle: 'italic',
     marginTop: tokens.spacingVerticalXS,
   },
+  previewNotice: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: tokens.spacingHorizontalXS,
+    marginTop: tokens.spacingVerticalXS,
+    padding: tokens.spacingHorizontalXS,
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground3,
+    color: tokens.colorNeutralForeground2,
+    fontSize: tokens.fontSizeBase200,
+  },
+  previewNoticeIcon: {
+    color: tokens.colorPaletteDarkOrangeForeground1,
+    flexShrink: 0,
+    marginTop: '2px',
+  },
+  previewNoticeList: {
+    margin: 0,
+    marginTop: tokens.spacingVerticalXXS,
+    paddingLeft: tokens.spacingHorizontalL,
+    listStyleType: 'disc',
+  },
   previewCode: {
     display: 'block',
     fontSize: tokens.fontSizeBase200,
@@ -443,8 +467,9 @@ export const useQueryBuilderStyles = makeStyles({
   },
   // Related entity nested card styles
   relatedEntityCard: {
-    border: `1px solid ${tokens.colorBrandStroke1}`,
-    borderRadius: tokens.borderRadiusSmall,
+    // Brand stroke softened to the muted variant - the accent still reads without shouting
+    border: `1px solid ${tokens.colorBrandStroke2}`,
+    borderRadius: tokens.borderRadiusLarge,
     backgroundColor: tokens.colorNeutralBackground3,
     padding: tokens.spacingHorizontalS,
     marginTop: tokens.spacingVerticalXS,
@@ -501,7 +526,7 @@ export const useQueryBuilderStyles = makeStyles({
     minHeight: '32px',
     backgroundColor: tokens.colorNeutralBackground1,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusSmall,
+    borderRadius: tokens.borderRadiusMedium,
     padding: tokens.spacingHorizontalXS,
     boxSizing: 'border-box',
   },

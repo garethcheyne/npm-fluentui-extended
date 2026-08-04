@@ -15,6 +15,8 @@ export interface QueryBuilderLookupTarget {
   displayName?: string;
   /** Primary name attribute for searching (e.g., "fullname") */
   primaryNameAttribute?: string;
+  /** Primary key attribute (e.g., "contactid", or "activityid" for activity entities) */
+  primaryIdAttribute?: string;
 }
 
 export interface QueryBuilderField {
@@ -157,6 +159,11 @@ export interface QueryBuilderCondition {
   relatedEntityName?: string;
   /** The target entity logical name (e.g., "systemuser") - used as "name" in link-entity */
   relatedEntityTarget?: string;
+  /**
+   * Primary key attribute of the target entity - used as "from" in link-entity.
+   * Falls back to "<entity>id" when absent, which is wrong for activity entities.
+   */
+  relatedEntityPrimaryId?: string;
   /** Alias for the link-entity (e.g., "S" in alias="S") */
   relatedEntityAlias?: string;
   /** Nested conditions for related entity (link-entity filter) */
@@ -179,6 +186,18 @@ export interface QueryBuilderState {
   groups: QueryBuilderGroup[];
 }
 
+/** A condition that has no OData equivalent and was omitted from the OData filter */
+export interface QueryBuilderODataUnsupported {
+  /** Logical name of the field the condition applies to */
+  fieldId: string;
+  /** Display label of the field */
+  fieldLabel: string;
+  /** The operator that cannot be translated (e.g., "last-x-days") */
+  operator: string;
+  /** Display label of the operator (e.g., "Last X Days") */
+  operatorLabel: string;
+}
+
 export interface QueryBuilderApplyResult {
   state: QueryBuilderState;
   fetchXmlFilter: string;
@@ -186,6 +205,12 @@ export interface QueryBuilderApplyResult {
   odataFilter: string;
   /** Full OData query URL (e.g., "accounts?$filter=...") - requires entitySetName */
   odataQuery?: string;
+  /**
+   * Conditions dropped from odataFilter because OData has no equivalent
+   * (relative dates, fiscal periods, user context, hierarchy operators).
+   * When non-empty the OData output is NOT equivalent to the FetchXML - use FetchXML instead.
+   */
+  odataUnsupported: QueryBuilderODataUnsupported[];
 }
 
 export interface QueryBuilderRelatedEntity {
@@ -199,6 +224,8 @@ export interface QueryBuilderRelatedEntity {
   targetEntity?: string;
   /** The target entity set name for OData (e.g., "contacts") */
   targetEntitySetName?: string;
+  /** The target entity's primary key attribute - used as "from" in the generated link-entity */
+  targetPrimaryIdAttribute?: string;
 }
 
 export interface QueryBuilderLookupOption {
@@ -230,6 +257,13 @@ export interface QueryBuilderProps {
   showResetToDefaultButton?: boolean;
   showDownloadFetchXmlButton?: boolean;
   showUploadFetchXmlButton?: boolean;
+  /**
+   * Show the "Edit FetchXML" toolbar button, which opens the current query as editable
+   * FetchXML that can be tweaked or overwritten by pasting. Defaults to true.
+   */
+  showEditFetchXmlButton?: boolean;
+  /** Show the toolbar buttons that toggle the OData and FetchXML previews. Defaults to true. */
+  showPreviewToggleButtons?: boolean;
   showDeleteAllFiltersButton?: boolean;
   showValidateButton?: boolean;
   showDataSourceToggle?: boolean;

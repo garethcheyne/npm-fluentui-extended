@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Button, Combobox, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, DialogTrigger, Dropdown, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Option, Spinner, Text, Textarea } from '@fluentui/react-components';
 import { DatePicker } from '@fluentui/react-datepicker-compat';
-import { AddRegular, ArrowDownloadRegular, ArrowResetRegular, ArrowUploadRegular, CheckmarkCircleRegular, CopyRegular, DeleteRegular, DismissRegular, MoreHorizontalRegular, WarningRegular } from '@fluentui/react-icons';
+import { AddRegular, ArrowDownloadRegular, ArrowResetRegular, ArrowUploadRegular, CheckmarkCircleRegular, CopyRegular, DeleteRegular, DismissRegular, EditRegular, EyeOffRegular, EyeRegular, MoreHorizontalRegular, WarningRegular } from '@fluentui/react-icons';
 import { mergeClasses, useQueryBuilderStyles } from './QueryBuilder.styles';
 import { Lookup } from '../Lookup';
 import type { LookupOption } from '../Lookup';
@@ -23,7 +23,11 @@ import { getOperatorsForType, getOperatorsForTypeSimple, operatorRequiresValue, 
 import { serializeQueryBuilderState, prettyPrintXml, escapeXml } from './QueryBuilder.serializer';
 import { parseFetchXmlToState, ParseFetchXmlResult } from './QueryBuilder.parser';
 import {
+    DEFAULT_BOOLEAN_OPTIONS,
     FALLBACK_FIELDS,
+    buildFieldOptions,
+    formatDateOnly,
+    isTrueValue,
     validateQueryBuilderState,
     dataTypeFromAttribute,
     getDefaultValueForField,
@@ -37,7 +41,7 @@ import {
 } from './QueryBuilder.utils';
 import { LookupValueInput } from './QueryBuilder.LookupInput';
 import { loadEntityFields, useEntityFields, extractAttributesArray, isValidAttribute, parseAttributeToField } from './QueryBuilder.hooks';
-import { enrichLookupFields, enrichOptionsetFields } from './QueryBuilder.enrichment';
+import { enrichLookupFields, enrichOptionsetFields, fetchOptionSetMetadata } from './QueryBuilder.enrichment';
 
 // Re-export for backward compatibility
 export type { QueryBuilderValidationError, QueryBuilderValidationResult };
@@ -121,6 +125,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                         lookupField: field.id,
                         targetEntity: target.entityLogicalName,
                         targetEntitySetName: target.entitySetName,
+                        targetPrimaryIdAttribute: target.primaryIdAttribute,
                     });
                 }
             }
@@ -165,7 +170,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
             try {
                 // Fetch entity metadata using native Web API
                 const entityResponse = await fetch(
-                    `/api/data/v9.2/EntityDefinitions(LogicalName='${props.entityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute`,
+                    `/api/data/v9.2/EntityDefinitions(LogicalName='${props.entityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute,PrimaryIdAttribute`,
                     {
                         headers: {
                             'OData-MaxVersion': '4.0',
@@ -189,7 +194,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
 
                 // Fetch regular attributes
                 const attributesResponse = await fetch(
-                    `/api/data/v9.2/EntityDefinitions(LogicalName='${props.entityName}')/Attributes?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName`,
+                    `/api/data/v9.2/EntityDefinitions(LogicalName='${props.entityName}')/Attributes?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName,IsValidForAdvancedFind`,
                     {
                         headers: {
                             'OData-MaxVersion': '4.0',
@@ -222,16 +227,21 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                 const lookupData = lookupResponse.ok ? await lookupResponse.json() : { value: [] };
                 const lookupAttributes = lookupData.value || [];
 
+                // Fetch selectable values for optionset/boolean attributes - option metadata
+                // cannot be expanded from the base Attributes collection
+                const optionSetMap = await fetchOptionSetMetadata(props.entityName, trace);
+
                 // Create a map of lookup attributes by LogicalName for easy lookup
                 const lookupMap = new Map<string, any>(lookupAttributes.map((attr: any) => [attr.LogicalName, attr]));
 
-                // Merge lookup Targets into the main attributes array
+                // Merge lookup Targets and option set metadata into the main attributes array
                 const mergedAttributes = attributesArray.map((attr: any) => {
                     const lookupAttr = lookupMap.get(attr.LogicalName);
-                    if (lookupAttr?.Targets) {
-                        return { ...attr, Targets: lookupAttr.Targets };
-                    }
-                    return attr;
+                    return {
+                        ...attr,
+                        ...(lookupAttr?.Targets ? { Targets: lookupAttr.Targets } : {}),
+                        ...optionSetMap.get(attr.LogicalName),
+                    };
                 });
 
                 // First pass: collect all unique target entity names from lookup fields
@@ -245,12 +255,13 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                     }
                 }
 
-                // Fetch metadata for each target entity to get entitySetName and primaryNameAttribute
-                const targetMetadataCache: Record<string, { entitySetName?: string; displayName?: string; primaryNameAttribute?: string }> = {};
+                // Fetch metadata for each target entity to get entitySetName, primaryNameAttribute
+                // and primaryIdAttribute (needed for the link-entity "from" attribute)
+                const targetMetadataCache: Record<string, { entitySetName?: string; displayName?: string; primaryNameAttribute?: string; primaryIdAttribute?: string }> = {};
                 for (const targetEntityName of targetEntityNames) {
                     try {
                         const targetResponse = await fetch(
-                            `/api/data/v9.2/EntityDefinitions(LogicalName='${targetEntityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute`,
+                            `/api/data/v9.2/EntityDefinitions(LogicalName='${targetEntityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute,PrimaryIdAttribute`,
                             {
                                 headers: {
                                     'OData-MaxVersion': '4.0',
@@ -265,6 +276,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                 entitySetName: targetMeta?.EntitySetName,
                                 displayName: targetMeta?.DisplayName?.UserLocalizedLabel?.Label || targetMeta?.LogicalName,
                                 primaryNameAttribute: targetMeta?.PrimaryNameAttribute,
+                                primaryIdAttribute: targetMeta?.PrimaryIdAttribute,
                             };
                         }
                     } catch (targetErr) {
@@ -287,6 +299,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                     entitySetName: target?.entitySetName || cached.entitySetName,
                                     displayName: target?.displayName || cached.displayName,
                                     primaryNameAttribute: target?.primaryNameAttribute || cached.primaryNameAttribute,
+                                    primaryIdAttribute: target?.primaryIdAttribute || cached.primaryIdAttribute,
                                 };
                             })
                             : undefined;
@@ -302,6 +315,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                             label,
                             schemaName: attribute.SchemaName,
                             dataType,
+                            options: buildFieldOptions(attribute, dataType),
                             targets,
                         };
                     })
@@ -371,6 +385,10 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                         if (!isValidOption) {
                             nextValue = String(matchedField.options[0].value);
                         }
+                    }
+                    // Booleans have no empty state - an unset value would silently serialize as "No"
+                    if (matchedField.dataType === 'boolean' && String(condition.value ?? '').trim() === '') {
+                        nextValue = getDefaultValueForField(matchedField);
                     }
 
                     if (condition.fieldId !== matchedField.id || condition.operator !== nextOperator || condition.value !== nextValue) {
@@ -655,13 +673,20 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                     // Find the related entity to get targetEntity
                     const related = computedRelatedEntities.find(r => r.id === condition.relatedEntityName);
 
-                    // Set relatedEntityTarget if not set (migration for existing data)
-                    if (related?.targetEntity && !condition.relatedEntityTarget) {
+                    // Backfill target metadata for conditions restored from FetchXML or initialState
+                    const needsTarget = !!related?.targetEntity && !condition.relatedEntityTarget;
+                    const needsPrimaryId = !!related?.targetPrimaryIdAttribute && !condition.relatedEntityPrimaryId;
+                    if (needsTarget || needsPrimaryId) {
                         updateGroup(group.id, (current) => ({
                             ...current,
                             conditions: current.conditions.map((c) =>
                                 c.id === condition.id
-                                    ? { ...c, relatedEntityTarget: related.targetEntity, fieldId: condition.relatedEntityName || c.fieldId }
+                                    ? {
+                                        ...c,
+                                        relatedEntityTarget: related?.targetEntity ?? c.relatedEntityTarget,
+                                        relatedEntityPrimaryId: related?.targetPrimaryIdAttribute ?? c.relatedEntityPrimaryId,
+                                        fieldId: condition.relatedEntityName || c.fieldId,
+                                    }
                                     : c
                             ),
                         }));
@@ -709,7 +734,20 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
         URL.revokeObjectURL(url);
     }, [availableFields, builderState, entitySetName, props.entityName]);
 
+    // Preview visibility is toggleable from the toolbar; the props seed the initial state
+    const [odataPreviewVisible, setODataPreviewVisible] = React.useState(props.showODataPreview ?? false);
+    const [fetchXmlPreviewVisible, setFetchXmlPreviewVisible] = React.useState(props.showFetchXmlPreview ?? false);
+
+    React.useEffect(() => {
+        if (props.showODataPreview !== undefined) setODataPreviewVisible(props.showODataPreview);
+    }, [props.showODataPreview]);
+
+    React.useEffect(() => {
+        if (props.showFetchXmlPreview !== undefined) setFetchXmlPreviewVisible(props.showFetchXmlPreview);
+    }, [props.showFetchXmlPreview]);
+
     const [uploadDialogOpen, setUploadDialogOpen] = React.useState(false);
+    const [xmlDialogMode, setXmlDialogMode] = React.useState<'import' | 'edit'>('import');
     const [uploadXmlText, setUploadXmlText] = React.useState('');
     const [uploadError, setUploadError] = React.useState<string | null>(null);
 
@@ -785,8 +823,15 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
         }
     }, [builderState, availableFields, entitySetName, props.entityName]);
 
-    const onOpenUploadDialog = React.useCallback(() => {
-        setUploadXmlText('');
+    /**
+     * Open the FetchXML dialog.
+     *
+     * "import" starts empty for pasting in a query from elsewhere; "edit" starts from the
+     * query currently in the builder so it can be tweaked or overwritten in place.
+     */
+    const openXmlDialog = React.useCallback((mode: 'import' | 'edit', initialXml: string) => {
+        setXmlDialogMode(mode);
+        setUploadXmlText(initialXml);
         setUploadError(null);
         setUploadDialogOpen(true);
     }, []);
@@ -797,10 +842,11 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
             setBuilderState(result.state);
             setUploadDialogOpen(false);
             setUploadError(null);
+            trace('[QueryBuilder] Applied FetchXML from dialog', { mode: xmlDialogMode });
         } else {
             setUploadError(result.error || 'Invalid FetchXML.');
         }
-    }, [uploadXmlText, availableFields]);
+    }, [uploadXmlText, availableFields, trace, xmlDialogMode]);
 
     const serialized = serializeQueryBuilderState(builderState, availableFields, props.entityName, entitySetName);
 
@@ -815,7 +861,23 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
             // still render as lookup (this happens when parsing FetchXML where field metadata isn't loaded yet)
             const hasLookupDisplayName = condition.valueDisplayName && condition.valueDisplayName.trim() !== '';
             const shouldRenderAsLookup = field.dataType === 'lookup' || hasLookupDisplayName;
-            
+
+            // Free-text fallback, also used when a choice field's options failed to load so the
+            // condition stays editable instead of rendering an empty cell
+            const renderFreeTextInput = (type: 'text' | 'number' = 'text') => (
+                <Input
+                    className={styles.compactControl}
+                    size="small"
+                    appearance="filled-darker"
+                    aria-label="Value"
+                    type={type}
+                    value={String(condition.value ?? '')}
+                    onChange={(_, data) => onValueChange(data.value)}
+                    disabled={isNullOperator}
+                    placeholder="Value"
+                />
+            );
+
             if (shouldRenderAsLookup) {
                 return (
                     <LookupValueInput
@@ -830,9 +892,16 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                 );
             }
 
+            // Some operators dictate the input regardless of the field type: "Last X Days" on a
+            // date column takes a count, and fiscal period/year operators take a number
+            const operatorValueType = getOperatorValueType(condition.operator);
+            if (operatorValueType === 'number') return renderFreeTextInput('number');
+
             switch (field.dataType) {
                 case 'optionset': {
-                    if (!field.options) return null;
+                    // Options can be missing when metadata failed to load or the consumer supplied
+                    // the field without them - fall back to raw entry rather than an unusable cell
+                    if (!field.options || field.options.length === 0) return renderFreeTextInput();
 
                     const isMultiSelect = condition.operator === 'in' || condition.operator === 'not-in';
 
@@ -916,58 +985,49 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                             appearance="filled-darker"
                             aria-label="Value"
                             value={condition.value ? new Date(String(condition.value)) : null}
-                            onSelectDate={(date) => onValueChange(date ? date.toISOString().split('T')[0] : '')}
+                            onSelectDate={(date) => onValueChange(formatDateOnly(date))}
                             disabled={isNullOperator}
                             placeholder="Select date..."
                         />
                     );
 
-                case 'boolean':
+                case 'boolean': {
+                    // Two-option fields carry their own labels in Dynamics (e.g. "Allowed"/"Not Allowed"),
+                    // so prefer the metadata labels and only fall back to Yes/No
+                    const booleanOptions = field.options && field.options.length > 0
+                        ? field.options
+                        : DEFAULT_BOOLEAN_OPTIONS;
+
+                    // Match on truthiness, not string equality - the stored value may be '1', 'true' or true
+                    const selectedOption =
+                        booleanOptions.find((option) => isTrueValue(option.value) === isTrueValue(condition.value))
+                        ?? booleanOptions[0];
+
                     return (
                         <Dropdown
                             className={styles.compactControl}
                             size="small"
                             appearance="filled-darker"
                             aria-label="Value"
-                            selectedOptions={[String(condition.value ?? 'true')]}
-                            value={String(condition.value ?? 'true') === 'true' ? 'Yes' : 'No'}
+                            selectedOptions={[String(selectedOption.value)]}
+                            value={selectedOption.label}
                             disabled={isNullOperator}
-                            onOptionSelect={(_, data) => onValueChange(data.optionValue ?? 'true')}
+                            onOptionSelect={(_, data) => onValueChange(data.optionValue ?? String(selectedOption.value))}
                         >
-                            <Option value="true">Yes</Option>
-                            <Option value="false">No</Option>
+                            {booleanOptions.map((option) => (
+                                <Option key={String(option.value)} value={String(option.value)}>
+                                    {option.label}
+                                </Option>
+                            ))}
                         </Dropdown>
                     );
+                }
 
                 case 'number':
-                    return (
-                        <Input
-                            className={styles.compactControl}
-                            size="small"
-                            appearance="filled-darker"
-                            aria-label="Value"
-                            type="number"
-                            value={String(condition.value ?? '')}
-                            onChange={(_, data) => onValueChange(data.value)}
-                            disabled={isNullOperator}
-                            placeholder="Value"
-                        />
-                    );
+                    return renderFreeTextInput('number');
 
                 default: // 'string' and any other types
-                    return (
-                        <Input
-                            className={styles.compactControl}
-                            size="small"
-                            appearance="filled-darker"
-                            aria-label="Value"
-                            type="text"
-                            value={String(condition.value ?? '')}
-                            onChange={(_, data) => onValueChange(data.value)}
-                            disabled={isNullOperator}
-                            placeholder="Value"
-                        />
-                    );
+                    return renderFreeTextInput();
             }
         },
         [styles.compactControl, styles.optionsetListbox, props.onLookupSearch],
@@ -1027,18 +1087,56 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                             size="small"
                             appearance="transparent"
                             icon={<ArrowUploadRegular />}
-                            onClick={onOpenUploadDialog}
+                            onClick={() => openXmlDialog('import', '')}
+                            title="Paste in FetchXML from elsewhere to rebuild the query"
                         >
                             Import FetchXML
                         </Button>
+                    )}
+                    {props.showEditFetchXmlButton !== false && (
+                        <Button
+                            size="small"
+                            appearance="transparent"
+                            icon={<EditRegular />}
+                            onClick={() => openXmlDialog('edit', serialized.fetchXml ? prettyPrintXml(serialized.fetchXml) : '')}
+                            title="View and edit the FetchXML for the current query"
+                        >
+                            Edit FetchXML
+                        </Button>
+                    )}
+                    {props.showPreviewToggleButtons !== false && (
+                        <>
+                            <Button
+                                size="small"
+                                appearance={odataPreviewVisible ? 'secondary' : 'transparent'}
+                                icon={odataPreviewVisible ? <EyeOffRegular /> : <EyeRegular />}
+                                onClick={() => setODataPreviewVisible((visible) => !visible)}
+                            >
+                                {odataPreviewVisible ? 'Hide OData' : 'Show OData'}
+                            </Button>
+                            <Button
+                                size="small"
+                                appearance={fetchXmlPreviewVisible ? 'secondary' : 'transparent'}
+                                icon={fetchXmlPreviewVisible ? <EyeOffRegular /> : <EyeRegular />}
+                                onClick={() => setFetchXmlPreviewVisible((visible) => !visible)}
+                            >
+                                {fetchXmlPreviewVisible ? 'Hide FetchXML' : 'Show FetchXML'}
+                            </Button>
+                        </>
                     )}
 
                     <Dialog open={uploadDialogOpen} onOpenChange={(_, data) => setUploadDialogOpen(data.open)}>
                         <DialogSurface className={styles.dialogSurfaceNarrow}>
                             <DialogBody>
-                                <DialogTitle>Import FetchXML</DialogTitle>
+                                <DialogTitle>
+                                    {xmlDialogMode === 'edit' ? 'Edit FetchXML' : 'Import FetchXML'}
+                                </DialogTitle>
                                 <DialogContent className={styles.dialogUploadContent}>
-                                    <Text>Paste your FetchXML below to rebuild the query:</Text>
+                                    <Text>
+                                        {xmlDialogMode === 'edit'
+                                            ? 'This is the FetchXML for the current query. Edit it, or paste a different query over it — applying rebuilds the builder from what is below.'
+                                            : 'Paste your FetchXML below to rebuild the query:'}
+                                    </Text>
                                     <Textarea
                                         placeholder="<fetch><entity name='account'><filter>...</filter></entity></fetch>"
                                         value={uploadXmlText}
@@ -1051,6 +1149,16 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                     )}
                                 </DialogContent>
                                 <DialogActions>
+                                    {xmlDialogMode === 'edit' && (
+                                        <Button
+                                            appearance="subtle"
+                                            icon={<CopyRegular />}
+                                            onClick={() => navigator.clipboard.writeText(uploadXmlText)}
+                                            title="Copy to clipboard"
+                                        >
+                                            Copy
+                                        </Button>
+                                    )}
                                     <DialogTrigger disableButtonEnhancement>
                                         <Button appearance="secondary">Cancel</Button>
                                     </DialogTrigger>
@@ -1171,7 +1279,8 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                         </Combobox>
                     </div>
                     {builderState.groups.map((group, groupIndex) => {
-                        const hasBetweenOperator = group.conditions.some((c) => c.operator === 'between');
+                        // between, not-between and the fiscal period-and-year operators all take a second value
+                        const hasBetweenOperator = group.conditions.some((c) => operatorRequiresValue2(c.operator));
                         const headerRowClass = mergeClasses(
                             styles.columnHeaderRow,
                             hasBetweenOperator && styles.columnHeaderRowWithBetween,
@@ -1274,6 +1383,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                                     ...row,
                                                                     relatedEntityName: relatedId,
                                                                     relatedEntityTarget: related?.targetEntity,
+                                                                    relatedEntityPrimaryId: related?.targetPrimaryIdAttribute,
                                                                     fieldId: relatedId || '__related_entity__',
                                                                     nestedConditions: [],
                                                                     nestedFields: [],
@@ -1364,7 +1474,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                                     {nestedConditions.map((nestedCond) => {
                                                                         const nestedField = nestedFields.find(f => f.id === nestedCond.fieldId) || nestedDefaultField;
                                                                         const nestedOperators = getOperatorsForType(nestedField.dataType);
-                                                                        const isNestedNullOp = nestedCond.operator === 'null' || nestedCond.operator === 'notnull';
+                                                                        const isNestedNullOp = !operatorRequiresValue(nestedCond.operator);
 
                                                                         // Build lookup options for nested field selector using same format as main field selector
                                                                         const formatDataType = (dataType: QueryBuilderField['dataType']): string => {
@@ -1476,8 +1586,12 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                             const isFieldUnknown = condition.isUnknownField && !availableFields.some(f => f.id === condition.fieldId);
                                             const selectedField = availableFields.find((field) => field.id === condition.fieldId) || defaultField;
                                             const operators = getOperatorsForType(selectedField.dataType);
-                                            const isNullOperator = condition.operator === 'null' || condition.operator === 'notnull';
-                                            const isBetween = condition.operator === 'between';
+                                            // Covers null/not-null and every no-value operator (today, this-week, eq-userid...)
+                                            const isNullOperator = !operatorRequiresValue(condition.operator);
+                                            const isBetween = operatorRequiresValue2(condition.operator);
+                                            // Fiscal period-and-year operators take two numbers even on a date
+                                            // column, so the second input must not become a date picker
+                                            const secondValueIsNumeric = getOperatorValueType(condition.operator) === 'number';
                                             const conditionRowClass = mergeClasses(
                                                 styles.conditionTreeRow,
                                                 (invalidConditionIds.has(condition.id) || isFieldUnknown) && styles.conditionInvalid,
@@ -1581,7 +1695,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                         {hasBetweenOperator && (
                                                             isBetween ? (
                                                                 <div className={styles.andCell} role="gridcell">
-                                                                    {selectedField.dataType === 'datetime' ? (
+                                                                    {selectedField.dataType === 'datetime' && !secondValueIsNumeric ? (
                                                                         <DatePicker
                                                                             className={styles.compactControl}
                                                                             size="small"
@@ -1593,7 +1707,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                                                     ...current,
                                                                                     conditions: current.conditions.map((row) =>
                                                                                         row.id === condition.id
-                                                                                            ? { ...row, value2: date ? date.toISOString().split('T')[0] : '' }
+                                                                                            ? { ...row, value2: formatDateOnly(date) }
                                                                                             : row,
                                                                                     ),
                                                                                 }))
@@ -1606,7 +1720,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                                             size="small"
                                                                             appearance="filled-darker"
                                                                             aria-label="Second value"
-                                                                            type={selectedField.dataType === 'number' ? 'number' : 'text'}
+                                                                            type={secondValueIsNumeric || selectedField.dataType === 'number' ? 'number' : 'text'}
                                                                             value={String(condition.value2 ?? '')}
                                                                             onChange={(_, data) =>
                                                                                 updateGroup(group.id, (current) => ({
@@ -1681,7 +1795,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                 </div>
             )}
 
-            {props.showODataPreview && (
+            {odataPreviewVisible && (
                 <div className={styles.previewCard}>
                     <div className={styles.previewHeader}>
                         <Text weight="semibold">OData Preview</Text>
@@ -1693,11 +1807,34 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                             title="Copy to clipboard"
                         />
                     </div>
+                    {serialized.odataUnsupported.length > 0 && (
+                        <div className={styles.previewNotice} role="note">
+                            <WarningRegular className={styles.previewNoticeIcon} />
+                            <div>
+                                <Text weight="semibold">
+                                    This query can&apos;t be fully expressed in OData.
+                                </Text>
+                                <ul className={styles.previewNoticeList}>
+                                    {serialized.odataUnsupported.map((unsupported, index) => (
+                                        <li key={`${unsupported.fieldId}_${unsupported.operator}_${index}`}>
+                                            <strong>{unsupported.fieldLabel}</strong> &mdash; &ldquo;{unsupported.operatorLabel}&rdquo;
+                                        </li>
+                                    ))}
+                                </ul>
+                                <Text>
+                                    {serialized.odataUnsupported.length === 1 ? 'This operator is' : 'These operators are'}
+                                    {' '}evaluated by the FetchXML engine and {serialized.odataUnsupported.length === 1 ? 'has' : 'have'} no
+                                    OData equivalent, so {serialized.odataUnsupported.length === 1 ? 'it has' : 'they have'} been left out of the
+                                    filter below. Use the FetchXML output to run this query.
+                                </Text>
+                            </div>
+                        </div>
+                    )}
                     <Text className={styles.previewCode}>{serialized.odataFilter || '(empty)'}</Text>
                 </div>
             )}
 
-            {props.showFetchXmlPreview && (
+            {fetchXmlPreviewVisible && (
                 <div className={styles.previewCard}>
                     <div className={styles.previewHeader}>
                         <Text weight="semibold">FetchXML Preview</Text>

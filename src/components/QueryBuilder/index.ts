@@ -15,6 +15,7 @@ export type {
   QueryBuilderRelatedEntity,
   QueryBuilderLookupOption,
   QueryBuilderLookupTarget,
+  QueryBuilderODataUnsupported,
   QueryBuilderDataType,
 } from './QueryBuilder.types';
 
@@ -28,6 +29,7 @@ export {
   operatorRequiresValue2,
   getOperatorValueType,
   isOperatorFetchXmlOnly,
+  isOperatorConvertibleToOData,
   getOperatorsForTypeSimple,
 } from './QueryBuilder.operators';
 export type { OperatorDefinition } from './QueryBuilder.operators';
@@ -39,8 +41,8 @@ export { conditionToFetchXml, conditionToOData, relatedEntityToLinkEntity, relat
 export { parseFetchXmlToState as parseFetchXml, validateFetchXmlSyntax } from './QueryBuilder.parser';
 
 // Helper utilities
-export { FALLBACK_FIELDS, dataTypeFromAttribute, getDefaultValueForField, createCondition, createRelatedCondition, createGroup, cloneState, getOperatorOptionsForType } from './QueryBuilder.utils';
-export { enrichLookupFields, enrichOptionsetFields } from './QueryBuilder.enrichment';
+export { FALLBACK_FIELDS, DEFAULT_BOOLEAN_OPTIONS, dataTypeFromAttribute, buildFieldOptions, isTrueValue, formatDateOnly, getDefaultValueForField, createCondition, createRelatedCondition, createGroup, cloneState, getOperatorOptionsForType } from './QueryBuilder.utils';
+export { enrichLookupFields, enrichOptionsetFields, fetchOptionSetMetadata } from './QueryBuilder.enrichment';
 
 // Hooks for field loading and metadata
 export {

@@ -7,10 +7,11 @@
 import type {
     QueryBuilderCondition,
     QueryBuilderField,
+    QueryBuilderODataUnsupported,
     QueryBuilderState,
     QueryBuilderApplyResult,
 } from './QueryBuilder.types';
-import { ALL_OPERATORS, getOperatorByValue } from './QueryBuilder.operators';
+import { ALL_OPERATORS, getOperatorByValue, isOperatorConvertibleToOData } from './QueryBuilder.operators';
 
 /** Fallback field if none provided */
 const FALLBACK_FIELD: QueryBuilderField = { id: 'name', label: 'Name', dataType: 'string' };
@@ -53,36 +54,34 @@ export const prettyPrintXml = (xml: string): string => {
 };
 
 /**
- * Map internal operator names to FetchXML operator names
+ * Map internal operator names to FetchXML operator names.
+ *
+ * FetchXML has no "contains" operator - substring matching is expressed as `like`/`not-like`
+ * with % wildcards around the value. Anything not listed here is already a FetchXML operator.
+ * @see https://learn.microsoft.com/power-apps/developer/data-platform/fetchxml/reference/operators
  */
-const getFetchXmlOperator = (operator: string): string => {
-    // Direct mapping operators
-    const directMap: Record<string, string> = {
-        'eq': 'eq',
-        'ne': 'ne',
-        'gt': 'gt',
-        'ge': 'ge',
-        'lt': 'lt',
-        'le': 'le',
-        'null': 'null',
-        'notnull': 'not-null', // Legacy internal format
-        'not-null': 'not-null',
-        'in': 'in',
-        'not-in': 'not-in',
-        // Legacy contains operators (converted to like)
-        'contains': 'like',
-        'notcontains': 'not-like',
-        'startswith': 'like',
-        'endswith': 'like',
-    };
+const FETCHXML_OPERATOR_MAP: Record<string, string> = {
+    'notnull': 'not-null', // Legacy internal format
+    // Substring operators have no FetchXML equivalent - they become wildcard LIKE patterns
+    'contains': 'like',
+    'not-contain': 'not-like',
+    'notcontains': 'not-like', // Legacy alias
+    'startswith': 'like', // Legacy alias
+    'endswith': 'like', // Legacy alias
+};
 
-    // If it's in the direct map, use that
-    if (directMap[operator]) {
-        return directMap[operator];
-    }
+const getFetchXmlOperator = (operator: string): string => FETCHXML_OPERATOR_MAP[operator] || operator;
 
-    // Otherwise, assume the operator IS the FetchXML operator
-    return operator;
+/**
+ * Operators that carry their wildcards in the value rather than in the operator itself.
+ * Maps the operator to how the raw value should be padded with % wildcards.
+ */
+const WILDCARD_PATTERNS: Record<string, (value: string) => string> = {
+    'contains': (value) => `%${value}%`,
+    'not-contain': (value) => `%${value}%`,
+    'notcontains': (value) => `%${value}%`,
+    'startswith': (value) => `${value}%`,
+    'endswith': (value) => `%${value}`,
 };
 
 /**
@@ -151,15 +150,10 @@ export const conditionToFetchXml = (
         value = value === true || value === 'true' || value === 1 || value === '1' ? '1' : '0';
     }
 
-    // Legacy contains/startswith/endswith using LIKE pattern
-    if (condition.operator === 'contains' || condition.operator === 'notcontains') {
-        value = `%${value}%`;
-    }
-    if (condition.operator === 'startswith') {
-        value = `${value}%`;
-    }
-    if (condition.operator === 'endswith') {
-        value = `%${value}`;
+    // Substring operators are expressed as LIKE patterns with wildcards
+    const wildcardPattern = WILDCARD_PATTERNS[condition.operator];
+    if (wildcardPattern) {
+        value = wildcardPattern(String(value ?? ''));
     }
 
     // Include uiname/uitype for lookup fields with display name
@@ -187,10 +181,14 @@ export const relatedEntityToLinkEntity = (
     const targetEntityName = escapeXml(condition.relatedEntityTarget);
     const lookupField = escapeXml(condition.relatedEntityName || '');
     // Use provided alias or generate one from lookup field name
-    const alias = condition.relatedEntityAlias 
-        ? escapeXml(condition.relatedEntityAlias) 
+    const alias = condition.relatedEntityAlias
+        ? escapeXml(condition.relatedEntityAlias)
         : `related_${lookupField}`;
-    const fromField = `${targetEntityName}id`;
+    // Prefer the real primary key from metadata - the "<entity>id" convention is wrong for
+    // activity entities (email, task, appointment... all use "activityid") among others
+    const fromField = condition.relatedEntityPrimaryId
+        ? escapeXml(condition.relatedEntityPrimaryId)
+        : `${targetEntityName}id`;
     const toField = lookupField;
 
     // Build nested filter from nestedConditions
@@ -287,8 +285,9 @@ export const conditionToOData = (condition: QueryBuilderCondition, field: QueryB
                 const logic = condition.operator === 'between' ? 'and' : 'or';
                 return `(${odataFieldName} ${op1} ${quote(condition.value)} ${logic} ${odataFieldName} ${op2} ${quote(condition.value2)})`;
             default:
-                // Cannot convert - return comment
-                return `/* FetchXML-only operator: ${condition.operator} */`;
+                // No OData equivalent - omit rather than emit an invalid filter.
+                // serializeQueryBuilderState reports these via odataUnsupported.
+                return '';
         }
     }
 
@@ -374,6 +373,12 @@ export const relatedEntityToOData = (
             const virtualField: QueryBuilderField = { ...nestedField, id: fieldName };
             const quote = (val: any) => quoteODataValue(val, virtualField);
 
+            // Operators with no OData equivalent must be omitted, not silently coerced to `eq`
+            // by the default branch below - serializeQueryBuilderState reports them instead
+            if (!isOperatorConvertibleToOData(nestedCond.operator)) {
+                return '';
+            }
+
             switch (nestedCond.operator) {
                 case 'eq':
                     return `${odataFieldName} eq ${quote(nestedCond.value)}`;
@@ -441,6 +446,29 @@ export const serializeQueryBuilderState = (
 ): QueryBuilderApplyResult => {
     const defaultField = fields[0] || FALLBACK_FIELD;
 
+    // Record every condition OData can't express, so callers can explain the gap rather than
+    // silently handing back a filter that means something different from the FetchXML
+    const odataUnsupported: QueryBuilderODataUnsupported[] = [];
+    const noteIfUnsupported = (condition: QueryBuilderCondition, availableFields: QueryBuilderField[]) => {
+        if (condition.kind === 'relatedEntity' || isOperatorConvertibleToOData(condition.operator)) return;
+        const field = availableFields.find((candidate) => candidate.id === condition.fieldId);
+        odataUnsupported.push({
+            fieldId: condition.fieldId,
+            fieldLabel: field?.label || condition.fieldId,
+            operator: condition.operator,
+            operatorLabel: getOperatorByValue(condition.operator)?.label || condition.operator,
+        });
+    };
+
+    state.groups.forEach((group) => {
+        group.conditions.forEach((condition) => {
+            noteIfUnsupported(condition, fields);
+            condition.nestedConditions?.forEach((nested) =>
+                noteIfUnsupported(nested, condition.nestedFields || [])
+            );
+        });
+    });
+
     // Collect all link-entity elements from related entity conditions
     const linkEntities: string[] = [];
     state.groups.forEach((group) => {
@@ -504,5 +532,6 @@ export const serializeQueryBuilderState = (
         fetchXml,
         odataFilter,
         odataQuery,
+        odataUnsupported,
     };
 };

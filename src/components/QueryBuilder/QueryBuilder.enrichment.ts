@@ -5,7 +5,78 @@
  * These functions work for both main entity fields and related entity fields.
  */
 
-import type { QueryBuilderField, QueryBuilderLookupTarget, QueryBuilderOption } from './QueryBuilder.types';
+import type { QueryBuilderField, QueryBuilderLookupTarget } from './QueryBuilder.types';
+import { buildFieldOptions } from './QueryBuilder.utils';
+
+const ODATA_HEADERS = {
+    'OData-MaxVersion': '4.0',
+    'OData-Version': '4.0',
+    'Accept': 'application/json',
+};
+
+/**
+ * Attribute type casts that carry selectable values, and the option properties each one exposes.
+ *
+ * Option metadata can't be expanded from the base Attributes collection, so every cast has to be
+ * queried separately. Picklists expose an Options list; booleans expose TrueOption/FalseOption.
+ */
+const OPTIONSET_CASTS: { castType: string; optionSelect: string }[] = [
+    { castType: 'PicklistAttributeMetadata', optionSelect: 'Options' },
+    { castType: 'StateAttributeMetadata', optionSelect: 'Options' },
+    { castType: 'StatusAttributeMetadata', optionSelect: 'Options' },
+    { castType: 'BooleanAttributeMetadata', optionSelect: 'TrueOption,FalseOption' },
+];
+
+/**
+ * Fetch option metadata for every optionset and boolean attribute on an entity.
+ *
+ * One request per attribute cast rather than one per field, so an entity with dozens of
+ * choice fields still costs a handful of calls.
+ *
+ * @returns Map of attribute logical name to its raw option set metadata
+ */
+export const fetchOptionSetMetadata = async (
+    entityName: string,
+    trace?: (message: string, data?: any) => void
+): Promise<Map<string, any>> => {
+    const results = await Promise.all(
+        OPTIONSET_CASTS.map(async ({ castType, optionSelect }) => {
+            const baseUrl = `/api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes/Microsoft.Dynamics.CRM.${castType}?$select=LogicalName`;
+            const localSet = `OptionSet($select=${optionSelect})`;
+            const globalSet = `GlobalOptionSet($select=${optionSelect})`;
+
+            // An attribute bound to a global option set returns nothing under OptionSet, so ask for
+            // both; retry with the local set alone if a cast rejects the combined expand.
+            for (const expandClause of [`${localSet},${globalSet}`, localSet]) {
+                try {
+                    const response = await fetch(`${baseUrl}&$expand=${expandClause}`, { headers: ODATA_HEADERS });
+                    if (!response.ok) continue;
+
+                    const data = await response.json();
+                    return (data.value || []).map((attr: any) => [
+                        attr.LogicalName,
+                        { OptionSet: attr.OptionSet, GlobalOptionSet: attr.GlobalOptionSet },
+                    ] as [string, any]);
+                } catch {
+                    // Fall through to the narrower expand
+                }
+            }
+
+            trace?.('[QueryBuilder] Failed to fetch option metadata', { entityName, castType });
+            return [] as [string, any][];
+        })
+    );
+
+    const optionSetMap = new Map<string, any>();
+    for (const entries of results) {
+        for (const [logicalName, optionSet] of entries) {
+            optionSetMap.set(logicalName, optionSet);
+        }
+    }
+
+    trace?.('[QueryBuilder] Fetched option metadata', { entityName, attributeCount: optionSetMap.size });
+    return optionSetMap;
+};
 
 /**
  * Enrich lookup fields with target entity metadata (EntitySetName, PrimaryNameAttribute, DisplayName).
@@ -53,7 +124,7 @@ export const enrichLookupFields = async (
                         
                         for (const targetEntityName of targetsData.Targets) {
                             try {
-                                const entityMetaUrl = `/api/data/v9.2/EntityDefinitions(LogicalName='${targetEntityName}')?$select=LogicalName,EntitySetName,PrimaryNameAttribute,DisplayName`;
+                                const entityMetaUrl = `/api/data/v9.2/EntityDefinitions(LogicalName='${targetEntityName}')?$select=LogicalName,EntitySetName,PrimaryNameAttribute,PrimaryIdAttribute,DisplayName`;
                                 const entityMetaResponse = await fetch(entityMetaUrl, {
                                     headers: {
                                         'OData-MaxVersion': '4.0',
@@ -113,72 +184,47 @@ export const enrichLookupFields = async (
 };
 
 /**
- * Enrich optionset fields with their option values.
- * Web API limitation requires fetching optionsets separately with type casting.
- * 
- * @param fields - Array of fields that may contain optionset fields
+ * Enrich optionset and boolean fields with their selectable values.
+ * Web API limitation requires fetching option metadata separately with type casting.
+ *
+ * @param fields - Array of fields that may contain optionset or boolean fields
  * @param entityName - The entity that owns these fields
  * @param trace - Optional trace callback for debugging
- * @returns Fields with enriched optionset options
+ * @returns Fields with enriched options
  */
 export const enrichOptionsetFields = async (
     fields: (QueryBuilderField & { _raw?: any })[],
     entityName: string,
     trace?: (message: string, data?: any) => void
 ): Promise<(QueryBuilderField & { _raw?: any })[]> => {
-    trace?.('[QueryBuilder] Enriching optionset metadata for optionset fields', { entityName });
-    
-    const optionsetFields = fields.filter((f: any) => f.dataType === 'optionset' && f._raw);
-    
-    for (const field of optionsetFields) {
-        try {
-            const attr = field._raw;
-            const attrType = attr.AttributeType || attr.AttributeTypeName?.Value;
-            let optionsetUrl = '';
-            
-            // Use appropriate URL based on attribute type
-            if (attrType === 'Picklist' || attrType === 'State' || attrType === 'Status') {
-                const typeCast = attrType === 'Picklist' ? 'PicklistAttributeMetadata' : 
-                               attrType === 'State' ? 'StateAttributeMetadata' : 
-                               'StatusAttributeMetadata';
-                optionsetUrl = `/api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes(LogicalName='${field.id}')/Microsoft.Dynamics.CRM.${typeCast}?$select=LogicalName&$expand=OptionSet($select=Options),GlobalOptionSet($select=Options)`;
-            }
-            
-            if (optionsetUrl) {
-                const optResponse = await fetch(optionsetUrl, {
-                    headers: {
-                        'OData-MaxVersion': '4.0',
-                        'OData-Version': '4.0',
-                        'Accept': 'application/json',
-                    },
-                });
-                
-                if (optResponse.ok) {
-                    const optData = await optResponse.json();
-                    const optionSet = optData.OptionSet || optData.GlobalOptionSet;
-                    
-                    if (optionSet?.Options) {
-                        field.options = optionSet.Options
-                            .filter((opt: any) => opt?.Value != null)
-                            .map((opt: any) => ({
-                                label: opt.Label?.UserLocalizedLabel?.Label || String(opt.Value),
-                                value: opt.Value,
-                            }));
-                        
-                        trace?.('[QueryBuilder] Enriched optionset options', { 
-                            field: field.id, 
-                            optionCount: field.options?.length ?? 0
-                        });
-                    }
-                }
-            }
-        } catch (optError) {
-            trace?.('[QueryBuilder] Failed to enrich optionset field', { 
-                field: field.id,
-                error: optError instanceof Error ? optError.message : String(optError)
-            });
-        }
+    const optionFields = fields.filter((f) => f.dataType === 'optionset' || f.dataType === 'boolean');
+
+    trace?.('[QueryBuilder] Enriching option metadata', { entityName, fieldCount: optionFields.length });
+
+    if (optionFields.length === 0) {
+        return fields;
     }
-    
+
+    try {
+        const optionSetMap = await fetchOptionSetMetadata(entityName, trace);
+
+        for (const field of optionFields) {
+            const options = buildFieldOptions(optionSetMap.get(field.id), field.dataType);
+            if (options) {
+                field.options = options;
+            }
+        }
+
+        trace?.('[QueryBuilder] Enriched option metadata', {
+            enriched: optionFields.filter((f) => !!f.options).length,
+            missing: optionFields.filter((f) => !f.options).map((f) => f.id),
+        });
+    } catch (optError) {
+        trace?.('[QueryBuilder] Failed to enrich option metadata', {
+            entityName,
+            error: optError instanceof Error ? optError.message : String(optError),
+        });
+    }
+
     return fields;
 };

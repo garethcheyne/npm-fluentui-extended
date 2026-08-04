@@ -895,6 +895,31 @@ export const isOperatorFetchXmlOnly = (operator: string): boolean => {
 };
 
 /**
+ * FetchXML-only operators the serializer can still approximate in OData.
+ * `like` becomes contains/startswith/endswith, `not-in` becomes chained `ne`,
+ * and `between` becomes a ge/le pair.
+ */
+const ODATA_APPROXIMATED_OPERATORS = new Set([
+    'like',
+    'not-like',
+    'not-in',
+    'between',
+    'not-between',
+]);
+
+/**
+ * Check whether an operator can be expressed in an OData $filter at all.
+ *
+ * Relative dates, fiscal periods, user-context and hierarchy operators are evaluated by the
+ * FetchXML engine itself and have no OData equivalent - a query using them can only run as FetchXML.
+ */
+export const isOperatorConvertibleToOData = (operator: string): boolean => {
+    const def = ALL_OPERATORS[operator];
+    if (!def) return true; // Unknown operators fall through to a plain comparison
+    return !def.fetchXmlOnly || ODATA_APPROXIMATED_OPERATORS.has(operator);
+};
+
+/**
  * Legacy function for backward compatibility - converts to simplified format
  */
 export const getOperatorsForTypeSimple = (dataType: QueryBuilderDataType): Array<{ value: string; label: string }> => {

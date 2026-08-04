@@ -6,23 +6,15 @@
 
 import * as React from 'react';
 import type { QueryBuilderField, QueryBuilderLookupTarget } from './QueryBuilder.types';
-import { dataTypeFromAttribute } from './QueryBuilder.utils';
+import { buildFieldOptions, dataTypeFromAttribute } from './QueryBuilder.utils';
+import { fetchOptionSetMetadata } from './QueryBuilder.enrichment';
 
 /**
  * Parse Dynamics 365 attribute metadata into QueryBuilderField format.
  */
 export const parseAttributeToField = (attr: any): QueryBuilderField => {
     const dataType = dataTypeFromAttribute(attr);
-    const optionSet = attr?.OptionSet?.Options;
-    const options =
-        dataType === 'optionset' && Array.isArray(optionSet)
-            ? optionSet
-                .map((opt: any) => ({
-                    label: opt?.Label?.UserLocalizedLabel?.Label || opt?.Label || String(opt?.Value),
-                    value: opt?.Value,
-                }))
-                .filter((opt: { label: string; value: string | number }) => opt.value !== undefined && opt.value !== null)
-            : undefined;
+    const options = buildFieldOptions(attr, dataType);
 
     const displayName = attr.DisplayName;
     const label = typeof displayName === 'string'
@@ -113,7 +105,7 @@ export const useEntityFields = (
             try {
                 // Fetch entity metadata using native Web API
                 const entityResponse = await fetch(
-                    `/api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute`,
+                    `/api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute,PrimaryIdAttribute`,
                     {
                         headers: {
                             'OData-MaxVersion': '4.0',
@@ -137,7 +129,7 @@ export const useEntityFields = (
 
                 // Fetch regular attributes
                 const attributesResponse = await fetch(
-                    `/api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName`,
+                    `/api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName,IsValidForAdvancedFind`,
                     {
                         headers: {
                             'OData-MaxVersion': '4.0',
@@ -170,50 +162,20 @@ export const useEntityFields = (
                 const lookupData = lookupResponse.ok ? await lookupResponse.json() : { value: [] };
                 const lookupAttributes = lookupData.value || [];
 
-                // Fetch picklist/state/status attributes with OptionSet Options
-                const picklistTypes = [
-                    'Microsoft.Dynamics.CRM.PicklistAttributeMetadata',
-                    'Microsoft.Dynamics.CRM.StatusAttributeMetadata',
-                    'Microsoft.Dynamics.CRM.StateAttributeMetadata',
-                ];
-                const optionSetMaps: Map<string, any>[] = await Promise.all(
-                    picklistTypes.map(async (castType) => {
-                        try {
-                            const res = await fetch(
-                                `/api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes/${castType}?$select=LogicalName&$expand=OptionSet($select=Options)`,
-                                {
-                                    headers: {
-                                        'OData-MaxVersion': '4.0',
-                                        'OData-Version': '4.0',
-                                        'Accept': 'application/json',
-                                    },
-                                }
-                            );
-                            if (!res.ok) return new Map();
-                            const data = await res.json();
-                            return new Map<string, any>(
-                                (data.value || []).map((a: any) => [a.LogicalName, a.OptionSet])
-                            );
-                        } catch {
-                            return new Map<string, any>();
-                        }
-                    })
-                );
-                // Merge all optionset maps (picklist, status, state)
-                const optionSetMap = new Map<string, any>();
-                for (const m of optionSetMaps) m.forEach((v, k) => optionSetMap.set(k, v));
+                // Fetch selectable values for picklist/state/status/boolean attributes
+                const optionSetMap = await fetchOptionSetMetadata(entityName);
 
                 // Create a map of lookup attributes by LogicalName
                 const lookupMap = new Map<string, any>(lookupAttributes.map((attr: any) => [attr.LogicalName, attr]));
 
-                // Merge lookup Targets and OptionSet data into the main attributes array
+                // Merge lookup Targets and option set data into the main attributes array
                 const mergedAttributes = attributesArray.map((attr: any) => {
                     const lookupAttr = lookupMap.get(attr.LogicalName);
                     const optionSet = optionSetMap.get(attr.LogicalName);
                     return {
                         ...attr,
                         ...(lookupAttr?.Targets ? { Targets: lookupAttr.Targets } : {}),
-                        ...(optionSet ? { OptionSet: optionSet } : {}),
+                        ...optionSet,
                     };
                 });
 
@@ -233,7 +195,7 @@ export const useEntityFields = (
                 for (const targetEntityName of targetEntityNames) {
                     try {
                         const targetResponse = await fetch(
-                            `/api/data/v9.2/EntityDefinitions(LogicalName='${targetEntityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute`,
+                            `/api/data/v9.2/EntityDefinitions(LogicalName='${targetEntityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute,PrimaryIdAttribute`,
                             {
                                 headers: {
                                     'OData-MaxVersion': '4.0',
@@ -351,9 +313,12 @@ export const loadEntityFields = async (
             return [];
         }
 
+        // Option metadata can't be expanded from the base Attributes collection - fetch it separately
+        const optionSetMap = await fetchOptionSetMetadata(targetEntity);
+
         return attributesArray
             .filter((attr: any) => isValidAttribute(attr, false))
-            .map((attr: any) => parseAttributeToField(attr))
+            .map((attr: any) => parseAttributeToField({ ...attr, ...optionSetMap.get(attr.LogicalName) }))
             .sort((a: QueryBuilderField, b: QueryBuilderField) => String(a.label).localeCompare(String(b.label), undefined, { sensitivity: 'base' }));
     } catch (error) {
         console.error('[QueryBuilder] Error fetching entity fields:', error);
