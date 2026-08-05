@@ -3,6 +3,7 @@ import { Button, Combobox, Dialog, DialogActions, DialogBody, DialogContent, Dia
 import { DatePicker } from '@fluentui/react-datepicker-compat';
 import { AddRegular, ArrowDownloadRegular, ArrowResetRegular, ArrowUploadRegular, CheckmarkCircleRegular, CopyRegular, DeleteRegular, DismissRegular, EditRegular, EyeOffRegular, EyeRegular, MoreHorizontalRegular, WarningRegular } from '@fluentui/react-icons';
 import { mergeClasses, useQueryBuilderStyles } from './QueryBuilder.styles';
+import { DEFAULT_FIELD_APPEARANCE, toListboxAppearance, toTextareaAppearance } from '../../types/appearance';
 import { Lookup } from '../Lookup';
 import type { LookupOption } from '../Lookup';
 import type {
@@ -135,6 +136,24 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
 
     const [builderState, setBuilderState] = React.useState<QueryBuilderState>(() => cloneState(props.initialState, defaultField));
     const initialFetchXmlParsedRef = React.useRef(false);
+
+    // Dynamics renders fields filled rather than outlined. Comboboxes and dropdowns take a
+    // narrower union than text inputs, so the two are resolved separately.
+    const fieldAppearance = props.appearance ?? DEFAULT_FIELD_APPEARANCE;
+    const listboxAppearance = toListboxAppearance(fieldAppearance);
+
+    /**
+     * Root <fetch> options with the explicit props layered over whatever an imported
+     * query carried. Everything that serializes reads this rather than `builderState`
+     * directly, so the props win consistently across preview, download and validate.
+     */
+    const effectiveState = React.useMemo<QueryBuilderState>(() => {
+        const merged = { ...builderState.queryOptions };
+        if (props.distinct !== undefined) merged.distinct = props.distinct;
+        if (props.noLock !== undefined) merged.noLock = props.noLock;
+        if (props.top !== undefined) merged.top = props.top;
+        return Object.keys(merged).length > 0 ? { ...builderState, queryOptions: merged } : builderState;
+    }, [builderState, props.distinct, props.noLock, props.top]);
 
     // Parse initialFetchXml once fields are available
     React.useEffect(() => {
@@ -347,10 +366,10 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
     React.useEffect(() => {
         if (!props.onSerializedChange) return;
         const timeout = setTimeout(() => {
-            props.onSerializedChange?.(serializeQueryBuilderState(builderState, availableFields, props.entityName, entitySetName));
+            props.onSerializedChange?.(serializeQueryBuilderState(effectiveState, availableFields, props.entityName, entitySetName));
         }, 150);
         return () => clearTimeout(timeout);
-    }, [availableFields, builderState, entitySetName, props.entityName, props.onSerializedChange]);
+    }, [availableFields, effectiveState, entitySetName, props.entityName, props.onSerializedChange]);
 
     React.useEffect(() => {
         const fallbackField = availableFields[0] || FALLBACK_FIELDS[0];
@@ -724,7 +743,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
     }, [defaultField, props]);
 
     const onDownloadFetchXml = React.useCallback(() => {
-        const payload = serializeQueryBuilderState(builderState, availableFields, props.entityName, entitySetName);
+        const payload = serializeQueryBuilderState(effectiveState, availableFields, props.entityName, entitySetName);
         const blob = new Blob([payload.fetchXml], { type: 'application/xml' });
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement('a');
@@ -779,7 +798,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
         setValidationDialogOpen(true);
 
         try {
-            const { odataFilter } = serializeQueryBuilderState(builderState, availableFields, props.entityName, entitySetName);
+            const { odataFilter } = serializeQueryBuilderState(effectiveState, availableFields, props.entityName, entitySetName);
             const entitySetForApi = entitySetName || props.entityName;
             const queryOptions = odataFilter ? `$filter=${odataFilter}&$top=1&$count=true` : '$top=1&$count=true';
 
@@ -848,7 +867,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
         }
     }, [uploadXmlText, availableFields, trace, xmlDialogMode]);
 
-    const serialized = serializeQueryBuilderState(builderState, availableFields, props.entityName, entitySetName);
+    const serialized = serializeQueryBuilderState(effectiveState, availableFields, props.entityName, entitySetName);
 
     const renderValueInput = React.useCallback(
         (
@@ -868,7 +887,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                 <Input
                     className={styles.compactControl}
                     size="small"
-                    appearance="filled-darker"
+                    appearance={fieldAppearance}
                     aria-label="Value"
                     type={type}
                     value={String(condition.value ?? '')}
@@ -888,6 +907,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                         targets={field.targets}
                         onLookupSearch={props.onLookupSearch}
                         onValueChange={(value, displayName) => onValueChange(value, displayName)}
+                        appearance={fieldAppearance}
                     />
                 );
             }
@@ -922,7 +942,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                             <Dropdown
                                 className={styles.compactControl}
                                 size="small"
-                                appearance="filled-darker"
+                                appearance={listboxAppearance}
                                 aria-label="Value"
                                 listbox={{ className: styles.optionsetListbox }}
                                 multiselect
@@ -952,7 +972,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                         <Dropdown
                             className={styles.compactControl}
                             size="small"
-                            appearance="filled-darker"
+                            appearance={listboxAppearance}
                             aria-label="Value"
                             listbox={{ className: styles.optionsetListbox }}
                             selectedOptions={[
@@ -982,7 +1002,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                         <DatePicker
                             className={styles.compactControl}
                             size="small"
-                            appearance="filled-darker"
+                            appearance={fieldAppearance}
                             aria-label="Value"
                             value={condition.value ? new Date(String(condition.value)) : null}
                             onSelectDate={(date) => onValueChange(formatDateOnly(date))}
@@ -1007,7 +1027,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                         <Dropdown
                             className={styles.compactControl}
                             size="small"
-                            appearance="filled-darker"
+                            appearance={listboxAppearance}
                             aria-label="Value"
                             selectedOptions={[String(selectedOption.value)]}
                             value={selectedOption.label}
@@ -1056,7 +1076,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
         <div className={styles.container}>
             <div className={styles.headerRow}>
                 <Text weight="semibold" className={styles.headerTitle}>
-                    Edit filters: {props.entityDisplayName || props.entityName}
+                    Query Builder: {props.entityDisplayName || props.entityName}
                 </Text>
             </div>
 
@@ -1141,6 +1161,8 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                         placeholder="<fetch><entity name='account'><filter>...</filter></entity></fetch>"
                                         value={uploadXmlText}
                                         onChange={(_, data) => setUploadXmlText(data.value)}
+                                        // Textarea has no underline variant, so that one falls back to outline
+                                        appearance={toTextareaAppearance(fieldAppearance)}
                                         className={styles.monacoTextarea}
                                         resize="vertical"
                                     />
@@ -1267,6 +1289,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                 </div>
             </div>
 
+            <div className={styles.scrollArea}>
             {loading ? (
                 <div className={styles.loadingWrap}>
                     <Spinner label="Loading fields..." />
@@ -1274,7 +1297,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
             ) : (
                 <div className={styles.groupsContainer}>
                     <div className={styles.rootLogicRow}>
-                        <Combobox className={styles.rootLogicSelect} size="small" appearance="filled-darker" value="AND" disabled>
+                        <Combobox className={styles.rootLogicSelect} size="small" appearance={listboxAppearance} value="AND" disabled>
                             <Option value="AND">AND</Option>
                         </Combobox>
                     </div>
@@ -1310,7 +1333,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                 <Combobox
                                                     className={styles.groupLogicSelect}
                                                     size="small"
-                                                    appearance="filled-darker"
+                                                    appearance={listboxAppearance}
                                                     selectedOptions={[group.logic]}
                                                     value={group.logic === 'or' ? 'OR' : 'AND'}
                                                     aria-label="Group logic"
@@ -1418,7 +1441,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                             <Dropdown
                                                                 className={styles.relatedEntityDropdown}
                                                                 size="small"
-                                                                appearance="filled-darker"
+                                                                appearance={listboxAppearance}
                                                                 aria-label="Related entity"
                                                                 listbox={{ className: styles.optionsetListbox }}
                                                                 selectedOptions={condition.relatedEntityName ? [condition.relatedEntityName] : []}
@@ -1438,7 +1461,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                             {nestedConditions.length > 1 && (
                                                                 <Combobox
                                                                     size="small"
-                                                                    appearance="filled-darker"
+                                                                    appearance={listboxAppearance}
                                                                     className={styles.nestedLogicDropdown}
                                                                     selectedOptions={[condition.nestedLogic || 'and']}
                                                                     value={condition.nestedLogic === 'or' ? 'OR' : 'AND'}
@@ -1505,7 +1528,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                                                 <Lookup
                                                                                     className={styles.compactControl}
                                                                                     size="small"
-                                                                                    appearance="filled-darker"
+                                                                                    appearance={fieldAppearance}
                                                                                     aria-label="Field"
                                                                                     options={nestedFieldLookupOptions}
                                                                                     selectedKey={nestedCond.fieldId}
@@ -1526,7 +1549,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                                                 <Dropdown
                                                                                     className={styles.compactControl}
                                                                                     size="small"
-                                                                                    appearance="filled-darker"
+                                                                                    appearance={listboxAppearance}
                                                                                     aria-label="Operator"
                                                                                     selectedOptions={[nestedCond.operator]}
                                                                                     value={nestedOperators.find(op => op.value === nestedCond.operator)?.label || ''}
@@ -1622,7 +1645,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                             <Lookup
                                                                 className={styles.compactControl}
                                                                 size="small"
-                                                                appearance="filled-darker"
+                                                                appearance={fieldAppearance}
                                                                 aria-label="Field"
                                                                 options={fieldLookupOptions}
                                                                 selectedKey={condition.fieldId}
@@ -1653,7 +1676,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                             <Dropdown
                                                                 className={styles.compactControl}
                                                                 size="small"
-                                                                appearance="filled-darker"
+                                                                appearance={listboxAppearance}
                                                                 aria-label="Operator"
                                                                 value={operators.find((op) => op.value === condition.operator)?.label || ''}
                                                                 selectedOptions={[condition.operator]}
@@ -1699,7 +1722,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                                         <DatePicker
                                                                             className={styles.compactControl}
                                                                             size="small"
-                                                                            appearance="filled-darker"
+                                                                            appearance={fieldAppearance}
                                                                             aria-label="Second value"
                                                                             value={condition.value2 ? new Date(String(condition.value2)) : null}
                                                                             onSelectDate={(date) =>
@@ -1718,7 +1741,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                                         <Input
                                                                             className={styles.compactControl}
                                                                             size="small"
-                                                                            appearance="filled-darker"
+                                                                            appearance={fieldAppearance}
                                                                             aria-label="Second value"
                                                                             type={secondValueIsNumeric || selectedField.dataType === 'number' ? 'number' : 'text'}
                                                                             value={String(condition.value2 ?? '')}
@@ -1849,6 +1872,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                     <Text className={styles.previewCode}>{serialized.fetchXml ? prettyPrintXml(serialized.fetchXml) : '(empty)'}</Text>
                 </div>
             )}
+            </div>
         </div>
     );
 };

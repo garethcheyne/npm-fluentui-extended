@@ -1,9 +1,30 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { FluentProvider, webLightTheme, Button, Link, Text, Badge, ToggleButton } from '@fluentui/react-components';
-import { Lookup, LookupOption, QueryBuilder, QueryBuilderApplyResult, QueryBuilderState } from '../src';
-import { BuildingRegular, AddRegular, PersonSearchRegular, PlugConnectedRegular, PlugDisconnectedRegular, PersonRegular, CheckmarkCircleRegular, ClockRegular, ArrowLeftRegular } from '@fluentui/react-icons';
+import { FluentProvider, webLightTheme, Button, Link, Text, Badge, ToggleButton, Tab, TabList, SelectTabData, SelectTabEvent } from '@fluentui/react-components';
+import {
+  Lookup, LookupOption, QueryBuilder, QueryBuilderApplyResult, QueryBuilderState,
+  CommandBar, EntityGrid, DateTimeField, OptionSetField, RecordHoverCard, formatMultiSelectValue,
+} from '../src';
+import { BuildingRegular, AddRegular, PersonSearchRegular, PlugConnectedRegular, PlugDisconnectedRegular, PersonRegular, CheckmarkCircleRegular, ClockRegular, ArrowLeftRegular, FilterRegular, AppsListRegular, TableRegular, CalendarLtrRegular, ContactCardRegular, EditRegular, DeleteRegular, ArrowClockwiseRegular, ShareRegular, ArrowDownloadRegular, FlashRegular, DocumentRegular } from '@fluentui/react-icons';
 import { installDynamicsMock, loginToDynamics, isDynamicsAuthenticated, logoutFromDynamics, getDynamicsUser } from './dynamics-mock';
+
+type HarnessTab = 'lookup' | 'querybuilder' | 'commandbar' | 'entitygrid' | 'fields' | 'hovercard';
+
+/** Static optionset options so the Fields tab demos without a live connection */
+const demoStatusOptions = [
+  { value: 1, label: 'Active', color: '#107c10' },
+  { value: 2, label: 'Inactive', color: '#a19f9d' },
+  { value: 3, label: 'Pending Review', color: '#f7630c' },
+  { value: 4, label: 'Escalated', color: '#d13438' },
+];
+
+const demoIndustryOptions = [
+  { value: 10, label: 'Technology' },
+  { value: 20, label: 'Manufacturing' },
+  { value: 30, label: 'Retail' },
+  { value: 40, label: 'Financial Services' },
+  { value: 50, label: 'Healthcare' },
+];
 
 // Helper to search Dynamics records via native API (fetch)
 const searchDynamicsRecordsNative = async (
@@ -606,6 +627,35 @@ function App() {
     }
   }, [dynamicsConnected, liveContactOptions.length, handleLiveContactSearch]);
 
+  // Component demos are split across tabs so each one can be screenshotted on its own
+  // for the README without the other component's markup bleeding into the capture
+  const [activeTab, setActiveTab] = useState<HarnessTab>('lookup');
+
+  // Demo state for the CommandBar / EntityGrid / Fields / HoverCard tabs
+  const [commandLog, setCommandLog] = useState<string | null>(null);
+  const [gridSelection, setGridSelection] = useState<string[]>([]);
+  const [statusValue, setStatusValue] = useState<number | null>(1);
+  const [industryValues, setIndustryValues] = useState<number[]>([10, 30]);
+  const [dateValues, setDateValues] = useState<Record<'UserLocal' | 'DateOnly' | 'TimeZoneIndependent', string | null>>({
+    UserLocal: null,
+    DateOnly: null,
+    TimeZoneIndependent: null,
+  });
+  const [liveDateValue, setLiveDateValue] = useState<string | null>(null);
+  const onTabSelect = useCallback((_: SelectTabEvent, data: SelectTabData) => {
+    setActiveTab(data.value as HarnessTab);
+  }, []);
+
+  // The Hover Card tab has no search box of its own, so seed it with real accounts
+  // rather than making the live example depend on visiting the Lookup tab first.
+  // Must sit below the activeTab declaration - a dependency array is evaluated during
+  // render, so reading it any earlier hits the const temporal dead zone.
+  useEffect(() => {
+    if (activeTab === 'hovercard' && dynamicsConnected && liveAccountOptions.length === 0) {
+      handleLiveAccountSearch('');
+    }
+  }, [activeTab, dynamicsConnected, liveAccountOptions.length, handleLiveAccountSearch]);
+
   const containerStyle: React.CSSProperties = {
     padding: '40px',
     maxWidth: '1200px',
@@ -664,6 +714,18 @@ function App() {
           </div>
         </div>
 
+
+        <TabList selectedValue={activeTab} onTabSelect={onTabSelect} size="large" style={{ marginBottom: 24 }}>
+          <Tab value="lookup" icon={<PersonSearchRegular />}>Lookup</Tab>
+          <Tab value="querybuilder" icon={<FilterRegular />}>Query Builder</Tab>
+          <Tab value="commandbar" icon={<AppsListRegular />}>Command Bar</Tab>
+          <Tab value="entitygrid" icon={<TableRegular />}>Entity Grid</Tab>
+          <Tab value="fields" icon={<CalendarLtrRegular />}>Fields</Tab>
+          <Tab value="hovercard" icon={<ContactCardRegular />}>Hover Card</Tab>
+        </TabList>
+
+        {activeTab === 'lookup' && (
+          <>
         {/* Basic Lookup - No Header/Footer */}
         <section style={{ marginBottom: 40 }}>
           <h2>Basic Lookup (No Header/Footer)</h2>
@@ -671,7 +733,6 @@ function App() {
             Simple lookup with expandable option details
           </p>
           <Lookup
-            appearance="filled-darker"
             options={staticOptions}
             selectedKey={selectedKey1}
             onOptionSelect={(opt) => setSelectedKey1(opt?.key ?? null)}
@@ -689,7 +750,6 @@ function App() {
             Includes tab header and action footer like Dynamics 365
           </p>
           <Lookup
-            appearance="filled-darker"
             options={staticOptions}
             selectedKey={selectedKey2}
             onOptionSelect={(opt) => setSelectedKey2(opt?.key ?? null)}
@@ -725,7 +785,6 @@ function App() {
             Toggle buttons filter by entity type like native Dynamics 365 - icon centers on single text row
           </p>
           <Lookup
-            appearance="filled-darker"
             options={filteredDetailsOnlyOptions}
             selectedKey={selectedKeyDetailsOnly}
             onOptionSelect={(opt) => setSelectedKeyDetailsOnly(opt?.key ?? null)}
@@ -798,7 +857,6 @@ function App() {
             }
           </p>
           <Lookup
-            appearance="filled-darker"
             options={dynamicOptions}
             selectedOption={selectedOption3}
             onOptionSelect={handleOptionSelect}
@@ -842,112 +900,6 @@ function App() {
             </p>
           )}
         </section>
-
-        {/* Query Builder */}
-        <section style={{ marginBottom: 40 }}>
-          <h2>QueryBuilder — Unknown / Invalid Fields</h2>
-          <p style={{ color: '#666', marginBottom: 12 }}>
-            When existing FetchXML is loaded and contains attributes that don't match any known field,
-            each unmatched condition is preserved and flagged with a warning banner so the user knows
-            what needs to be fixed before saving.
-          </p>
-          <QueryBuilder
-            entityName="product"
-            entityDisplayName="Products"
-            fields={[
-              { id: 'name', label: 'Product Name', dataType: 'string' },
-              { id: 'productnumber', label: 'Product Number', dataType: 'string' },
-              { id: 'statecode', label: 'Status', dataType: 'optionset', options: [
-                { label: 'Active', value: 0 },
-                { label: 'Inactive', value: 1 },
-              ]},
-            ]}
-            initialFetchXml={`<fetch version="1.0" output-format="xml-platform" mapping="logical" distinct="false">
-  <entity name="product">
-    <filter type="and">
-      <condition attribute="name" operator="like" value="%Widget%" />
-      <condition attribute="sample_unknownfield" operator="eq" value="1" />
-      <condition attribute="statecode" operator="eq" value="0" />
-      <condition attribute="sample_custom_obsolete_flag" operator="eq" value="true" />
-    </filter>
-  </entity>
-</fetch>`}
-            showFetchXmlPreview
-          />
-        </section>
-
-        <section style={{ marginBottom: 40 }}>
-          <h2>Query Builder</h2>
-          <p style={{ color: '#666', marginBottom: 12 }}>
-            {dynamicsConnected
-              ? <>Fields loaded from <strong>Dynamics 365</strong> via native <code>fetch()</code> API.</>
-              : <>Requires connection to Dynamics 365 to load entity metadata.</>
-            }
-          </p>
-
-          <div style={{ border: dynamicsConnected ? '1px solid #0078d4' : '1px solid #e1dfdd', borderRadius: 8, padding: 16, background: '#fff', width: '100%', position: 'relative', minHeight: '400px' }}>
-            {!dynamicsConnected && (
-              <div style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: 'rgba(255, 255, 255, 0.95)',
-                backdropFilter: 'blur(4px)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '16px',
-                borderRadius: 8,
-                zIndex: 10,
-              }}>
-                <PlugDisconnectedRegular style={{ fontSize: '48px', color: '#999' }} />
-                <Text size={500} weight="semibold">Connect to Dynamics 365</Text>
-                <Text size={300} style={{ color: '#666', textAlign: 'center', maxWidth: '400px' }}>
-                  QueryBuilder requires a live connection to load entity metadata, fields, and relationships.
-                </Text>
-                <Button appearance="primary" onClick={handleDynamicsLogin} disabled={!dynamicsConfigured || dynamicsLoading}>
-                  {dynamicsLoading ? 'Connecting...' : 'Connect Now'}
-                </Button>
-                {!dynamicsConfigured && (
-                  <Text size={200} style={{ color: '#999' }}>
-                    Configure environment variables to enable connection
-                  </Text>
-                )}
-              </div>
-            )}
-            <QueryBuilder
-              key={`live-${liveQueryBuilderKey}`}
-              entityName="account"
-              entityDisplayName="Accounts"
-              showODataPreview
-              showFetchXmlPreview
-              showDataSourceToggle
-              debug
-              onStateChange={(state) => setQueryBuilderState(state)}
-              onSerializedChange={(result) => setQueryBuilderResult(result)}
-            />
-          </div>
-
-          <div style={{ marginTop: 12, display: 'grid', gap: 12 }}>
-            <div style={{ border: '1px solid #e1dfdd', borderRadius: 6, padding: 12, background: '#faf9f8' }}>
-              <Text weight="semibold">Live State</Text>
-              <pre style={{ margin: '8px 0 0', fontSize: 12, overflowX: 'auto' }}>
-                {JSON.stringify(queryBuilderState, null, 2)}
-              </pre>
-            </div>
-
-            <div style={{ border: '1px solid #e1dfdd', borderRadius: 6, padding: 12, background: '#faf9f8' }}>
-              <Text weight="semibold">Serialized Output</Text>
-              <pre style={{ margin: '8px 0 0', fontSize: 12, overflowX: 'auto' }}>
-                {JSON.stringify(queryBuilderResult, null, 2)}
-              </pre>
-            </div>
-          </div>
-        </section>
-
         {/* Multi-Entity Lookup with React Elements */}
         <section style={{ marginBottom: 40 }}>
           <h2>Multi-Entity Lookup with React Elements</h2>
@@ -956,7 +908,6 @@ function App() {
             and React elements (Badges) in expandable <code>details</code>.
           </p>
           <Lookup
-            appearance="filled-darker"
             options={multiEntityOptions}
             selectedOption={selectedMultiEntity}
             onOptionSelect={setSelectedMultiEntity}
@@ -1026,13 +977,16 @@ function App() {
                 Searches real accounts from Dynamics 365 using <code>Xrm.WebApi.retrieveMultipleRecords</code>.
               </p>
               <Lookup
-                appearance="filled-darker"
                 options={liveAccountOptions}
                 selectedOption={selectedLiveAccount}
                 onOptionSelect={setSelectedLiveAccount}
                 onSearchChange={handleLiveAccountSearch}
                 onFocus={handleLiveAccountFocus}
                 loading={liveAccountLoading}
+                // At rest this shows the entity icon and the record name as a link,
+                // the way a resolved lookup renders on a Dynamics form
+                entityIcon={<BuildingRegular />}
+                onRecordClick={(option) => setCommandLog(`Open account ${option.text}`)}
                 placeholder="Search accounts in Dynamics..."
                 minSearchLength={0}
                 searchDebounceMs={300}
@@ -1073,7 +1027,6 @@ function App() {
                 Searches real contacts from Dynamics 365.
               </p>
               <Lookup
-                appearance="filled-darker"
                 options={liveContactOptions}
                 selectedOption={selectedLiveContact}
                 onOptionSelect={setSelectedLiveContact}
@@ -1101,6 +1054,375 @@ function App() {
               )}
             </div>
 
+          </section>
+        )}
+          </>
+        )}
+
+        {activeTab === 'querybuilder' && (
+          <>
+        {/* Query Builder */}
+        <section style={{ marginBottom: 40 }}>
+          <h2>QueryBuilder — Unknown / Invalid Fields</h2>
+          <p style={{ color: '#666', marginBottom: 12 }}>
+            When existing FetchXML is loaded and contains attributes that don't match any known field,
+            each unmatched condition is preserved and flagged with a warning banner so the user knows
+            what needs to be fixed before saving.
+          </p>
+          <QueryBuilder
+            entityName="product"
+            entityDisplayName="Products"
+            fields={[
+              { id: 'name', label: 'Product Name', dataType: 'string' },
+              { id: 'productnumber', label: 'Product Number', dataType: 'string' },
+              { id: 'statecode', label: 'Status', dataType: 'optionset', options: [
+                { label: 'Active', value: 0 },
+                { label: 'Inactive', value: 1 },
+              ]},
+            ]}
+            initialFetchXml={`<fetch version="1.0" output-format="xml-platform" mapping="logical" distinct="false">
+  <entity name="product">
+    <filter type="and">
+      <condition attribute="name" operator="like" value="%Widget%" />
+      <condition attribute="sample_unknownfield" operator="eq" value="1" />
+      <condition attribute="statecode" operator="eq" value="0" />
+      <condition attribute="sample_custom_obsolete_flag" operator="eq" value="true" />
+    </filter>
+  </entity>
+</fetch>`}
+            showFetchXmlPreview
+          />
+        </section>
+
+        <section style={{ marginBottom: 40 }}>
+          <h2>Query Builder</h2>
+          <p style={{ color: '#666', marginBottom: 12 }}>
+            {dynamicsConnected
+              ? <>Fields loaded from <strong>Dynamics 365</strong> via native <code>fetch()</code> API.</>
+              : <>Requires connection to Dynamics 365 to load entity metadata.</>
+            }
+          </p>
+
+          <div style={{ border: dynamicsConnected ? '1px solid #0078d4' : '1px solid #e1dfdd', borderRadius: 8, padding: 16, background: '#fff', width: '100%', position: 'relative', height: '500px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            {!dynamicsConnected && (
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '16px',
+                borderRadius: 8,
+                zIndex: 10,
+              }}>
+                <PlugDisconnectedRegular style={{ fontSize: '48px', color: '#999' }} />
+                <Text size={500} weight="semibold">Connect to Dynamics 365</Text>
+                <Text size={300} style={{ color: '#666', textAlign: 'center', maxWidth: '400px' }}>
+                  QueryBuilder requires a live connection to load entity metadata, fields, and relationships.
+                </Text>
+                <Button appearance="primary" onClick={handleDynamicsLogin} disabled={!dynamicsConfigured || dynamicsLoading}>
+                  {dynamicsLoading ? 'Connecting...' : 'Connect Now'}
+                </Button>
+                {!dynamicsConfigured && (
+                  <Text size={200} style={{ color: '#999' }}>
+                    Configure environment variables to enable connection
+                  </Text>
+                )}
+              </div>
+            )}
+            <QueryBuilder
+              key={`live-${liveQueryBuilderKey}`}
+              entityName="account"
+              entityDisplayName="Accounts"
+              showODataPreview
+              showFetchXmlPreview
+              showDataSourceToggle
+              debug
+              onStateChange={(state) => setQueryBuilderState(state)}
+              onSerializedChange={(result) => setQueryBuilderResult(result)}
+            />
+          </div>
+
+          <div style={{ marginTop: 12, display: 'grid', gap: 12 }}>
+            <div style={{ border: '1px solid #e1dfdd', borderRadius: 6, padding: 12, background: '#faf9f8' }}>
+              <Text weight="semibold">Live State</Text>
+              <pre style={{ margin: '8px 0 0', fontSize: 12, overflowX: 'auto' }}>
+                {JSON.stringify(queryBuilderState, null, 2)}
+              </pre>
+            </div>
+
+            <div style={{ border: '1px solid #e1dfdd', borderRadius: 6, padding: 12, background: '#faf9f8' }}>
+              <Text weight="semibold">Serialized Output</Text>
+              <pre style={{ margin: '8px 0 0', fontSize: 12, overflowX: 'auto' }}>
+                {JSON.stringify(queryBuilderResult, null, 2)}
+              </pre>
+            </div>
+          </div>
+        </section>
+          </>
+        )}
+
+        {activeTab === 'commandbar' && (
+          <>
+            <section style={{ marginBottom: 40 }}>
+              <h2>Command Bar</h2>
+              <p style={{ color: '#666', marginBottom: 12 }}>
+                Commands that no longer fit collapse into a "More commands" menu rather than being
+                clipped. <strong>Narrow the browser window</strong> to watch them move.
+              </p>
+              <div style={{ border: '1px solid #e1dfdd', borderRadius: 8, background: '#fff' }}>
+                <CommandBar
+                  items={[
+                    { key: 'new', text: 'New', icon: <AddRegular />, appearance: 'primary', onClick: () => setCommandLog('New') },
+                    { key: 'edit', text: 'Edit', icon: <EditRegular />, onClick: () => setCommandLog('Edit') },
+                    { key: 'delete', text: 'Delete', icon: <DeleteRegular />, onClick: () => setCommandLog('Delete') },
+                    { key: 'refresh', text: 'Refresh', icon: <ArrowClockwiseRegular />, dividerBefore: true, onClick: () => setCommandLog('Refresh') },
+                    { key: 'assign', text: 'Assign', icon: <PersonRegular />, onClick: () => setCommandLog('Assign') },
+                    { key: 'share', text: 'Share', icon: <ShareRegular />, onClick: () => setCommandLog('Share') },
+                    {
+                      key: 'export', text: 'Export', icon: <ArrowDownloadRegular />,
+                      subItems: [
+                        { key: 'excel', text: 'Export to Excel', onClick: () => setCommandLog('Export to Excel') },
+                        { key: 'csv', text: 'Export to CSV', onClick: () => setCommandLog('Export to CSV') },
+                      ],
+                    },
+                    { key: 'flow', text: 'Flow', icon: <FlashRegular />, onClick: () => setCommandLog('Flow') },
+                    { key: 'wordtemplates', text: 'Word Templates', icon: <DocumentRegular />, onClick: () => setCommandLog('Word Templates') },
+                  ]}
+                  farItems={[
+                    { key: 'filter', title: 'Filter', icon: <FilterRegular />, onClick: () => setCommandLog('Filter') },
+                  ]}
+                />
+              </div>
+              <p style={{ marginTop: 12, fontSize: 14 }}>
+                Last command: <strong>{commandLog ?? 'None'}</strong>
+              </p>
+            </section>
+
+            <section style={{ marginBottom: 40 }}>
+              <h3>Pinned commands and overflow disabled</h3>
+              <p style={{ color: '#666', marginBottom: 12 }}>
+                A pinned command never collapses. With <code>disableOverflow</code> the bar scrolls
+                horizontally instead.
+              </p>
+              <div style={{ border: '1px solid #e1dfdd', borderRadius: 8, background: '#fff', maxWidth: 420 }}>
+                <CommandBar
+                  items={[
+                    { key: 'save', text: 'Save', icon: <AddRegular />, appearance: 'primary', pinned: true },
+                    { key: 'a', text: 'Command A' },
+                    { key: 'b', text: 'Command B' },
+                    { key: 'c', text: 'Command C' },
+                    { key: 'd', text: 'Command D' },
+                  ]}
+                />
+              </div>
+            </section>
+          </>
+        )}
+
+        {activeTab === 'entitygrid' && (
+          <section style={{ marginBottom: 40 }}>
+            <h2>Entity Grid</h2>
+            <p style={{ color: '#666', marginBottom: 12 }}>
+              Server-side paging via <code>Prefer: odata.maxpagesize</code> and <code>@odata.nextLink</code>,
+              sorting pushed to the server, and lookups rendered from their formatted-value annotations.
+              {dynamicsConnected ? '' : ' Requires a Dynamics 365 connection.'}
+            </p>
+            {dynamicsConnected ? (
+              <EntityGrid
+                entityName="account"
+                title="Accounts"
+                height={420}
+                pageSize={10}
+                selectable
+                columns={[
+                  { name: 'name', width: 260 },
+                  { name: 'accountnumber', width: 160 },
+                  { name: 'telephone1', width: 160 },
+                  { name: 'primarycontactid', label: 'Primary Contact', width: 200 },
+                ]}
+                onRecordOpen={(id) => setCommandLog(`Open record ${id}`)}
+                onSelectionChange={(ids) => setGridSelection(ids)}
+                onLoadError={(err) => console.error('[EntityGrid]', err)}
+              />
+            ) : (
+              <div style={{ border: '1px dashed #e1dfdd', borderRadius: 8, padding: 32, textAlign: 'center', color: '#888' }}>
+                Connect to Dynamics 365 to load the grid.
+              </div>
+            )}
+            <p style={{ marginTop: 12, fontSize: 14 }}>
+              Selected: <strong>{gridSelection.length}</strong> record(s)
+            </p>
+          </section>
+        )}
+
+        {activeTab === 'fields' && (
+          <>
+            <section style={{ marginBottom: 40 }}>
+              <h2>DateTimeField — DateTimeBehavior</h2>
+              <p style={{ color: '#666', marginBottom: 12 }}>
+                The same picked date serialized three ways. <strong>DateOnly</strong> and
+                <strong> TimeZoneIndependent</strong> never pass through UTC, so they cannot drift a day
+                the way <code>toISOString()</code> does in a positive UTC offset.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+                {(['UserLocal', 'DateOnly', 'TimeZoneIndependent'] as const).map((behavior) => (
+                  <div key={behavior} style={{ border: '1px solid #e1dfdd', borderRadius: 8, padding: 16, background: '#fff' }}>
+                    <DateTimeField
+                      label={behavior}
+                      behavior={behavior}
+                      showTime={behavior !== 'DateOnly'}
+                      value={dateValues[behavior]}
+                      onChange={(stored) => setDateValues((current) => ({ ...current, [behavior]: stored }))}
+                    />
+                    <pre style={{ margin: '12px 0 0', fontSize: 12, color: '#666', whiteSpace: 'pre-wrap' }}>
+                      {dateValues[behavior] ?? '(empty)'}
+                    </pre>
+                  </div>
+                ))}
+              </div>
+
+              {dynamicsConnected && (
+                <div style={{ marginTop: 24, border: '1px solid #0078d4', borderRadius: 8, padding: 16, background: '#fff', maxWidth: 420 }}>
+                  <h3 style={{ marginTop: 0 }}>Behavior read from live metadata</h3>
+                  <p style={{ color: '#666', marginBottom: 12, fontSize: 14 }}>
+                    <code>account.createdon</code> — the behavior comes from attribute metadata rather
+                    than a prop, so the hint below reflects however your environment configured it.
+                  </p>
+                  <DateTimeField
+                    label="Created On (live)"
+                    entityName="account"
+                    attributeName="createdon"
+                    showTime
+                    value={liveDateValue}
+                    onChange={(stored) => setLiveDateValue(stored)}
+                    onLoadError={(err) => console.error('[DateTimeField]', err)}
+                  />
+                  <pre style={{ margin: '12px 0 0', fontSize: 12, color: '#666' }}>
+                    {liveDateValue ?? '(empty)'}
+                  </pre>
+                </div>
+              )}
+            </section>
+
+            <section style={{ marginBottom: 40 }}>
+              <h2>OptionSetField</h2>
+              <p style={{ color: '#666', marginBottom: 12 }}>
+                {dynamicsConnected
+                  ? <>Options loaded live from <strong>account</strong> attribute metadata, including
+                    the global option set behind <code>industrycode</code>.</>
+                  : <>Static options shown — connect to Dynamics 365 to load options from live attribute metadata.</>}
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+                <div style={{ border: '1px solid #e1dfdd', borderRadius: 8, padding: 16, background: '#fff' }}>
+                  <OptionSetField
+                    label={dynamicsConnected ? 'Status Reason (live: statuscode)' : 'Status Reason (static)'}
+                    entityName={dynamicsConnected ? 'account' : undefined}
+                    attributeName={dynamicsConnected ? 'statuscode' : undefined}
+                    options={dynamicsConnected ? undefined : demoStatusOptions}
+                    showColors
+                    value={statusValue}
+                    onChange={(value) => setStatusValue(value as number | null)}
+                    onLoadError={(err) => console.error('[OptionSetField]', err)}
+                  />
+                  <pre style={{ margin: '12px 0 0', fontSize: 12, color: '#666' }}>
+                    {statusValue ?? '(empty)'}
+                  </pre>
+                </div>
+
+                <div style={{ border: '1px solid #e1dfdd', borderRadius: 8, padding: 16, background: '#fff' }}>
+                  <OptionSetField
+                    label={dynamicsConnected ? 'Industry (live: industrycode)' : 'Industries (static)'}
+                    entityName={dynamicsConnected ? 'account' : undefined}
+                    attributeName={dynamicsConnected ? 'industrycode' : undefined}
+                    options={dynamicsConnected ? undefined : demoIndustryOptions}
+                    multiselect
+                    value={industryValues}
+                    onChange={(value) => setIndustryValues((value as number[]) ?? [])}
+                    onLoadError={(err) => console.error('[OptionSetField]', err)}
+                  />
+                  <pre style={{ margin: '12px 0 0', fontSize: 12, color: '#666' }}>
+                    {formatMultiSelectValue(industryValues) || '(empty)'}
+                  </pre>
+                </div>
+              </div>
+            </section>
+          </>
+        )}
+
+        {activeTab === 'hovercard' && (
+          <section style={{ marginBottom: 40 }}>
+            <h2>Record Hover Card</h2>
+            <p style={{ color: '#666', marginBottom: 12 }}>
+              Hover a record reference to reveal its details. The fetch waits for the pointer to settle,
+              so dragging across a column does not fire a request per row.
+            </p>
+            <div style={{ border: '1px solid #e1dfdd', borderRadius: 8, padding: 24, background: '#fff', display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+              <RecordHoverCard
+                record={{
+                  title: '007 PROJECTS PTY LTD',
+                  subtitle: 'COD007PR777',
+                  icon: <BuildingRegular />,
+                  details: [
+                    { label: 'Status', value: <Badge appearance="filled" color="success" size="small">Active</Badge> },
+                    { label: 'Phone', value: '32682915877' },
+                    { label: 'Industry', value: 'Construction' },
+                    { label: 'Owner', value: 'Gareth Cheyne' },
+                  ],
+                }}
+                actions={<Link as="button" style={{ fontSize: 12 }}>Open record</Link>}
+              >
+                <Link as="button" style={{ fontSize: 14 }}>007 PROJECTS PTY LTD</Link>
+              </RecordHoverCard>
+
+              <RecordHoverCard
+                record={{
+                  title: 'Jane Smith',
+                  subtitle: 'Chief Executive Officer',
+                  icon: <PersonRegular />,
+                  details: [
+                    { label: 'Email', value: 'jane@contoso.com' },
+                    { label: 'Phone', value: '0412 345 678' },
+                  ],
+                }}
+              >
+                <Link as="button" style={{ fontSize: 14 }}>Jane Smith</Link>
+              </RecordHoverCard>
+
+            </div>
+
+            <h3 style={{ marginTop: 32 }}>Live records</h3>
+            <p style={{ color: '#666', marginBottom: 12 }}>
+              {dynamicsConnected
+                ? 'Real accounts, each fetching its own columns on hover. Open the network tab to see that nothing is requested until a pointer settles.'
+                : 'Connect to Dynamics 365 to hover real records.'}
+            </p>
+            <div style={{ border: '1px solid #e1dfdd', borderRadius: 8, padding: 24, background: '#fff', display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+              {dynamicsConnected && liveAccountOptions.length === 0 && (
+                <Text size={200} style={{ color: '#888' }}>Loading accounts...</Text>
+              )}
+              {liveAccountOptions.slice(0, 5).map((account) => (
+                <RecordHoverCard
+                  key={account.key}
+                  entityName="account"
+                  recordId={account.key}
+                  columns={['accountnumber', 'telephone1', 'primarycontactid', 'industrycode']}
+                  actions={<Link as="button" style={{ fontSize: 12 }}>Open record</Link>}
+                  onLoadError={(err) => console.error('[RecordHoverCard]', err)}
+                >
+                  <Link as="button" style={{ fontSize: 14 }}>{account.text}</Link>
+                </RecordHoverCard>
+              ))}
+              {!dynamicsConnected && (
+                <Text size={200} style={{ color: '#888' }}>Not connected.</Text>
+              )}
+            </div>
           </section>
         )}
       </div>

@@ -19,6 +19,39 @@ export const useLookupStyles = makeStyles({
     width: '100%',
   },
 
+  /**
+   * At rest with a record selected, Dynamics renders the value as a link rather than
+   * plain input text - it doubles as the affordance for opening the record.
+   */
+  inputSelectedText: {
+    color: tokens.colorBrandForeground1,
+    cursor: 'pointer',
+    ':hover': {
+      textDecorationLine: 'underline',
+    },
+  },
+
+  /** Entity icon shown before the value, matching the Dynamics lookup rest state */
+  entityIcon: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    width: '16px',
+    height: '16px',
+    color: tokens.colorBrandForeground1,
+    fontSize: '16px',
+  },
+
+  /** Entity image, when the table has one configured. Square to match Dynamics. */
+  entityImage: {
+    flexShrink: 0,
+    width: '16px',
+    height: '16px',
+    borderRadius: tokens.borderRadiusSmall,
+    objectFit: 'cover',
+  },
+
   iconContainer: {
     display: 'flex',
     alignItems: 'center',

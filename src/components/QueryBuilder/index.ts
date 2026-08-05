@@ -11,6 +11,7 @@ export type {
   QueryBuilderCondition,
   QueryBuilderGroup,
   QueryBuilderState,
+  QueryBuilderQueryOptions,
   QueryBuilderApplyResult,
   QueryBuilderRelatedEntity,
   QueryBuilderLookupOption,
@@ -35,7 +36,7 @@ export {
 export type { OperatorDefinition } from './QueryBuilder.operators';
 
 // Serialization utilities
-export { conditionToFetchXml, conditionToOData, relatedEntityToLinkEntity, relatedEntityToOData, escapeXml, prettyPrintXml } from './QueryBuilder.serializer';
+export { conditionToFetchXml, conditionToOData, relatedEntityToLinkEntity, relatedEntityToOData, escapeXml, prettyPrintXml, buildFetchAttributes, DEFAULT_QUERY_OPTIONS } from './QueryBuilder.serializer';
 
 // Parser utilities
 export { parseFetchXmlToState as parseFetchXml, validateFetchXmlSyntax } from './QueryBuilder.parser';

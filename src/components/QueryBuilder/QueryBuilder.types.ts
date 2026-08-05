@@ -1,3 +1,5 @@
+import type { FieldAppearance } from '../../types/appearance';
+
 export type QueryBuilderDataType = 'string' | 'number' | 'datetime' | 'boolean' | 'optionset' | 'lookup';
 
 export interface QueryBuilderOption {
@@ -182,8 +184,27 @@ export interface QueryBuilderGroup {
   conditions: QueryBuilderCondition[];
 }
 
+/**
+ * Attributes emitted on the root <fetch> element. These mirror what the Dynamics 365
+ * advanced-find editor produces, so a query imported from Dynamics keeps its options
+ * instead of silently losing them on the next serialize.
+ */
+export interface QueryBuilderQueryOptions {
+  /**
+   * Emit distinct="true". Matters once link-entities are involved, where a single
+   * record can otherwise match on several related rows. Defaults to true.
+   */
+  distinct?: boolean;
+  /** Emit no-lock="true" to read without taking shared locks. Defaults to false. */
+  noLock?: boolean;
+  /** Emit top="N" to cap the row count. Omitted entirely when not set. */
+  top?: number;
+}
+
 export interface QueryBuilderState {
   groups: QueryBuilderGroup[];
+  /** Root <fetch> attributes. Omitted means "use the defaults". */
+  queryOptions?: QueryBuilderQueryOptions;
 }
 
 /** A condition that has no OData equivalent and was omitted from the OData filter */
@@ -245,6 +266,21 @@ export interface QueryBuilderProps {
   fields?: QueryBuilderField[];
   /** Related entities for filtering. If not provided, will be auto-detected from lookup fields. */
   relatedEntities?: QueryBuilderRelatedEntity[];
+  /**
+   * Emit distinct="true" on the root <fetch>. Overrides whatever an imported query
+   * carried. Defaults to true, matching the Dynamics advanced-find editor.
+   */
+  distinct?: boolean;
+  /** Emit no-lock="true" on the root <fetch>. Overrides imported values. Defaults to false. */
+  noLock?: boolean;
+  /** Emit top="N" on the root <fetch> to cap the row count. Overrides imported values. */
+  top?: number;
+  /**
+   * Controls the colors and borders of every field inside the builder. Defaults to
+   * `filled-darker`, which is how Dynamics 365 renders fields natively. The deprecated
+   * shadow variants are narrowed for the dropdowns, which never supported them.
+   */
+  appearance?: FieldAppearance;
   /** Initial query state object */
   initialState?: QueryBuilderState;
   /** Initial FetchXML string - will be parsed to populate the query builder */

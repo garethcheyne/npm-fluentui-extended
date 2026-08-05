@@ -2294,3 +2294,88 @@ describe('OData translatability inside related entities', () => {
         expect(result.odataFilter).toContain('ownerid/createdon eq');
     });
 });
+
+describe('root <fetch> query options', () => {
+    const simpleState = (queryOptions?: QueryBuilderState['queryOptions']): QueryBuilderState => ({
+        queryOptions,
+        groups: [
+            {
+                id: 'grp1',
+                logic: 'and',
+                conditions: [{ id: 'cond1', fieldId: 'name', operator: 'eq', value: 'Contoso' }],
+            },
+        ],
+    });
+
+    it('emits the Dynamics default attributes when no options are set', () => {
+        const result = serializeQueryBuilderState(simpleState(), testFields, 'account');
+
+        expect(result.fetchXml).toContain('<fetch version="1.0" mapping="logical" no-lock="false" distinct="true">');
+    });
+
+    it('honours explicit distinct and no-lock values', () => {
+        const result = serializeQueryBuilderState(
+            simpleState({ distinct: false, noLock: true }),
+            testFields,
+            'account',
+        );
+
+        expect(result.fetchXml).toContain('no-lock="true"');
+        expect(result.fetchXml).toContain('distinct="false"');
+    });
+
+    it('emits top only when set to a positive number', () => {
+        expect(serializeQueryBuilderState(simpleState({ top: 50 }), testFields, 'account').fetchXml)
+            .toContain('top="50"');
+        expect(serializeQueryBuilderState(simpleState(), testFields, 'account').fetchXml)
+            .not.toContain('top=');
+        expect(serializeQueryBuilderState(simpleState({ top: 0 }), testFields, 'account').fetchXml)
+            .not.toContain('top=');
+        expect(serializeQueryBuilderState(simpleState({ top: -5 }), testFields, 'account').fetchXml)
+            .not.toContain('top=');
+    });
+
+    it('truncates a fractional top rather than emitting invalid XML', () => {
+        const result = serializeQueryBuilderState(simpleState({ top: 25.7 }), testFields, 'account');
+
+        expect(result.fetchXml).toContain('top="25"');
+    });
+
+    it('parses options off an imported query', () => {
+        const xml = `<fetch version="1.0" mapping="logical" no-lock="true" distinct="false" top="10">
+            <entity name="account">
+                <filter type="and">
+                    <condition attribute="name" operator="eq" value="Contoso" />
+                </filter>
+            </entity>
+        </fetch>`;
+
+        const result = parseFetchXmlToState(xml, testFields);
+
+        expect(result.state?.queryOptions).toEqual({ distinct: false, noLock: true, top: 10 });
+    });
+
+    it('leaves options undefined when the imported query declares none', () => {
+        const xml = `<fetch>
+            <entity name="account">
+                <filter type="and">
+                    <condition attribute="name" operator="eq" value="Contoso" />
+                </filter>
+            </entity>
+        </fetch>`;
+
+        expect(parseFetchXmlToState(xml, testFields).state?.queryOptions).toBeUndefined();
+    });
+
+    it('round-trips options through serialize and parse', () => {
+        const serialized = serializeQueryBuilderState(
+            simpleState({ distinct: false, noLock: true, top: 5 }),
+            testFields,
+            'account',
+        );
+
+        const reparsed = parseFetchXmlToState(serialized.fetchXml, testFields);
+
+        expect(reparsed.state?.queryOptions).toEqual({ distinct: false, noLock: true, top: 5 });
+    });
+});

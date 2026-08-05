@@ -79,5 +79,25 @@ export interface LookupProps extends Omit<InputProps, 'onChange' | 'value'> {
    * already filtered. Defaults to `false` (client-side filtering enabled).
    */
   disableClientFilter?: boolean;
+  /**
+   * Icon shown before the selected value at rest, representing the table.
+   * Falls back to the selected option's own `icon`.
+   */
+  entityIcon?: React.ReactNode;
+  /**
+   * URL of the table's entity image, shown in place of `entityIcon` when the
+   * table has one configured in Dynamics.
+   */
+  entityImage?: string;
+  /**
+   * Render the selected value as a link at rest, the way Dynamics presents a
+   * resolved lookup. Defaults to `true`.
+   */
+  recordLinkAppearance?: boolean;
+  /**
+   * Called when the selected value is clicked at rest - use it to open the record.
+   * Without it the click falls through to opening the dropdown as before.
+   */
+  onRecordClick?: (option: LookupOption) => void;
 }
 

@@ -8,9 +8,35 @@ import type {
     QueryBuilderCondition,
     QueryBuilderField,
     QueryBuilderGroup,
+    QueryBuilderQueryOptions,
     QueryBuilderState,
 } from './QueryBuilder.types';
 import { ALL_OPERATORS } from './QueryBuilder.operators';
+
+/**
+ * Read the root <fetch> attributes. Only attributes actually present are returned,
+ * so an absent attribute falls through to the serializer default rather than being
+ * pinned to whatever the parser guessed.
+ */
+const parseQueryOptions = (fetchEl: Element | null): QueryBuilderQueryOptions | undefined => {
+    if (!fetchEl || fetchEl.tagName.toLowerCase() !== 'fetch') return undefined;
+
+    const options: QueryBuilderQueryOptions = {};
+
+    const distinct = fetchEl.getAttribute('distinct');
+    if (distinct !== null) options.distinct = distinct.toLowerCase() === 'true';
+
+    const noLock = fetchEl.getAttribute('no-lock');
+    if (noLock !== null) options.noLock = noLock.toLowerCase() === 'true';
+
+    const top = fetchEl.getAttribute('top');
+    if (top !== null) {
+        const parsed = Number.parseInt(top, 10);
+        if (Number.isFinite(parsed) && parsed > 0) options.top = parsed;
+    }
+
+    return Object.keys(options).length > 0 ? options : undefined;
+};
 
 export interface ParseFetchXmlResult {
     state: QueryBuilderState | null;
@@ -269,7 +295,9 @@ export const parseFetchXmlToState = (xml: string, fields: QueryBuilderField[]): 
             };
         }
 
-        return { state: { groups }, error: null };
+        const queryOptions = parseQueryOptions(doc.documentElement);
+
+        return { state: queryOptions ? { groups, queryOptions } : { groups }, error: null };
     } catch (err) {
         return { state: null, error: `Error parsing FetchXML: ${err instanceof Error ? err.message : 'Unknown error'}` };
     }

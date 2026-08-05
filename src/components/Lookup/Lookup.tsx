@@ -7,8 +7,9 @@ import {
   Portal,
   useId,
 } from '@fluentui/react-components';
-import { DismissRegular, ChevronDownRegular } from '@fluentui/react-icons';
+import { DismissRegular, ChevronDownRegular, SearchRegular } from '@fluentui/react-icons';
 import { useLookupStyles } from './Lookup.styles';
+import { DEFAULT_FIELD_APPEARANCE } from '../../types/appearance';
 import type { LookupProps, LookupOption } from './Lookup.types';
 
 export const Lookup: React.FC<LookupProps> = ({
@@ -31,6 +32,12 @@ export const Lookup: React.FC<LookupProps> = ({
   open: controlledOpen,
   onOpenChange,
   disableClientFilter = false,
+  // Dynamics 365 renders fields filled rather than outlined, so that is the default here
+  appearance = DEFAULT_FIELD_APPEARANCE,
+  entityIcon,
+  entityImage,
+  recordLinkAppearance = true,
+  onRecordClick,
   ...inputProps
 }) => {
   const styles = useLookupStyles();
@@ -117,6 +124,31 @@ export const Lookup: React.FC<LookupProps> = ({
     }
     return selectedOption?.text ?? '';
   }, [isOpen, searchText, selectedOption]);
+
+  /**
+   * "At rest" is a resolved lookup that is not currently being searched. Dynamics
+   * presents that state differently from an empty or open field: entity icon, and the
+   * record name as a link rather than plain input text.
+   */
+  const isAtRest = !isOpen && Boolean(selectedOption);
+
+  /** Entity image wins over an icon, matching how Dynamics renders a table with one set. */
+  const restIcon = React.useMemo((): React.ReactElement | undefined => {
+    if (!isAtRest) return undefined;
+
+    if (entityImage) {
+      return <img src={entityImage} alt="" className={styles.entityImage} />;
+    }
+
+    const icon = entityIcon ?? selectedOption?.icon;
+    if (!icon) return undefined;
+
+    return (
+      <span className={styles.entityIcon} aria-hidden>
+        {icon}
+      </span>
+    );
+  }, [isAtRest, entityImage, entityIcon, selectedOption, styles]);
 
   // ─── Open / close helpers ────────────────────────────────────────
   const openDropdown = React.useCallback(() => {
@@ -262,6 +294,20 @@ export const Lookup: React.FC<LookupProps> = ({
     }
   }, [disabled, isOpen, openDropdown]);
 
+  /**
+   * Clicking the resolved value opens the record when a handler is supplied. Without
+   * one the click falls through to the wrapper and opens the dropdown as before, so
+   * the link styling never becomes a dead end.
+   */
+  const handleValueClick = React.useCallback(
+    (e: React.MouseEvent<HTMLInputElement>) => {
+      if (!isAtRest || !onRecordClick || !selectedOption) return;
+      e.stopPropagation();
+      onRecordClick(selectedOption);
+    },
+    [isAtRest, onRecordClick, selectedOption],
+  );
+
   // Cleanup debounce on unmount
   React.useEffect(() => {
     return () => {
@@ -370,7 +416,15 @@ export const Lookup: React.FC<LookupProps> = ({
           {...inputProps}
           id={lookupId}
           ref={inputRef}
+          appearance={appearance}
           className={mergeClasses(styles.input, inputProps.className)}
+          // The link styling belongs on the text itself, so it applies to the value
+          // rather than the whole field chrome
+          input={{
+            className: mergeClasses(isAtRest && recordLinkAppearance && styles.inputSelectedText),
+            onClick: handleValueClick,
+          }}
+          contentBefore={restIcon}
           value={displayValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
@@ -399,7 +453,9 @@ export const Lookup: React.FC<LookupProps> = ({
                 <Spinner size="tiny" />
               ) : (
                 <span className={styles.chevronIcon}>
-                  <ChevronDownRegular />
+                  {/* Dynamics marks a lookup with a magnifier; the chevron reads as a
+                      plain dropdown and loses that distinction */}
+                  {isAtRest ? <SearchRegular /> : <ChevronDownRegular />}
                 </span>
               )}
             </span>

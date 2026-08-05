@@ -372,10 +372,13 @@ export const cloneState = (
     defaultField: QueryBuilderField
 ): QueryBuilderState => {
     if (!state?.groups?.length) {
-        return { groups: [createGroup(defaultField)] };
+        // Root <fetch> options survive an empty/absent group list - they describe the
+        // query envelope, not the filter, so there is nothing to reset them alongside
+        return { groups: [createGroup(defaultField)], queryOptions: state?.queryOptions };
     }
 
     return {
+        queryOptions: state.queryOptions,
         groups: state.groups.map((group) => ({
             id: group.id || `grp_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
             logic: group.logic || 'and',

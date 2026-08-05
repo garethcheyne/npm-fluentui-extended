@@ -19,6 +19,34 @@ This project is **open source** and **free to use**. It is provided as-is, witho
 npm install fluentui-extended @fluentui/react-components @fluentui/react-icons
 ```
 
+## Appearance
+
+Every field-like component in this library takes an `appearance` prop and **defaults it to
+`filled-darker`**, which is how Dynamics 365 renders fields natively. Fluent's own default is
+`outline`, which reads as foreign on a model-driven form — so the default is deliberately different
+from upstream Fluent.
+
+```tsx
+<Lookup options={options} />                        // filled-darker
+<Lookup options={options} appearance="outline" />   // opt back out
+```
+
+Applies to `Lookup`, `QueryBuilder` (every field inside it), `DateTimeField` and `OptionSetField`.
+`CommandBar`, `EntityGrid` and `RecordHoverCard` are not field controls and take no `appearance`.
+
+| Value | Notes |
+|-------|-------|
+| `outline` | Fluent's default |
+| `underline` | Not supported by `Textarea`; falls back to `outline` there |
+| `filled-darker` | **This library's default** — native Dynamics 365 |
+| `filled-lighter` | |
+| `filled-darker-shadow` | Deprecated upstream; narrowed to `filled-darker` on dropdowns |
+| `filled-lighter-shadow` | Deprecated upstream; narrowed to `filled-lighter` on dropdowns |
+
+The two shadow variants are deprecated in Fluent and will be removed there. They are accepted so
+existing callers keep working, but `Combobox` and `Dropdown` never supported them, so a component
+containing those narrows to the closest non-shadow fill rather than dropping the value.
+
 ## Components
 
 ### Lookup
@@ -34,6 +62,41 @@ A searchable dropdown component styled after Dynamics 365 lookup fields. Support
 An Advanced Find-style query builder for Dynamics 365. Build complex filter conditions with AND/OR logic, serialize to FetchXML or OData, and validate queries against the Dynamics 365 API.
 
 ![QueryBuilder Component](assets/screenshot-querybuilder.png)
+
+### CommandBar
+
+> **🚧 Beta**
+
+A Dynamics-style command bar. Commands that no longer fit collapse into a "More commands" menu
+rather than wrapping to a second row or being clipped.
+
+### EntityGrid
+
+> **🚧 Beta**
+
+A subgrid backed by the Web API: columns named from entity metadata, server-side paging and
+sorting, and lookups rendered as names rather than GUIDs.
+
+### DateTimeField
+
+> **🚧 Beta**
+
+A date/time field that respects the attribute's Dynamics `DateTimeBehavior`, so `DateOnly` values
+cannot drift a day across timezones.
+
+### OptionSetField
+
+> **🚧 Beta**
+
+An optionset / multi-select picklist field that loads its options from metadata, including global
+option sets, and round-trips multi-selects in the comma-separated form Dynamics stores.
+
+### RecordHoverCard
+
+> **🚧 Beta**
+
+A hover card for a record reference. The record is fetched lazily once the pointer settles, and the
+result is held so re-opening costs nothing.
 
 ## Quick Start
 
@@ -257,25 +320,59 @@ const options: LookupOption[] = [
 
 ## Test Harness Examples
 
-Run the test harness with `npm run harness` to see all examples in action.
+Run the test harness with `npm run harness` to see all examples in action. The harness is split into
+one tab per component, so each can be viewed and screenshotted on its own.
 
-| Example | Description |
-|---------|-------------|
-| **Basic Lookup** | Simple lookup with expandable details, no header/footer |
-| **Header & Footer** | D365-style with "Accounts" header and "New" / "Advanced" footer links |
-| **Details Only (No Secondary Text)** | Options with icons + details but no secondary text; demonstrates icon centering on single-line text |
-| **Multi-Entity Filter** | Toggle between Accounts/Contacts with drill-down header pattern (← All) |
-| **Dynamic Search (Async API)** | Simulated 800ms API delay with loading spinner; auto-loads top 5 on open |
-| **Live Dynamics Lookup** | Connects to real D365 environment via Xrm.WebApi (when connected) |
-| **QueryBuilder** | Full Advanced Find-style query builder with FetchXML serialization |
+| Example | Tab | Description |
+|---------|-----|-------------|
+| **Basic Lookup** | Lookup | Simple lookup with expandable details, no header/footer |
+| **Header & Footer** | Lookup | D365-style with "Accounts" header and "New" / "Advanced" footer links |
+| **Details Only (No Secondary Text)** | Lookup | Options with icons + details but no secondary text; demonstrates icon centering on single-line text |
+| **Multi-Entity Filter** | Lookup | Toggle between Accounts/Contacts with drill-down header pattern (← All) |
+| **Dynamic Search (Async API)** | Lookup | Simulated 800ms API delay with loading spinner; auto-loads top 5 on open |
+| **Live Dynamics Lookup** | Lookup | Connects to real D365 environment via Xrm.WebApi (when connected) |
+| **QueryBuilder** | Query Builder | Full Advanced Find-style query builder with FetchXML serialization |
+| **Unknown / Invalid Fields** | Query Builder | FetchXML referencing attributes that match no known field, each flagged inline |
+| **Command Bar** | Command Bar | Nine commands collapsing into an overflow menu; narrow the window to watch them move |
+| **Pinned / no overflow** | Command Bar | A pinned command that never collapses, and horizontal scrolling with overflow disabled |
+| **Entity Grid** | Entity Grid | Server-paged accounts with sorting, selection and formatted lookup values (needs a connection) |
+| **DateTimeBehavior** | Fields | One picked date serialized three ways, showing which behaviours pass through UTC |
+| **OptionSetField** | Fields | Single-select with metadata colours, and a multi-select round-tripping as "1,2" |
+| **Record Hover Card** | Hover Card | Static and live record cards with lazy loading on hover intent |
 
 ## API Reference
+
+### Resolved Lookup (rest state)
+
+Once a record is selected and the dropdown is closed, the field renders the way a resolved lookup
+does on a Dynamics form: the table's icon (or its entity image), the record name as a link, a clear
+button, and a magnifier rather than a chevron.
+
+```tsx
+<Lookup
+  options={options}
+  selectedOption={selected}
+  onOptionSelect={setSelected}
+  entityIcon={<BuildingRegular />}                      // falls back to the option's own icon
+  entityImage={account.entityimage_url}                 // wins over the icon when the table has one
+  onRecordClick={(option) => openRecord(option.key)}    // clicking the name opens the record
+/>
+```
+
+Without `onRecordClick` the link styling is still applied but the click falls through to opening the
+dropdown, so the affordance never becomes a dead end. Set `recordLinkAppearance={false}` to render the
+value as plain input text instead.
 
 ### Lookup Props
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `id` | `string` | auto-generated | Unique identifier for the lookup |
+| `appearance` | `FieldAppearance` | `'filled-darker'` | See [Appearance](#appearance) |
+| `entityIcon` | `React.ReactNode` | option's `icon` | Table icon shown at rest |
+| `entityImage` | `string` | - | Entity image URL, shown in place of the icon |
+| `recordLinkAppearance` | `boolean` | `true` | Render the resolved value as a link |
+| `onRecordClick` | `(option: LookupOption) => void` | - | Called when the resolved value is clicked |
 | `options` | `LookupOption[]` | `[]` | Options to display in the dropdown |
 | `selectedKey` | `string \| null` | - | Selected option key (controlled) |
 | `selectedOption` | `LookupOption \| null` | - | Selected option object (recommended for async) |
@@ -627,6 +724,38 @@ const fields: QueryBuilderField[] = [
 />
 ```
 
+### Layout and Scrolling
+
+The header and toolbar stay pinned while the filter groups and previews scroll together as one
+region. That scroll only engages when the parent constrains the height — give the wrapper a fixed
+`height` (or `maxHeight`) and the component fills it:
+
+```tsx
+<div style={{ height: 500, display: 'flex', flexDirection: 'column' }}>
+  <QueryBuilder entityName="account" entityDisplayName="Accounts" />
+</div>
+```
+
+In an unconstrained parent the component simply grows to fit its content and the page scrolls instead.
+
+### Query Options
+
+The root `<fetch>` element carries the same attributes the Dynamics advanced-find editor emits:
+
+```xml
+<fetch version="1.0" mapping="logical" no-lock="false" distinct="true">
+```
+
+`distinct` defaults to `true`, which matters once related-entity filters are in play — a single
+record can otherwise match several linked rows and appear more than once. Override per instance:
+
+```tsx
+<QueryBuilder entityName="account" distinct={false} noLock top={50} />
+```
+
+These props take precedence over whatever an imported query carried. When no prop is set, options
+parsed from `initialFetchXml` are preserved rather than dropped on the next serialize.
+
 ### QueryBuilder Props
 
 | Prop | Type | Default | Description |
@@ -636,6 +765,9 @@ const fields: QueryBuilderField[] = [
 | `fields` | `QueryBuilderField[]` | - | Fields for filtering (auto-loaded via Web API if omitted) |
 | `initialFetchXml` | `string` | - | FetchXML to pre-populate the query builder |
 | `initialState` | `QueryBuilderState` | - | Initial query state object |
+| `distinct` | `boolean` | `true` | Emit `distinct="…"` on the root `<fetch>` |
+| `noLock` | `boolean` | `false` | Emit `no-lock="…"` on the root `<fetch>` |
+| `top` | `number` | - | Emit `top="N"` to cap the row count; omitted when unset |
 | `onSerializedChange` | `(result: QueryBuilderApplyResult) => void` | - | Called when query changes |
 | `onLookupSearch` | `(fieldId: string, searchText: string) => Promise<LookupOption[]>` | - | Lookup field search handler |
 | `showODataPreview` | `boolean` | `false` | Initial visibility of the OData filter preview |
@@ -747,6 +879,250 @@ be expressed in OData — see [Queries That OData Cannot Express](#queries-that-
 
 ---
 
+## CommandBar
+
+Fluent ships `Toolbar` and `Overflow` as separate primitives. `CommandBar` composes them into the
+behaviour a command bar needs: commands that no longer fit move into a "More commands" menu instead
+of wrapping or being clipped. Widths are measured from the live DOM, so label length and icons are
+accounted for rather than estimated.
+
+```tsx
+import { CommandBar } from 'fluentui-extended';
+import { AddRegular, EditRegular, DeleteRegular } from '@fluentui/react-icons';
+
+<CommandBar
+  items={[
+    { key: 'new', text: 'New', icon: <AddRegular />, appearance: 'primary', onClick: handleNew },
+    { key: 'edit', text: 'Edit', icon: <EditRegular />, onClick: handleEdit },
+    { key: 'delete', text: 'Delete', icon: <DeleteRegular />, dividerBefore: true, onClick: handleDelete },
+    {
+      key: 'export',
+      text: 'Export',
+      subItems: [{ key: 'excel', text: 'Export to Excel', onClick: handleExport }],
+    },
+  ]}
+/>
+```
+
+### CommandBar Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `items` | `CommandBarItem[]` | - | Commands rendered from the left (required) |
+| `farItems` | `CommandBarItem[]` | - | Right-aligned commands; never collapse |
+| `size` | `'small' \| 'medium' \| 'large'` | `'small'` | Button size |
+| `disableOverflow` | `boolean` | `false` | Scroll horizontally instead of collapsing |
+| `overflowAriaLabel` | `string` | `'More commands'` | Label for the overflow trigger |
+
+`CommandBarItem` carries `key`, `text`, `icon`, `onClick`, `disabled`, `appearance`, `checked` (renders
+a toggle), `subItems` (renders a menu button, preserved as a submenu when overflowed), `dividerBefore`,
+and `pinned`. A pinned command never collapses — use it sparingly, because one that does not fit is
+clipped rather than moved.
+
+---
+
+## EntityGrid
+
+A subgrid backed by the Web API. `DataGrid` renders rows you already have; `EntityGrid` fetches them.
+
+Paging uses `Prefer: odata.maxpagesize` and follows `@odata.nextLink`, rather than `$top`/`$skip` —
+Dynamics does not support `$skip` for arbitrary offsets, and `$top` suppresses the paging cookie
+entirely. Because `nextLink` only moves forward, the URL of each visited page is kept so Previous can
+replay it.
+
+```tsx
+import { EntityGrid } from 'fluentui-extended';
+
+<EntityGrid
+  entityName="account"
+  title="Accounts"
+  height={420}
+  pageSize={25}
+  selectable
+  columns={[
+    { name: 'name', width: 260 },
+    { name: 'accountnumber' },
+    { name: 'primarycontactid', label: 'Primary Contact' },
+  ]}
+  onRecordOpen={(id) => Xrm.Navigation.openForm({ entityName: 'account', entityId: id })}
+/>
+```
+
+Cells prefer the `@OData.Community.Display.V1.FormattedValue` annotation Dynamics attaches, which is
+what renders a lookup as a name and an optionset as its label rather than a GUID or an integer. The
+grid requests those annotations for you.
+
+### EntityGrid Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `entityName` | `string` | - | Entity logical name (required) |
+| `columns` | `EntityGridColumn[]` | primary name attribute | Columns to render |
+| `filter` | `string` | - | OData filter applied to every page |
+| `defaultSort` | `EntityGridSort` | primary name ascending | Initial sort |
+| `pageSize` | `number` | `25` | Rows per page |
+| `selectable` | `boolean` | `false` | Show selection checkboxes |
+| `onRecordOpen` | `(id, record) => void` | - | Row activation handler |
+| `onSelectionChange` | `(ids: string[]) => void` | - | Selection handler |
+| `height` | `number \| string` | - | Fixed height for the scrolling body |
+
+`EntityGridColumn` carries `name`, `label` (defaults to the metadata display name), `width`,
+`sortable`, and `render(formatted, record)` for custom cells.
+
+Pair it with QueryBuilder by passing that component's `odataFilter` output as `filter`.
+
+---
+
+## DateTimeField
+
+Dynamics has three `DateTimeBehavior` values and they do not agree on what a stored string means, so
+a single `new Date(value)` is wrong for two of the three:
+
+| Behavior | Stored as | Conversion |
+|----------|-----------|------------|
+| `UserLocal` | UTC | Converted to the user's timezone |
+| `DateOnly` | Calendar date, no time or zone | None — must never shift |
+| `TimeZoneIndependent` | Wall-clock, no zone | None — shown exactly as entered |
+
+The trap is that `new Date('2026-08-06')` parses as UTC midnight, which renders as the 5th anywhere
+west of Greenwich, while `toISOString()` on a local date shifts the day for any user east of it.
+`DateTimeField` handles both explicitly.
+
+```tsx
+import { DateTimeField } from 'fluentui-extended';
+
+<DateTimeField
+  label="Estimated Close Date"
+  behavior="DateOnly"
+  value={value}
+  onChange={(stored) => setValue(stored)}  // "2026-08-06", never an ISO timestamp
+/>
+```
+
+Pass `entityName` and `attributeName` to read the behavior from metadata instead of declaring it.
+The conversion helpers are exported for use outside the component:
+
+```ts
+import { parseStoredValue, formatStoredValue } from 'fluentui-extended';
+
+const date = parseStoredValue('2026-08-06', 'DateOnly');   // local midnight on the 6th
+const stored = formatStoredValue(date, 'DateOnly');        // "2026-08-06"
+```
+
+### DateTimeField Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `value` | `string \| Date \| null` | - | Stored value, interpreted per `behavior` |
+| `onChange` | `(value: string \| null, date: Date \| null) => void` | - | Serialized value plus the Date |
+| `behavior` | `DateTimeBehavior` | `'UserLocal'` | How the attribute is stored |
+| `showTime` | `boolean` | `false` | Show a time picker; ignored for `DateOnly` |
+| `timeIntervalMinutes` | `number` | `30` | Spacing of the time dropdown entries |
+| `entityName` / `attributeName` | `string` | - | Read `behavior` from metadata |
+| `clearable` | `boolean` | `true` | Show a clear button |
+
+---
+
+## OptionSetField
+
+```tsx
+import { OptionSetField } from 'fluentui-extended';
+
+// Options loaded from metadata
+<OptionSetField entityName="account" attributeName="industrycode" value={value} onChange={setValue} />
+
+// Multi-select picklist
+<OptionSetField
+  options={options}
+  multiselect
+  value={values}              // accepts [1, 2] or the stored "1,2"
+  onChange={(next) => setValues(next as number[])}
+/>
+```
+
+Two Dynamics details this handles that a plain `Dropdown` does not. A **global option set** leaves
+`OptionSet` empty and puts its values on `GlobalOptionSet` instead — reading only the former is why a
+dropdown that should be populated comes back empty. And a **multi-select picklist** stores its value
+as a comma-separated string, so `"1,2"` and `[1, 2]` have to mean the same thing; `parseSelectedValues`
+and `formatMultiSelectValue` are exported for that conversion.
+
+### OptionSetField Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `options` | `OptionSetOption[]` | - | Options; omit to auto-load from metadata |
+| `entityName` / `attributeName` | `string` | - | Required for metadata auto-load |
+| `multiselect` | `boolean` | `false` | Multi-select picklist behaviour |
+| `value` | `number \| number[] \| string \| null` | - | Accepts every stored form |
+| `onChange` | `(value: number \| number[] \| null) => void` | - | Selection handler |
+| `showColors` | `boolean` | `false` | Render metadata colours as swatches |
+| `clearable` | `boolean` | `true` | Allow clearing the selection |
+
+---
+
+## RecordHoverCard
+
+```tsx
+import { RecordHoverCard } from 'fluentui-extended';
+
+<RecordHoverCard
+  entityName="account"
+  recordId={record.accountid}
+  columns={['accountnumber', 'telephone1', 'primarycontactid']}
+  actions={<Link onClick={open}>Open record</Link>}
+>
+  <Link>{record.name}</Link>
+</RecordHoverCard>
+```
+
+The record is fetched only after the pointer has settled on the anchor for `hoverDelayMs` (400 by
+default) — without that delay, dragging a pointer across a grid column fires a request per row. The
+result is held for the life of the anchor, so re-opening the same card costs nothing, while a failure
+is not cached so the next hover retries.
+
+Pass `record` directly to skip loading entirely when the calling grid already has the data.
+
+### RecordHoverCard Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactElement` | - | Anchor element (required) |
+| `entityName` / `recordId` | `string` | - | Required to load via the Web API |
+| `columns` | `string[]` | primary name only | Columns to request and show |
+| `record` | `RecordHoverCardRecord` | - | Supply the record and skip loading |
+| `mapRecord` | `(raw) => RecordHoverCardRecord` | - | Map a raw record onto the card |
+| `hoverDelayMs` | `number` | `400` | Delay before a hover triggers a fetch |
+| `actions` | `React.ReactNode` | - | Footer commands |
+
+---
+
+## Web API Client
+
+The metadata-aware components share one Web API client with a process-wide metadata cache, so two
+components mounting in the same tick share a single round trip. Metadata is immutable for the life of
+a page, and failures are not cached.
+
+```ts
+import { setWebApiBaseUrl, setWebApiFetch, getEntityDefinition, clearMetadataCache } from 'fluentui-extended';
+
+// Standalone / SPA usage - defaults to a relative path, which works inside Dynamics
+setWebApiBaseUrl('https://contoso.crm.dynamics.com/api/data/v9.2');
+
+// Supply your own authenticated transport
+setWebApiFetch((url, init) => authenticatedFetch(url, init));
+
+const definition = await getEntityDefinition('account');  // EntitySetName, PrimaryIdAttribute, ...
+```
+
+Exports: `webApiGet`, `setWebApiFetch`, `setWebApiBaseUrl`, `getWebApiBaseUrl`, `WebApiError`,
+`getEntityDefinition`, `getEntityAttributes`, `getEntityOptionSets`, `getAttributeOptions`,
+`clearMetadataCache`.
+
+> **Note:** Lookup and QueryBuilder still use their own internal fetch logic and do not yet share
+> this client.
+
+---
+
 ## Acknowledgments
 
 This library extends [Microsoft's Fluent UI React v9](https://react.fluentui.dev/) components. Thank you to Microsoft and the Fluent UI team for creating and maintaining such an excellent design system.
@@ -760,6 +1136,57 @@ This library extends [Microsoft's Fluent UI React v9](https://react.fluentui.dev
 ## Changelog
 
 > Version format: `YYYY.M.DD` (e.g., `2026.8.30` = August 30, 2026)
+
+### Unreleased
+
+Five new Dynamics 365 components, plus the shared Web API client they sit on.
+
+- 💄 **`filled-darker` is now the default appearance** across every field component — Lookup,
+  QueryBuilder, DateTimeField and OptionSetField — matching native Dynamics 365. Fluent's default is
+  `outline`. **Breaking for anyone relying on the previous outline look**; pass
+  `appearance="outline"` to restore it. See [Appearance](#appearance).
+- 💄 **Resolved lookups now render like Dynamics at rest**: table icon or entity image, the record
+  name as a link, and a magnifier in place of the chevron. New `entityIcon`, `entityImage`,
+  `recordLinkAppearance` and `onRecordClick` props.
+- 🐛 **Attribute metadata requests failed against live environments.** `Format` was included in the
+  `$select` against the base `Attributes` collection, but it is declared on derived types — Dynamics
+  rejects the whole request with *"Could not find a property named 'Format' on type
+  'Microsoft.Dynamics.CRM.AttributeMetadata'"*. `Format` and `DateTimeBehavior` are now fetched
+  through cast segments and merged in, which also means `DateTimeField`'s metadata auto-load works
+  (it could never have resolved a behavior before).
+
+- ✨ **[CommandBar](#commandbar)** — commands that no longer fit collapse into a "More commands" menu
+  instead of wrapping or being clipped. Widths are measured from the DOM rather than estimated.
+- ✨ **[EntityGrid](#entitygrid)** — a subgrid with columns named from entity metadata, server-side
+  paging via `Prefer: odata.maxpagesize` and `@odata.nextLink`, server-side sorting, and lookups
+  rendered from their formatted-value annotations rather than as GUIDs.
+- ✨ **[DateTimeField](#datetimefield)** — respects the attribute's `DateTimeBehavior`, so `DateOnly`
+  and `TimeZoneIndependent` values never pass through UTC and cannot drift a day.
+- ✨ **[OptionSetField](#optionsetfield)** — optionset and multi-select picklist field that reads
+  global option sets as well as local ones, and round-trips multi-selects as the comma-separated
+  string Dynamics stores.
+- ✨ **[RecordHoverCard](#recordhovercard)** — lazy record loading gated on hover intent, so dragging
+  a pointer across a grid column does not fire a request per row.
+- ✨ **[Web API client](#web-api-client)** — one client with a process-wide metadata cache shared by
+  the new components. Promises are cached rather than values, so components mounting in the same tick
+  share a round trip; failures are not cached. Lookup and QueryBuilder are not yet migrated onto it.
+- 🔧 Test harness split into one tab per component.
+
+### 2026.8.40
+
+QueryBuilder layout and query options.
+
+- 🐛 **Toolbar was crushed when the query grew.** In a height-constrained parent the header and
+  toolbar were the only flex items able to shrink, so they were compressed and clipped instead of
+  the filter list scrolling. Header and toolbar are now pinned, and the filter groups plus previews
+  scroll together as one region. See [Layout and Scrolling](#layout-and-scrolling).
+- ✨ **Root `<fetch>` query options.** Generated FetchXML now carries `mapping`, `no-lock` and
+  `distinct`, matching what the Dynamics advanced-find editor emits. `distinct` defaults to `true`.
+  New `distinct`, `noLock` and `top` props override per instance, and options on an imported query
+  are preserved through a serialize round-trip rather than silently dropped.
+- ✨ Preview cards grow to fit their content instead of scrolling internally.
+- 💄 Component header now reads "Query Builder: {entity}" rather than "Edit filters: {entity}".
+- 🔧 Test harness split into **Lookup** and **Query Builder** tabs.
 
 ### 2026.8.36
 

@@ -16,6 +16,8 @@ export const useQueryBuilderStyles = makeStyles({
     flexDirection: 'column',
     gap: tokens.spacingVerticalXS,
     width: '100%',
+    flex: 1,
+    minHeight: 0,
     backgroundColor: tokens.colorNeutralBackground1,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
     // Softer, card-like surface matching other Dynamics containers
@@ -26,6 +28,8 @@ export const useQueryBuilderStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
+    // Never squeezed by the scrolling body below
+    flexShrink: 0,
     paddingTop: tokens.spacingVerticalS,
     paddingBottom: tokens.spacingVerticalS,
     paddingLeft: tokens.spacingHorizontalM,
@@ -41,7 +45,12 @@ export const useQueryBuilderStyles = makeStyles({
     justifyContent: 'flex-start',
     alignItems: 'center',
     gap: tokens.spacingHorizontalM,
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
+    overflowX: 'auto',
+    overflowY: 'hidden',
+    // Stays put regardless of how tall the query body gets
+    flexShrink: 0,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
     paddingTop: tokens.spacingVerticalXS,
     paddingBottom: tokens.spacingVerticalXS,
     paddingLeft: tokens.spacingHorizontalM,
@@ -51,20 +60,36 @@ export const useQueryBuilderStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
+    flexShrink: 0,
   },
   caption: {
     color: tokens.colorNeutralForeground2,
     fontSize: tokens.fontSizeBase200,
+  },
+  /**
+   * The single scrolling region: query groups plus the previews below them.
+   * `minHeight: 0` is what lets a flex child actually shrink below its content
+   * height - without it the overflow is pushed onto the header/toolbar instead.
+   */
+  scrollArea: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: '1 1 auto',
+    minHeight: 0,
+    overflowY: 'auto',
+    overflowX: 'hidden',
   },
   groupsContainer: {
     display: 'flex',
     flexDirection: 'column',
     paddingLeft: tokens.spacingHorizontalM,
     paddingRight: tokens.spacingHorizontalM,
+    paddingTop: tokens.spacingVerticalS,
     paddingBottom: tokens.spacingVerticalM,
     minWidth: 0,
-    overflow: 'hidden',
+    // Content sizes itself and overflows into scrollArea rather than compressing
+    flexShrink: 0,
   },
   rootLogicRow: {
     display: 'flex',
@@ -318,6 +343,7 @@ export const useQueryBuilderStyles = makeStyles({
     transform: 'translateY(-50%)',
   },
   previewCard: {
+    flexShrink: 0,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
     borderRadius: tokens.borderRadiusLarge,
     backgroundColor: tokens.colorNeutralBackground1,

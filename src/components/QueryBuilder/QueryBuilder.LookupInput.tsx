@@ -8,6 +8,7 @@ import * as React from 'react';
 import { Input, Text } from '@fluentui/react-components';
 import { Lookup, type LookupOption } from '../Lookup';
 import type { QueryBuilderLookupOption, QueryBuilderLookupTarget } from './QueryBuilder.types';
+import { DEFAULT_FIELD_APPEARANCE, type FieldAppearance } from '../../types/appearance';
 
 export interface LookupValueInputProps {
     fieldId: string;
@@ -18,6 +19,8 @@ export interface LookupValueInputProps {
     targets?: QueryBuilderLookupTarget[];
     onLookupSearch?: (fieldId: string, searchText: string) => Promise<QueryBuilderLookupOption[]> | QueryBuilderLookupOption[];
     onValueChange: (value: string, displayName: string) => void;
+    /** Inherited from the parent QueryBuilder so nested fields match the rest of the form */
+    appearance?: FieldAppearance;
 }
 
 export const LookupValueInput: React.FC<LookupValueInputProps> = ({
@@ -28,6 +31,7 @@ export const LookupValueInput: React.FC<LookupValueInputProps> = ({
     targets,
     onLookupSearch,
     onValueChange,
+    appearance = DEFAULT_FIELD_APPEARANCE,
 }) => {
     const [lookupOptions, setLookupOptions] = React.useState<LookupOption[]>([]);
     const [lookupLoading, setLookupLoading] = React.useState(false);
@@ -169,7 +173,7 @@ export const LookupValueInput: React.FC<LookupValueInputProps> = ({
         return (
             <Input
                 size="small"
-                appearance="filled-darker"
+                appearance={appearance}
                 aria-label="Lookup GUID"
                 type="text"
                 value={value || ''}
@@ -206,7 +210,7 @@ export const LookupValueInput: React.FC<LookupValueInputProps> = ({
     return (
         <Lookup
             size="small"
-            appearance="filled-darker"
+            appearance={appearance}
             placeholder="Search..."
             aria-label="Lookup value"
             options={lookupOptions}

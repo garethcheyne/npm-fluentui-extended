@@ -8,6 +8,7 @@ import type {
     QueryBuilderCondition,
     QueryBuilderField,
     QueryBuilderODataUnsupported,
+    QueryBuilderQueryOptions,
     QueryBuilderState,
     QueryBuilderApplyResult,
 } from './QueryBuilder.types';
@@ -15,6 +16,33 @@ import { ALL_OPERATORS, getOperatorByValue, isOperatorConvertibleToOData } from 
 
 /** Fallback field if none provided */
 const FALLBACK_FIELD: QueryBuilderField = { id: 'name', label: 'Name', dataType: 'string' };
+
+/** Root <fetch> defaults, matching what the Dynamics 365 advanced-find editor emits */
+export const DEFAULT_QUERY_OPTIONS: Required<Omit<QueryBuilderQueryOptions, 'top'>> = {
+    distinct: true,
+    noLock: false,
+};
+
+/**
+ * Build the attribute list for the root <fetch> element.
+ * Attribute order follows the Dynamics editor's own output so generated XML diffs
+ * cleanly against queries copied out of advanced find.
+ */
+export const buildFetchAttributes = (options?: QueryBuilderQueryOptions): string => {
+    const attributes = ['version="1.0"', 'mapping="logical"'];
+
+    // top is dropped rather than clamped when nonsensical - a bad cap would silently
+    // truncate results, whereas omitting it returns everything the filter matches
+    const top = options?.top;
+    if (typeof top === 'number' && Number.isFinite(top) && top > 0) {
+        attributes.push(`top="${Math.floor(top)}"`);
+    }
+
+    attributes.push(`no-lock="${options?.noLock ?? DEFAULT_QUERY_OPTIONS.noLock}"`);
+    attributes.push(`distinct="${options?.distinct ?? DEFAULT_QUERY_OPTIONS.distinct}"`);
+
+    return attributes.join(' ');
+};
 
 /**
  * Escape XML special characters
@@ -501,7 +529,7 @@ export const serializeQueryBuilderState = (
 
     // Combine filters and link-entities in the entity element
     const entityContent = fetchXmlFilter + linkEntities.join('');
-    const fetchXml = `<fetch version="1.0"><entity name="${escapeXml(entityName)}">${entityContent || '<filter type="and"></filter>'}</entity></fetch>`;
+    const fetchXml = `<fetch ${buildFetchAttributes(state.queryOptions)}><entity name="${escapeXml(entityName)}">${entityContent || '<filter type="and"></filter>'}</entity></fetch>`;
 
     const odataFilter = state.groups
         .map((group) => {
