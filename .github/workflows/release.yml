@@ -6,6 +6,10 @@ on:
       - 'v*'
   release:
     types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   publish:
@@ -27,7 +31,27 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Check npm version availability
+        id: npm_check
+        shell: bash
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version > /dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "Version ${PACKAGE_NAME}@${PACKAGE_VERSION} already exists on npm."
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "Version ${PACKAGE_NAME}@${PACKAGE_VERSION} is not published yet."
+          fi
+
       - name: Publish to npm
+        if: steps.npm_check.outputs.published == 'false'
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish skipped
+        if: steps.npm_check.outputs.published == 'true'
+        run: echo "Skipping publish because this version is already on npm."
