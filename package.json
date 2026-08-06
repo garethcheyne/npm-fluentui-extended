@@ -1,6 +1,6 @@
 {
   "name": "fluentui-extended",
-  "version": "2026.8.50",
+  "version": "2026.8.51",
   "description": "Extended Fluent UI v9 components styled after Dynamics 365 - Lookup with async search, expandable details, and more",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
