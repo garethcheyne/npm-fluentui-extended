@@ -4,24 +4,22 @@ import { DatePicker } from '@fluentui/react-datepicker-compat';
 import { AddRegular, ArrowDownloadRegular, ArrowResetRegular, ArrowUploadRegular, CheckmarkCircleRegular, CopyRegular, DeleteRegular, DismissRegular, EditRegular, EyeOffRegular, EyeRegular, MoreHorizontalRegular, WarningRegular } from '@fluentui/react-icons';
 import { mergeClasses, useQueryBuilderStyles } from './QueryBuilder.styles';
 import { DEFAULT_FIELD_APPEARANCE, toListboxAppearance, toTextareaAppearance } from '../../types/appearance';
+import { CommandBar } from '../CommandBar';
+import type { CommandBarItem } from '../CommandBar';
 import { Lookup } from '../Lookup';
 import type { LookupOption } from '../Lookup';
 import type {
-    QueryBuilderApplyResult,
     QueryBuilderCondition,
     QueryBuilderField,
     QueryBuilderGroup,
-    QueryBuilderLookupOption,
-    QueryBuilderLookupTarget,
-    QueryBuilderOption,
     QueryBuilderProps,
     QueryBuilderRelatedEntity,
     QueryBuilderState,
 } from './QueryBuilder.types';
 
 // Import from new modular files
-import { getOperatorsForType, getOperatorsForTypeSimple, operatorRequiresValue, operatorIsMultiValue, operatorRequiresValue2, getOperatorValueType } from './QueryBuilder.operators';
-import { serializeQueryBuilderState, prettyPrintXml, escapeXml } from './QueryBuilder.serializer';
+import { getOperatorsForType, operatorRequiresValue, operatorRequiresValue2, getOperatorValueType } from './QueryBuilder.operators';
+import { serializeQueryBuilderState, prettyPrintXml } from './QueryBuilder.serializer';
 import { parseFetchXmlToState, ParseFetchXmlResult } from './QueryBuilder.parser';
 import {
     DEFAULT_BOOLEAN_OPTIONS,
@@ -36,12 +34,10 @@ import {
     createRelatedCondition,
     createGroup,
     cloneState,
-    getOperatorOptionsForType,
     QueryBuilderValidationError,
     QueryBuilderValidationResult,
 } from './QueryBuilder.utils';
 import { LookupValueInput } from './QueryBuilder.LookupInput';
-import { loadEntityFields, useEntityFields, extractAttributesArray, isValidAttribute, parseAttributeToField } from './QueryBuilder.hooks';
 import { enrichLookupFields, enrichOptionsetFields, fetchOptionSetMetadata } from './QueryBuilder.enrichment';
 
 // Re-export for backward compatibility
@@ -140,6 +136,8 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
     // Dynamics renders fields filled rather than outlined. Comboboxes and dropdowns take a
     // narrower union than text inputs, so the two are resolved separately.
     const fieldAppearance = props.appearance ?? DEFAULT_FIELD_APPEARANCE;
+
+
     const listboxAppearance = toListboxAppearance(fieldAppearance);
 
     /**
@@ -1072,6 +1070,93 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
         [],
     );
 
+    /**
+     * Toolbar commands. Built as data rather than JSX so CommandBar can measure them
+     * and move whatever does not fit into its overflow menu - the previous hand-rolled
+     * row simply clipped the trailing commands on a narrow container.
+     */
+    const toolbarCommands = React.useMemo((): CommandBarItem[] => {
+        const items: CommandBarItem[] = [];
+
+        if (props.showResetToDefaultButton !== false) {
+            items.push({ key: 'reset', text: 'Reset to default', icon: <ArrowResetRegular />, onClick: onReset });
+        }
+        if (props.showDownloadFetchXmlButton !== false) {
+            items.push({
+                key: 'download',
+                text: 'Download FetchXML',
+                icon: <ArrowDownloadRegular />,
+                onClick: onDownloadFetchXml,
+            });
+        }
+        if (props.showUploadFetchXmlButton !== false) {
+            items.push({
+                key: 'import',
+                text: 'Import FetchXML',
+                icon: <ArrowUploadRegular />,
+                title: 'Paste in FetchXML from elsewhere to rebuild the query',
+                onClick: () => openXmlDialog('import', ''),
+            });
+        }
+        if (props.showEditFetchXmlButton !== false) {
+            items.push({
+                key: 'edit',
+                text: 'Edit FetchXML',
+                icon: <EditRegular />,
+                title: 'View and edit the FetchXML for the current query',
+                onClick: () => openXmlDialog('edit', serialized.fetchXml ? prettyPrintXml(serialized.fetchXml) : ''),
+            });
+        }
+        if (props.showPreviewToggleButtons !== false) {
+            // `checked` renders these as toggles, which is what they always were
+            items.push({
+                key: 'odata',
+                text: odataPreviewVisible ? 'Hide OData' : 'Show OData',
+                icon: odataPreviewVisible ? <EyeOffRegular /> : <EyeRegular />,
+                checked: odataPreviewVisible,
+                dividerBefore: true,
+                onClick: () => setODataPreviewVisible((visible) => !visible),
+            });
+            items.push({
+                key: 'fetchxml',
+                text: fetchXmlPreviewVisible ? 'Hide FetchXML' : 'Show FetchXML',
+                icon: fetchXmlPreviewVisible ? <EyeOffRegular /> : <EyeRegular />,
+                checked: fetchXmlPreviewVisible,
+                onClick: () => setFetchXmlPreviewVisible((visible) => !visible),
+            });
+        }
+        if (props.showValidateButton !== false) {
+            items.push({
+                key: 'validate',
+                text: 'Validate',
+                icon: <CheckmarkCircleRegular />,
+                dividerBefore: true,
+                onClick: onValidate,
+            });
+        }
+        if (props.showDeleteAllFiltersButton !== false) {
+            items.push({ key: 'deleteAll', text: 'Delete all filters', icon: <DeleteRegular />, onClick: onDeleteAll });
+        }
+
+        return items;
+    }, [
+        props.showResetToDefaultButton,
+        props.showDownloadFetchXmlButton,
+        props.showUploadFetchXmlButton,
+        props.showEditFetchXmlButton,
+        props.showPreviewToggleButtons,
+        props.showValidateButton,
+        props.showDeleteAllFiltersButton,
+        onReset,
+        onDownloadFetchXml,
+        openXmlDialog,
+        onValidate,
+        onDeleteAll,
+        serialized.fetchXml,
+        odataPreviewVisible,
+        fetchXmlPreviewVisible,
+    ]);
+
     return (
         <div className={styles.container}>
             <div className={styles.headerRow}>
@@ -1080,214 +1165,132 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                 </Text>
             </div>
 
-            <div className={styles.toolbar}>
-                <div className={styles.toolbarGroup}>
-                    {props.showResetToDefaultButton !== false && (
-                        <Button
-                            size="small"
-                            appearance="transparent"
-                            icon={<ArrowResetRegular />}
-                            onClick={onReset}
-                        >
-                            Reset to default
-                        </Button>
-                    )}
-                    {props.showDownloadFetchXmlButton !== false && (
-                        <Button
-                            size="small"
-                            appearance="transparent"
-                            icon={<ArrowDownloadRegular />}
-                            onClick={onDownloadFetchXml}
-                        >
-                            Download FetchXML
-                        </Button>
-                    )}
-                    {props.showUploadFetchXmlButton !== false && (
-                        <Button
-                            size="small"
-                            appearance="transparent"
-                            icon={<ArrowUploadRegular />}
-                            onClick={() => openXmlDialog('import', '')}
-                            title="Paste in FetchXML from elsewhere to rebuild the query"
-                        >
-                            Import FetchXML
-                        </Button>
-                    )}
-                    {props.showEditFetchXmlButton !== false && (
-                        <Button
-                            size="small"
-                            appearance="transparent"
-                            icon={<EditRegular />}
-                            onClick={() => openXmlDialog('edit', serialized.fetchXml ? prettyPrintXml(serialized.fetchXml) : '')}
-                            title="View and edit the FetchXML for the current query"
-                        >
-                            Edit FetchXML
-                        </Button>
-                    )}
-                    {props.showPreviewToggleButtons !== false && (
-                        <>
-                            <Button
-                                size="small"
-                                appearance={odataPreviewVisible ? 'secondary' : 'transparent'}
-                                icon={odataPreviewVisible ? <EyeOffRegular /> : <EyeRegular />}
-                                onClick={() => setODataPreviewVisible((visible) => !visible)}
-                            >
-                                {odataPreviewVisible ? 'Hide OData' : 'Show OData'}
-                            </Button>
-                            <Button
-                                size="small"
-                                appearance={fetchXmlPreviewVisible ? 'secondary' : 'transparent'}
-                                icon={fetchXmlPreviewVisible ? <EyeOffRegular /> : <EyeRegular />}
-                                onClick={() => setFetchXmlPreviewVisible((visible) => !visible)}
-                            >
-                                {fetchXmlPreviewVisible ? 'Hide FetchXML' : 'Show FetchXML'}
-                            </Button>
-                        </>
-                    )}
+            {/* Commands. CommandBar collapses anything that will not fit into a
+                "More commands" menu, rather than clipping it as the previous
+                hand-rolled toolbar did. */}
+            <CommandBar className={styles.toolbar} items={toolbarCommands} size="small" />
 
-                    <Dialog open={uploadDialogOpen} onOpenChange={(_, data) => setUploadDialogOpen(data.open)}>
-                        <DialogSurface className={styles.dialogSurfaceNarrow}>
-                            <DialogBody>
-                                <DialogTitle>
-                                    {xmlDialogMode === 'edit' ? 'Edit FetchXML' : 'Import FetchXML'}
-                                </DialogTitle>
-                                <DialogContent className={styles.dialogUploadContent}>
-                                    <Text>
-                                        {xmlDialogMode === 'edit'
-                                            ? 'This is the FetchXML for the current query. Edit it, or paste a different query over it — applying rebuilds the builder from what is below.'
-                                            : 'Paste your FetchXML below to rebuild the query:'}
-                                    </Text>
-                                    <Textarea
-                                        placeholder="<fetch><entity name='account'><filter>...</filter></entity></fetch>"
-                                        value={uploadXmlText}
-                                        onChange={(_, data) => setUploadXmlText(data.value)}
-                                        // Textarea has no underline variant, so that one falls back to outline
-                                        appearance={toTextareaAppearance(fieldAppearance)}
-                                        className={styles.monacoTextarea}
-                                        resize="vertical"
-                                    />
-                                    {uploadError && (
-                                        <Text className={styles.uploadErrorText}>{uploadError}</Text>
-                                    )}
-                                </DialogContent>
-                                <DialogActions>
-                                    {xmlDialogMode === 'edit' && (
-                                        <Button
-                                            appearance="subtle"
-                                            icon={<CopyRegular />}
-                                            onClick={() => navigator.clipboard.writeText(uploadXmlText)}
-                                            title="Copy to clipboard"
-                                        >
-                                            Copy
-                                        </Button>
-                                    )}
-                                    <DialogTrigger disableButtonEnhancement>
-                                        <Button appearance="secondary">Cancel</Button>
-                                    </DialogTrigger>
-                                    <Button appearance="primary" onClick={onApplyUploadedXml} disabled={!uploadXmlText.trim()}>
-                                        Apply
+                <Dialog open={uploadDialogOpen} onOpenChange={(_, data) => setUploadDialogOpen(data.open)}>
+                    <DialogSurface className={styles.dialogSurfaceNarrow}>
+                        <DialogBody>
+                            <DialogTitle>
+                                {xmlDialogMode === 'edit' ? 'Edit FetchXML' : 'Import FetchXML'}
+                            </DialogTitle>
+                            <DialogContent className={styles.dialogUploadContent}>
+                                <Text>
+                                    {xmlDialogMode === 'edit'
+                                        ? 'This is the FetchXML for the current query. Edit it, or paste a different query over it — applying rebuilds the builder from what is below.'
+                                        : 'Paste your FetchXML below to rebuild the query:'}
+                                </Text>
+                                <Textarea
+                                    placeholder="<fetch><entity name='account'><filter>...</filter></entity></fetch>"
+                                    value={uploadXmlText}
+                                    onChange={(_, data) => setUploadXmlText(data.value)}
+                                    // Textarea has no underline variant, so that one falls back to outline
+                                    appearance={toTextareaAppearance(fieldAppearance)}
+                                    className={styles.monacoTextarea}
+                                    resize="vertical"
+                                />
+                                {uploadError && (
+                                    <Text className={styles.uploadErrorText}>{uploadError}</Text>
+                                )}
+                            </DialogContent>
+                            <DialogActions>
+                                {xmlDialogMode === 'edit' && (
+                                    <Button
+                                        appearance="subtle"
+                                        icon={<CopyRegular />}
+                                        onClick={() => navigator.clipboard.writeText(uploadXmlText)}
+                                        title="Copy to clipboard"
+                                    >
+                                        Copy
                                     </Button>
-                                </DialogActions>
-                            </DialogBody>
-                        </DialogSurface>
-                    </Dialog>
-                    {props.showValidateButton !== false && (
-                        <Button
-                            size="small"
-                            appearance="transparent"
-                            icon={<CheckmarkCircleRegular />}
-                            onClick={onValidate}
-                        >
-                            Validate
-                        </Button>
-                    )}
+                                )}
+                                <DialogTrigger disableButtonEnhancement>
+                                    <Button appearance="secondary">Cancel</Button>
+                                </DialogTrigger>
+                                <Button appearance="primary" onClick={onApplyUploadedXml} disabled={!uploadXmlText.trim()}>
+                                    Apply
+                                </Button>
+                            </DialogActions>
+                        </DialogBody>
+                    </DialogSurface>
+                </Dialog>
 
-                    <Dialog open={validationDialogOpen} onOpenChange={(_, data) => setValidationDialogOpen(data.open)}>
-                        <DialogSurface className={styles.dialogSurfaceCompact}>
-                            <DialogBody>
-                                <DialogTitle>Query Validation</DialogTitle>
-                                <DialogContent className={styles.dialogValidationContent}>
-                                    {/* Local Validation Section */}
-                                    <div>
-                                        <Text weight="semibold" className={styles.validationSectionTitle}>
-                                            {validationResult?.isValid ? (
-                                                <span className={styles.validationSuccess}>
-                                                    <CheckmarkCircleRegular className={styles.validationIcon} />
-                                                    Query Structure: Valid
-                                                </span>
-                                            ) : (
-                                                <span className={styles.validationError}>
-                                                    <WarningRegular className={styles.validationIcon} />
-                                                    Query Structure: Errors Found
-                                                </span>
-                                            )}
-                                        </Text>
-                                        {!validationResult?.isValid && (
-                                            <ul className={styles.validationErrorList}>
-                                                {validationResult?.errors.map((error, idx) => (
-                                                    <li key={idx} className={styles.validationErrorItem}>
-                                                        <strong>{error.fieldLabel}:</strong> {error.message}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        )}
-                                    </div>
-
-                                    {/* API Validation Section */}
-                                    <div className={styles.apiValidationSection}>
-                                        <Text weight="semibold" className={styles.validationSectionTitle}>
-                                            Dynamics 365 API Test
-                                        </Text>
-                                        {!validationResult?.apiValidation?.available ? (
-                                            <Text className={styles.apiUnavailable}>
-                                                API validation unavailable — not running in Dynamics 365 environment.
-                                            </Text>
-                                        ) : !validationResult?.isValid ? (
-                                            <Text className={styles.apiUnavailable}>
-                                                Fix query structure errors before testing against the API.
-                                            </Text>
-                                        ) : apiValidating ? (
-                                            <div className={styles.validationApiRow}>
-                                                <Spinner size="tiny" />
-                                                <Text>Testing query against Dynamics 365...</Text>
-                                            </div>
-                                        ) : validationResult?.apiValidation?.tested ? (
-                                            validationResult.apiValidation.success ? (
-                                                <Text className={styles.validationSuccess}>
-                                                    <CheckmarkCircleRegular className={styles.validationIcon} />
-                                                    Query executed successfully. {validationResult.apiValidation.recordCount ?? 0} record(s) would match.
-                                                </Text>
-                                            ) : (
-                                                <Text className={styles.validationError}>
-                                                    <WarningRegular className={styles.validationIcon} />
-                                                    API Error: {validationResult.apiValidation.errorMessage}
-                                                </Text>
-                                            )
+                <Dialog open={validationDialogOpen} onOpenChange={(_, data) => setValidationDialogOpen(data.open)}>
+                    <DialogSurface className={styles.dialogSurfaceCompact}>
+                        <DialogBody>
+                            <DialogTitle>Query Validation</DialogTitle>
+                            <DialogContent className={styles.dialogValidationContent}>
+                                {/* Local Validation Section */}
+                                <div>
+                                    <Text weight="semibold" className={styles.validationSectionTitle}>
+                                        {validationResult?.isValid ? (
+                                            <span className={styles.validationSuccess}>
+                                                <CheckmarkCircleRegular className={styles.validationIcon} />
+                                                Query Structure: Valid
+                                            </span>
                                         ) : (
-                                            <Text className={styles.apiUnavailable}>Waiting for validation...</Text>
+                                            <span className={styles.validationError}>
+                                                <WarningRegular className={styles.validationIcon} />
+                                                Query Structure: Errors Found
+                                            </span>
                                         )}
-                                    </div>
-                                </DialogContent>
-                                <DialogActions>
-                                    <DialogTrigger disableButtonEnhancement>
-                                        <Button appearance="primary">OK</Button>
-                                    </DialogTrigger>
-                                </DialogActions>
-                            </DialogBody>
-                        </DialogSurface>
-                    </Dialog>
-                    {props.showDeleteAllFiltersButton !== false && (
-                        <Button
-                            size="small"
-                            appearance="transparent"
-                            icon={<DeleteRegular />}
-                            onClick={onDeleteAll}
-                        >
-                            Delete all filters
-                        </Button>
-                    )}
-                </div>
-            </div>
+                                    </Text>
+                                    {!validationResult?.isValid && (
+                                        <ul className={styles.validationErrorList}>
+                                            {validationResult?.errors.map((error, idx) => (
+                                                <li key={idx} className={styles.validationErrorItem}>
+                                                    <strong>{error.fieldLabel}:</strong> {error.message}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+
+                                {/* API Validation Section */}
+                                <div className={styles.apiValidationSection}>
+                                    <Text weight="semibold" className={styles.validationSectionTitle}>
+                                        Dynamics 365 API Test
+                                    </Text>
+                                    {!validationResult?.apiValidation?.available ? (
+                                        <Text className={styles.apiUnavailable}>
+                                            API validation unavailable — not running in Dynamics 365 environment.
+                                        </Text>
+                                    ) : !validationResult?.isValid ? (
+                                        <Text className={styles.apiUnavailable}>
+                                            Fix query structure errors before testing against the API.
+                                        </Text>
+                                    ) : apiValidating ? (
+                                        <div className={styles.validationApiRow}>
+                                            <Spinner size="tiny" />
+                                            <Text>Testing query against Dynamics 365...</Text>
+                                        </div>
+                                    ) : validationResult?.apiValidation?.tested ? (
+                                        validationResult.apiValidation.success ? (
+                                            <Text className={styles.validationSuccess}>
+                                                <CheckmarkCircleRegular className={styles.validationIcon} />
+                                                Query executed successfully. {validationResult.apiValidation.recordCount ?? 0} record(s) would match.
+                                            </Text>
+                                        ) : (
+                                            <Text className={styles.validationError}>
+                                                <WarningRegular className={styles.validationIcon} />
+                                                API Error: {validationResult.apiValidation.errorMessage}
+                                            </Text>
+                                        )
+                                    ) : (
+                                        <Text className={styles.apiUnavailable}>Waiting for validation...</Text>
+                                    )}
+                                </div>
+                            </DialogContent>
+                            <DialogActions>
+                                <DialogTrigger disableButtonEnhancement>
+                                    <Button appearance="primary">OK</Button>
+                                </DialogTrigger>
+                            </DialogActions>
+                        </DialogBody>
+                    </DialogSurface>
+                </Dialog>
 
             <div className={styles.scrollArea}>
             {loading ? (

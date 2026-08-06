@@ -39,6 +39,57 @@ export const useOptionSetFieldStyles = makeStyles({
     whiteSpace: 'nowrap',
   },
 
+  /** Container for badges in the dropdown trigger */
+  badgeContainer: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '4px',
+    alignItems: 'center',
+    lineHeight: 1,
+  },
+
+  /** Badge style for options with a colour when asBadge is enabled */
+  badge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    paddingLeft: '6px',
+    paddingRight: '6px',
+    paddingTop: '1px',
+    paddingBottom: '1px',
+    borderRadius: '4px',
+    fontSize: '12px',
+    fontWeight: tokens.fontWeightSemibold,
+    lineHeight: '16px',
+    color: tokens.colorNeutralForegroundOnBrand,
+    backgroundColor: tokens.colorBrandBackground,
+  },
+
+  /** Badge style for options without a colour */
+  badgeNoColor: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    paddingLeft: '6px',
+    paddingRight: '6px',
+    paddingTop: '1px',
+    paddingBottom: '1px',
+    borderRadius: '4px',
+    fontSize: '12px',
+    fontWeight: tokens.fontWeightSemibold,
+    lineHeight: '16px',
+    color: tokens.colorNeutralForeground1,
+    backgroundColor: tokens.colorNeutralBackground3,
+  },
+
+  /** Lighter badge text for dark backgrounds */
+  badgeLightText: {
+    color: '#ffffff',
+  },
+
+  /** Darker badge text for light backgrounds */
+  badgeDarkText: {
+    color: '#000000',
+  },
+
   loadingRow: {
     display: 'flex',
     alignItems: 'center',

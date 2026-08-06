@@ -1,0 +1,70 @@
+- generic [ref=f1e4]:
+  - banner [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - heading "FluentUI Extended — Test Harness" [level=1] [ref=f1e7]
+      - generic [ref=f1e8]: Set VITE_DYNAMICS_* env vars to enable live connection
+    - tablist [ref=f1e9]:
+      - tab "Lookup" [selected] [ref=f1e11] [cursor=pointer]
+      - tab "QueryBuilder" [ref=f1e16] [cursor=pointer]
+      - tab "CommandBar" [ref=f1e21] [cursor=pointer]
+      - tab "EntityGrid" [ref=f1e26] [cursor=pointer]
+      - tab "DateTimeField" [ref=f1e31] [cursor=pointer]
+      - tab "OptionSetField" [ref=f1e36] [cursor=pointer]
+      - tab "HoverCard" [ref=f1e41] [cursor=pointer]
+  - generic [ref=f1e47]:
+    - heading "Basic Lookup (No Header/Footer)" [level=2] [ref=f1e48]
+    - paragraph [ref=f1e49]: Simple lookup with expandable option details. Click the chevron on each option to reveal additional information.
+    - textbox "Search accounts..." [ref=f1e53]
+    - paragraph [ref=f1e58]:
+      - text: "Selected:"
+      - strong [ref=f1e59]: None
+  - generic [ref=f1e60]:
+    - heading "Multi-Select Lookup" [level=2] [ref=f1e61]
+    - paragraph [ref=f1e62]: Select multiple items displayed as pale blue badges with dismiss buttons. Maximum selection is limited to 3 items in this example.
+    - textbox "Search and select accounts..." [ref=f1e66]
+    - paragraph [ref=f1e71]:
+      - text: "Selected (0/3):"
+      - strong [ref=f1e72]: None
+  - generic [ref=f1e73]:
+    - heading "Lookup with Header & Footer" [level=2] [ref=f1e74]
+    - paragraph [ref=f1e75]: Includes tab header and action footer like Dynamics 365 lookup dialogs.
+    - textbox "Search accounts..." [ref=f1e79]
+    - paragraph [ref=f1e84]:
+      - text: "Selected:"
+      - strong [ref=f1e85]: None
+  - generic [ref=f1e86]:
+    - heading "Lookup with Details Only (No Secondary Text)" [level=2] [ref=f1e87]
+    - paragraph [ref=f1e88]: Toggle buttons filter by entity type like native Dynamics 365 - icon centers on single text row.
+    - textbox "Search accounts & contacts..." [ref=f1e92]
+    - paragraph [ref=f1e97]:
+      - text: "Selected:"
+      - strong [ref=f1e98]: None
+  - generic [ref=f1e99]:
+    - heading "Dynamic Search (Async API)" [level=2] [ref=f1e100]
+    - paragraph [ref=f1e101]:
+      - text: Using simulated API with 800ms delay.
+      - strong [ref=f1e102]: Connect to Dynamics
+      - text: for live data.
+    - generic [ref=f1e104]:
+      - textbox "Type to search accounts..." [ref=f1e106]
+      - progressbar [ref=f1e108]
+    - paragraph [ref=f1e111]:
+      - text: "Selected:"
+      - strong [ref=f1e112]: None
+    - paragraph [ref=f1e113]: "Try searching: \"contoso\", \"acme\", \"fab\", \"north\""
+  - generic [ref=f1e114]:
+    - heading "Multi-Entity Lookup with React Elements" [level=2] [ref=f1e115]
+    - paragraph [ref=f1e116]:
+      - text: "Demonstrates: selectable filter tabs in header, React elements in"
+      - code [ref=f1e117]: secondaryText
+      - text: ", and React elements (Badges) in expandable"
+      - code [ref=f1e118]: details
+      - text: .
+    - textbox "Search records..." [ref=f1e122]
+    - paragraph [ref=f1e127]:
+      - text: "Selected:"
+      - strong [ref=f1e128]: None
+    - paragraph [ref=f1e129]:
+      - text: "Active filter:"
+      - code [ref=f1e130]: accounts
+      - text: — Click tabs in header to switch entity types. Expand contacts to see Badges in details.

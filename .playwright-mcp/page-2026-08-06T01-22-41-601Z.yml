@@ -1,0 +1,54 @@
+- generic [ref=f4e4]:
+  - generic [ref=f4e5]:
+    - heading "Command Bar" [level=2] [ref=f4e6]
+    - paragraph [ref=f4e7]:
+      - text: Commands that no longer fit collapse into a "More commands" menu rather than being clipped.
+      - strong [ref=f4e8]: Narrow the browser window
+      - text: to watch them move.
+    - toolbar "Commands" [ref=f4e10]:
+      - generic [ref=f4e11]:
+        - button [ref=f4e13]
+        - button [ref=f4e18]
+        - button [ref=f4e23]
+        - button [ref=f4e29]
+        - button [ref=f4e34]
+        - button [ref=f4e39]
+        - button [ref=f4e44]
+        - button [ref=f4e52]
+        - button [ref=f4e57]
+      - button "Filter" [ref=f4e62]
+    - paragraph [ref=f4e66]:
+      - text: "Last command:"
+      - strong [ref=f4e67]: None
+    - generic [ref=f4e68]:
+      - strong [ref=f4e69]: "How overflow works:"
+      - list [ref=f4e70]:
+        - listitem [ref=f4e71]:
+          - text: CommandBar uses
+          - code [ref=f4e72]: ResizeObserver
+          - text: to measure container width
+        - listitem [ref=f4e73]: Items are measured and those that don't fit move to overflow
+        - listitem [ref=f4e74]: Submenus (like Export) work the same way in overflow
+        - listitem [ref=f4e75]: Far items overflow separately from main items
+  - generic [ref=f4e76]:
+    - heading "Pinned commands and overflow disabled" [level=3] [ref=f4e77]
+    - paragraph [ref=f4e78]:
+      - text: A pinned command never collapses. With
+      - code [ref=f4e79]: disableOverflow
+      - text: the bar scrolls horizontally instead.
+    - toolbar "Commands" [ref=f4e81]:
+      - generic [ref=f4e82]:
+        - button [ref=f4e84]
+        - button "Command A" [ref=f4e89]
+        - button "Command B" [ref=f4e91]
+        - button "Command C" [ref=f4e93]
+        - button "Command D" [ref=f4e95]
+    - generic [ref=f4e96]:
+      - strong [ref=f4e97]: "Pinned item behavior:"
+      - list [ref=f4e98]:
+        - listitem [ref=f4e99]:
+          - text: Set
+          - code [ref=f4e100]: "pinned: true"
+          - text: on critical actions like Save
+        - listitem [ref=f4e101]: Pinned items have higher priority — non-pinned overflow first
+        - listitem [ref=f4e102]: Use sparingly to avoid a crowded always-visible section

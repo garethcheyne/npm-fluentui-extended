@@ -12,6 +12,35 @@ import {
 import type { OptionSetFieldProps, OptionSetOption } from './OptionSetField.types';
 
 /**
+ * Calculate relative luminance from a hex colour and return the appropriate
+ * text class for contrast (light text on dark backgrounds, dark text on light).
+ */
+function getBadgeTextClass(
+  hex: string,
+  styles: { badgeLightText: string; badgeDarkText: string },
+): string {
+  // Parse hex colour (supports #RGB and #RRGGBB)
+  const cleanHex = hex.replace('#', '');
+  const r =
+    cleanHex.length === 3
+      ? parseInt(cleanHex[0] + cleanHex[0], 16)
+      : parseInt(cleanHex.slice(0, 2), 16);
+  const g =
+    cleanHex.length === 3
+      ? parseInt(cleanHex[1] + cleanHex[1], 16)
+      : parseInt(cleanHex.slice(2, 4), 16);
+  const b =
+    cleanHex.length === 3
+      ? parseInt(cleanHex[2] + cleanHex[2], 16)
+      : parseInt(cleanHex.slice(4, 6), 16);
+
+  // Relative luminance formula (WCAG 2.0)
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+  return luminance > 0.5 ? styles.badgeDarkText : styles.badgeLightText;
+}
+
+/**
  * A Dynamics 365 optionset / multi-select picklist field.
  *
  * Fluent's `Dropdown` has no notion of optionset metadata: it does not know that values
@@ -27,10 +56,12 @@ export const OptionSetField: React.FC<OptionSetFieldProps> = ({
   value,
   onChange,
   showColors = false,
+  asBadge = false,
   placeholder = '---',
   disabled,
   appearance = DEFAULT_FIELD_APPEARANCE,
   clearable = true,
+  open,
   label,
   validationMessage,
   required,
@@ -77,6 +108,12 @@ export const OptionSetField: React.FC<OptionSetFieldProps> = ({
   const selectedValues = React.useMemo(() => parseSelectedValues(value), [value]);
   const displayLabels = React.useMemo(() => selectedLabels(options, selectedValues), [options, selectedValues]);
 
+  // Get full selected option objects for badge rendering
+  const selectedOptions = React.useMemo(
+    () => options.filter((opt) => selectedValues.includes(opt.value)),
+    [options, selectedValues],
+  );
+
   const handleOptionSelect = React.useCallback(
     (_: unknown, data: { optionValue?: string; selectedOptions: string[] }) => {
       const parsed = data.selectedOptions
@@ -99,19 +136,43 @@ export const OptionSetField: React.FC<OptionSetFieldProps> = ({
     [multiselect, onChange, clearable, selectedValues],
   );
 
+  // Build the button content when asBadge is enabled
+  const badgeButtonContent =
+    asBadge && selectedOptions.length > 0 ? (
+      <span className={styles.badgeContainer}>
+        {selectedOptions.map((opt) =>
+          opt.color ? (
+            <span
+              key={opt.value}
+              className={mergeClasses(styles.badge, getBadgeTextClass(opt.color, styles))}
+              style={{ backgroundColor: opt.color }}
+            >
+              {opt.label}
+            </span>
+          ) : (
+            <span key={opt.value} className={styles.badgeNoColor}>
+              {opt.label}
+            </span>
+          ),
+        )}
+      </span>
+    ) : undefined;
+
   const control = (
     <>
       <Dropdown
         className={styles.dropdown}
         listbox={{ className: styles.listbox }}
+        open={open}
         // Dropdown never supported the deprecated shadow fills, so they are narrowed
         appearance={toListboxAppearance(appearance)}
         multiselect={multiselect}
         placeholder={loading ? 'Loading...' : placeholder}
         disabled={disabled || loading}
-        value={displayLabels.join(', ')}
+        value={badgeButtonContent ? '' : displayLabels.join(', ')}
         selectedOptions={selectedValues.map(String)}
         onOptionSelect={handleOptionSelect}
+        button={badgeButtonContent ? { children: badgeButtonContent } : undefined}
       >
         {options.map((option) => (
           <Option key={option.value} value={String(option.value)} text={option.label} disabled={option.disabled}>

@@ -308,7 +308,8 @@ export const parseFetchXmlToState = (xml: string, fields: QueryBuilderField[]): 
  */
 const parseLinkEntity = (
     linkEl: Element,
-    fields: QueryBuilderField[]
+    // Nested conditions resolve their own fields, so the outer list is not consulted
+    _fields: QueryBuilderField[]
 ): QueryBuilderCondition | null => {
     const targetEntityName = linkEl.getAttribute('name') || '';
     const toField = linkEl.getAttribute('to') || '';

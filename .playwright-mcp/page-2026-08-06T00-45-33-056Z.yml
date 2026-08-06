@@ -1,0 +1,66 @@
+- generic [ref=e4]:
+  - banner [ref=e5]:
+    - generic [ref=e6]:
+      - heading "FluentUI Extended — Test Harness" [level=1] [ref=e7]
+      - button [ref=e135]
+    - tablist [ref=e12]:
+      - tab "Lookup" [ref=e14] [cursor=pointer]
+      - tab "QueryBuilder" [ref=e19] [cursor=pointer]
+      - tab "CommandBar" [active] [selected] [ref=e24] [cursor=pointer]
+      - tab "EntityGrid" [ref=e29] [cursor=pointer]
+      - tab "DateTimeField" [ref=e34] [cursor=pointer]
+      - tab "OptionSetField" [ref=e39] [cursor=pointer]
+      - tab "HoverCard" [ref=e44] [cursor=pointer]
+  - generic [ref=e384]:
+    - heading "Command Bar" [level=2] [ref=e385]
+    - paragraph [ref=e386]:
+      - text: Commands that no longer fit collapse into a "More commands" menu rather than being clipped.
+      - strong [ref=e387]: Narrow the browser window
+      - text: to watch them move.
+    - toolbar "Commands" [ref=e389]:
+      - generic [ref=e390]:
+        - button [ref=e392]
+        - button [ref=e397]
+        - button [ref=e402]
+        - button [ref=e408]
+        - button [ref=e413]
+        - button [ref=e418]
+        - button [ref=e423]
+        - button [ref=e431]
+        - button [ref=e436]
+      - button "Filter" [ref=e441]
+    - paragraph [ref=e445]:
+      - text: "Last command:"
+      - strong [ref=e446]: None
+    - generic [ref=e447]:
+      - strong [ref=e448]: "How overflow works:"
+      - list [ref=e449]:
+        - listitem [ref=e450]:
+          - text: CommandBar uses
+          - code [ref=e451]: ResizeObserver
+          - text: to measure container width
+        - listitem [ref=e452]: Items are measured and those that don't fit move to overflow
+        - listitem [ref=e453]: Submenus (like Export) work the same way in overflow
+        - listitem [ref=e454]: Far items overflow separately from main items
+  - generic [ref=e455]:
+    - heading "Pinned commands and overflow disabled" [level=3] [ref=e456]
+    - paragraph [ref=e457]:
+      - text: A pinned command never collapses. With
+      - code [ref=e458]: disableOverflow
+      - text: the bar scrolls horizontally instead.
+    - toolbar "Commands" [ref=e460]:
+      - generic [ref=e461]:
+        - button [ref=e463]
+        - button "Command A" [ref=e468]
+        - button "Command B" [ref=e470]
+        - button "Command C" [ref=e472]
+        - button "Command D" [ref=e474]
+    - generic [ref=e475]:
+      - strong [ref=e476]: "Pinned item behavior:"
+      - list [ref=e477]:
+        - listitem [ref=e478]:
+          - text: Set
+          - code [ref=e479]: "pinned: true"
+          - text: on critical actions like Save
+        - listitem [ref=e480]: Pinned items have higher priority — non-pinned overflow first
+        - listitem [ref=e481]: Use sparingly to avoid a crowded always-visible section

@@ -1,15 +1,22 @@
 import * as React from 'react';
 import { Popover, PopoverSurface, PopoverTrigger, Spinner, Text } from '@fluentui/react-components';
-import { getEntityDefinition } from '../../api/metadata';
+import { getEntityAttributes, getEntityDefinition } from '../../api/metadata';
+import { labelOf } from '../../api/metadata.types';
 import { webApiGet } from '../../api/webApi';
 import { useRecordHoverCardStyles } from './RecordHoverCard.styles';
 import type { RecordHoverCardProps, RecordHoverCardRecord } from './RecordHoverCard.types';
 
-/** Turn a logical name into something readable when no mapper is supplied. */
+/**
+ * Last-resort label when metadata has no display name for a column.
+ * Produces "Account Number" rather than "Accountnumber" where it can.
+ */
 const humanizeColumn = (column: string): string =>
   column
+    .replace(/^_/, '')
+    .replace(/_value$/, '')
     .replace(/^[a-z0-9]+_/i, '')
     .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/^./, (char) => char.toUpperCase());
 
 /** Render a raw Web API value without leaking objects or nulls into the UI. */
@@ -38,9 +45,11 @@ export const RecordHoverCard: React.FC<RecordHoverCardProps> = ({
   actions,
   onLoadError,
   disabled,
+  open: openProp,
 }) => {
   const styles = useRecordHoverCardStyles();
-  const [open, setOpen] = React.useState(false);
+  const [internalOpen, setInternalOpen] = React.useState(false);
+  const open = openProp ?? internalOpen;
   const [record, setRecord] = React.useState<RecordHoverCardRecord | null>(providedRecord ?? null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -89,11 +98,25 @@ export const RecordHoverCard: React.FC<RecordHoverCardProps> = ({
         return;
       }
 
+      // Column labels come from attribute metadata so the card reads the way the form
+      // does - "Account Number", not "Accountnumber". The metadata client caches this,
+      // so it costs nothing after the first card for a given entity.
+      const attributes = await getEntityAttributes(entityName).catch(() => []);
+      const labels = new Map<string, string>(
+        attributes.map((a) => [a.LogicalName, labelOf(a.DisplayName, '')] as [string, string]),
+      );
+      const labelFor = (column: string) => {
+        const normalized = column.replace(/^_/, '').replace(/_value$/, '');
+        return labels.get(column) || labels.get(normalized) || humanizeColumn(column);
+      };
+
+      if (disposedRef.current) return;
+
       setRecord({
         title: String(raw[definition.PrimaryNameAttribute] ?? 'Untitled'),
         details: (columns || []).map((column) => ({
           // Prefer the formatted value Dynamics annotates onto lookups and optionsets
-          label: humanizeColumn(column),
+          label: labelFor(column),
           value: renderValue(
             raw[`${column}@OData.Community.Display.V1.FormattedValue`] ?? raw[column],
           ),
@@ -116,19 +139,27 @@ export const RecordHoverCard: React.FC<RecordHoverCardProps> = ({
     (_: unknown, data: { open: boolean }) => {
       if (openTimer.current) clearTimeout(openTimer.current);
 
+      // Controlled: the caller owns the state, so hover must not fight it
+      if (openProp !== undefined) return;
+
       if (!data.open) {
-        setOpen(false);
+        setInternalOpen(false);
         return;
       }
 
       // Wait for the pointer to settle before committing to a request
       openTimer.current = setTimeout(() => {
-        setOpen(true);
+        setInternalOpen(true);
         void loadRecord();
       }, hoverDelayMs);
     },
-    [hoverDelayMs, loadRecord],
+    [hoverDelayMs, loadRecord, openProp],
   );
+
+  // A card opened by the caller never receives the hover that would trigger a load
+  React.useEffect(() => {
+    if (openProp) void loadRecord();
+  }, [openProp, loadRecord]);
 
   if (disabled) return children;
 

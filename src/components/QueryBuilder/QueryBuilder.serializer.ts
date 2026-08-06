@@ -12,7 +12,7 @@ import type {
     QueryBuilderState,
     QueryBuilderApplyResult,
 } from './QueryBuilder.types';
-import { ALL_OPERATORS, getOperatorByValue, isOperatorConvertibleToOData } from './QueryBuilder.operators';
+import { getOperatorByValue, isOperatorConvertibleToOData } from './QueryBuilder.operators';
 
 /** Fallback field if none provided */
 const FALLBACK_FIELD: QueryBuilderField = { id: 'name', label: 'Name', dataType: 'string' };
@@ -283,7 +283,7 @@ export const conditionToOData = (condition: QueryBuilderCondition, field: QueryB
     if (operatorDef?.fetchXmlOnly) {
         // For some operators, we can approximate
         switch (condition.operator) {
-            case 'like':
+            case 'like': {
                 // like with wildcards - can use contains/startswith/endswith
                 const likeVal = String(condition.value ?? '');
                 if (likeVal.startsWith('%') && likeVal.endsWith('%')) {
@@ -294,24 +294,28 @@ export const conditionToOData = (condition: QueryBuilderCondition, field: QueryB
                     return `endswith(${odataFieldName}, '${likeVal.slice(1).replace(/'/g, "''")}')`;
                 }
                 return `contains(${odataFieldName}, ${quoteAsString(condition.value)})`;
-            case 'not-like':
+            }
+            case 'not-like': {
                 const notLikeVal = String(condition.value ?? '');
                 if (notLikeVal.startsWith('%') && notLikeVal.endsWith('%')) {
                     return `not contains(${odataFieldName}, '${notLikeVal.slice(1, -1).replace(/'/g, "''")}')`;
                 }
                 return `not contains(${odataFieldName}, ${quoteAsString(condition.value)})`;
-            case 'not-in':
+            }
+            case 'not-in': {
                 // OData doesn't have "not in", use multiple "ne" conditions with "and"
                 const values = Array.isArray(condition.value) ? condition.value : [condition.value];
                 const conditions = values.filter(v => v !== undefined && v !== null).map(v => `${odataFieldName} ne ${quote(v)}`);
                 return conditions.length > 1 ? `(${conditions.join(' and ')})` : conditions[0] || '';
+            }
             case 'between':
-            case 'not-between':
+            case 'not-between': {
                 // between can be expressed as ge/le
                 const op1 = condition.operator === 'between' ? 'ge' : 'lt';
                 const op2 = condition.operator === 'between' ? 'le' : 'gt';
                 const logic = condition.operator === 'between' ? 'and' : 'or';
                 return `(${odataFieldName} ${op1} ${quote(condition.value)} ${logic} ${odataFieldName} ${op2} ${quote(condition.value2)})`;
+            }
             default:
                 // No OData equivalent - omit rather than emit an invalid filter.
                 // serializeQueryBuilderState reports these via odataUnsupported.

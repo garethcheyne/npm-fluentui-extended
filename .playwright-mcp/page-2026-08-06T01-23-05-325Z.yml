@@ -1,0 +1,38 @@
+- generic [ref=f8e6]:
+  - heading "Record Hover Card" [level=2] [ref=f8e7]
+  - paragraph [ref=f8e8]: Hover a record reference to reveal its details. The fetch waits for the pointer to settle, so dragging across a column does not fire a request per row.
+  - generic [ref=f8e9]:
+    - button "007 PROJECTS PTY LTD" [ref=f8e10] [cursor=pointer]
+    - button "Jane Smith" [ref=f8e11] [cursor=pointer]
+  - generic [ref=f8e12]:
+    - strong [ref=f8e13]: "Static mode usage:"
+    - list [ref=f8e14]:
+      - listitem [ref=f8e15]:
+        - text: Pass
+        - code [ref=f8e16]: record
+        - text: prop with pre-loaded data
+      - listitem [ref=f8e17]: No network requests — ideal for offline demos or cached data
+      - listitem [ref=f8e18]:
+        - text: Use
+        - code [ref=f8e19]: actions
+        - text: slot for custom buttons/links
+  - heading "Live records" [level=3] [ref=f8e20]
+  - paragraph [ref=f8e21]: Connect to Dynamics 365 to hover real records.
+  - generic [ref=f8e22]: Not connected.
+  - generic [ref=f8e24]:
+    - strong [ref=f8e25]: "Live mode behavior:"
+    - list [ref=f8e26]:
+      - listitem [ref=f8e27]:
+        - strong [ref=f8e28]: "Debounced:"
+        - text: Waits ~300ms for pointer to settle before fetching
+      - listitem [ref=f8e29]:
+        - strong [ref=f8e30]: "Efficient:"
+        - text: Dragging across rows doesn't fire requests
+      - listitem [ref=f8e31]:
+        - strong [ref=f8e32]: "Cached:"
+        - text: Re-hovering same record uses cached data
+      - listitem [ref=f8e33]:
+        - strong [ref=f8e34]: "Columns:"
+        - text: Only specified columns are fetched (
+        - code [ref=f8e35]: $select
+        - text: )

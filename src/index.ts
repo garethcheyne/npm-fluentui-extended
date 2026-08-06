@@ -25,6 +25,17 @@ export { OptionSetField } from './components/OptionSetField';
 export type { OptionSetFieldProps, OptionSetOption } from './components/OptionSetField';
 export { formatMultiSelectValue, parseSelectedValues } from './components/OptionSetField';
 
+export { SystemUserPersona, SystemUserCard } from './components/SystemUserPersona';
+export type {
+	SystemUserPersonaProps,
+	SystemUserPersonaSize,
+	SystemUserContactItem,
+	SystemUserCardProps,
+} from './components/SystemUserPersona';
+
+export { OwnerLookup } from './components/OwnerLookup';
+export type { OwnerLookupProps } from './components/OwnerLookup';
+
 export { RecordHoverCard } from './components/RecordHoverCard';
 export type {
 	RecordHoverCardProps,
@@ -44,14 +55,34 @@ export {
 	getEntityOptionSets,
 	getAttributeOptions,
 	clearMetadataCache,
+	getSystemUser,
+	searchSystemUsers,
+	systemUserImageUrl,
+	initialsOf,
+	searchOwners,
+	searchTeams,
+	getOwner,
+	ownerFromUser,
 } from './api';
 export type {
 	AttributeMetadata,
 	EntityDefinition,
 	OptionSetValue,
 	WebApiCollection,
+	SystemUserRecord,
+	SearchSystemUsersOptions,
+	OwnerRecord,
+	OwnerType,
+	SearchOwnersOptions,
 } from './api';
-export { QueryBuilder, serializeQueryBuilderState } from './components/QueryBuilder';
+export {
+	QueryBuilder,
+	serializeQueryBuilderState,
+	// Documented under Programmatic API, so they belong on the package root
+	parseFetchXmlToState,
+	validateQueryBuilderState,
+	validateFetchXmlSyntax,
+} from './components/QueryBuilder';
 export type {
 	QueryBuilderProps,
 	QueryBuilderField,

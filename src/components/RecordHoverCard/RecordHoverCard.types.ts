@@ -52,4 +52,9 @@ export interface RecordHoverCardProps {
   onLoadError?: (error: Error) => void;
   /** Disable the card without changing the anchor markup */
   disabled?: boolean;
+  /**
+   * Force the card open. Chiefly for documentation captures and tests, where an open
+   * surface has to be rendered without driving a real pointer.
+   */
+  open?: boolean;
 }

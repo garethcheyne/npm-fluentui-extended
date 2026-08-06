@@ -1,0 +1,92 @@
+- generic [ref=e4]:
+  - banner [ref=e5]:
+    - generic [ref=e6]:
+      - heading "FluentUI Extended — Test Harness" [level=1] [ref=e7]
+      - button [ref=e135]
+    - tablist [ref=e12]:
+      - tab "Lookup" [active] [selected] [ref=e14] [cursor=pointer]
+      - tab "QueryBuilder" [ref=e19] [cursor=pointer]
+      - tab "CommandBar" [ref=e24] [cursor=pointer]
+      - tab "EntityGrid" [ref=e29] [cursor=pointer]
+      - tab "DateTimeField" [ref=e34] [cursor=pointer]
+      - tab "OptionSetField" [ref=e39] [cursor=pointer]
+      - tab "HoverCard" [ref=e44] [cursor=pointer]
+  - generic [ref=e38780]:
+    - heading "Basic Lookup (No Header/Footer)" [level=2] [ref=e38781]
+    - paragraph [ref=e38782]: Simple lookup with expandable option details. Click the chevron on each option to reveal additional information.
+    - textbox "Search accounts..." [ref=e38786]
+    - paragraph [ref=e38791]:
+      - text: "Selected:"
+      - strong [ref=e38792]: None
+  - generic [ref=e38793]:
+    - heading "Multi-Select Lookup" [level=2] [ref=e38794]
+    - paragraph [ref=e38795]: Select multiple items displayed as pale blue badges with dismiss buttons. Maximum selection is limited to 3 items in this example.
+    - textbox "Search and select accounts..." [ref=e38799]
+    - paragraph [ref=e38804]:
+      - text: "Selected (0/3):"
+      - strong [ref=e38805]: None
+  - generic [ref=e38806]:
+    - heading "Lookup with Header & Footer" [level=2] [ref=e38807]
+    - paragraph [ref=e38808]: Includes tab header and action footer like Dynamics 365 lookup dialogs.
+    - textbox "Search accounts..." [ref=e38812]
+    - paragraph [ref=e38817]:
+      - text: "Selected:"
+      - strong [ref=e38818]: None
+  - generic [ref=e38819]:
+    - heading "Lookup with Details Only (No Secondary Text)" [level=2] [ref=e38820]
+    - paragraph [ref=e38821]: Toggle buttons filter by entity type like native Dynamics 365 - icon centers on single text row.
+    - textbox "Search accounts & contacts..." [ref=e38825]
+    - paragraph [ref=e38830]:
+      - text: "Selected:"
+      - strong [ref=e38831]: None
+  - generic [ref=e38832]:
+    - heading "Dynamic Search (Async API)" [level=2] [ref=e38833]
+    - paragraph [ref=e38834]:
+      - text: Searching
+      - strong [ref=e38835]: live Dynamics 365
+      - text: accounts via native
+      - code [ref=e38836]: fetch()
+      - text: API
+    - textbox "Type to search accounts..." [ref=e38840]
+    - paragraph [ref=e38845]:
+      - text: "Selected:"
+      - strong [ref=e38846]: None
+  - generic [ref=e38847]:
+    - heading "Multi-Entity Lookup with React Elements" [level=2] [ref=e38848]
+    - paragraph [ref=e38849]:
+      - text: "Demonstrates: selectable filter tabs in header, React elements in"
+      - code [ref=e38850]: secondaryText
+      - text: ", and React elements (Badges) in expandable"
+      - code [ref=e38851]: details
+      - text: .
+    - textbox "Search records..." [ref=e38855]
+    - paragraph [ref=e38860]:
+      - text: "Selected:"
+      - strong [ref=e38861]: None
+    - paragraph [ref=e38862]:
+      - text: "Active filter:"
+      - code [ref=e38863]: accounts
+      - text: — Click tabs in header to switch entity types. Expand contacts to see Badges in details.
+  - generic [ref=e38864]:
+    - heading "Dynamics 365 Live Data" [level=2] [ref=e38865]
+    - paragraph [ref=e38866]:
+      - text: Connected to your Dynamics 365 instance. Components below use live data via
+      - code [ref=e38867]: Xrm.WebApi
+      - text: .
+    - generic [ref=e38868]:
+      - heading "Live Account Lookup" [level=3] [ref=e38869]
+      - paragraph [ref=e38870]:
+        - text: Searches real accounts from Dynamics 365 using
+        - code [ref=e38871]: Xrm.WebApi.retrieveMultipleRecords
+        - text: .
+      - textbox "Search accounts in Dynamics..." [ref=e38875]
+      - paragraph [ref=e38880]:
+        - text: "Selected:"
+        - strong [ref=e38881]: None
+    - generic [ref=e38882]:
+      - heading "Live Contact Lookup" [level=3] [ref=e38883]
+      - paragraph [ref=e38884]: Searches real contacts from Dynamics 365.
+      - textbox "Search contacts in Dynamics..." [ref=e38888]
+      - paragraph [ref=e38893]:
+        - text: "Selected:"
+        - strong [ref=e38894]: None

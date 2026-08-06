@@ -5,6 +5,8 @@ export type {
   EntityGridSort,
   EntityGridSortDirection,
   EntityGridPage,
+  EntityGridLoadMode,
+  ColumnState,
 } from './EntityGrid.types';
 export {
   formattedValue,

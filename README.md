@@ -16,7 +16,11 @@ This project is **open source** and **free to use**. It is provided as-is, witho
 ## Installation
 
 ```bash
-npm install fluentui-extended @fluentui/react-components @fluentui/react-icons
+npm install fluentui-extended \
+  @fluentui/react-components \
+  @fluentui/react-icons \
+  @fluentui/react-datepicker-compat \
+  @fluentui/react-calendar-compat
 ```
 
 ## Appearance
@@ -53,7 +57,9 @@ containing those narrows to the closest non-shadow fill rather than dropping the
 
 A searchable dropdown component styled after Dynamics 365 lookup fields. Supports async search, expandable option details, and customizable header/footer.
 
-![Lookup Component](assets/screenshot-lookup.png)
+![Lookup resolved](assets/screenshot-lookup-rest.png)
+
+![Lookup open](assets/screenshot-lookup-open.png)
 
 ### QueryBuilder
 
@@ -61,7 +67,7 @@ A searchable dropdown component styled after Dynamics 365 lookup fields. Support
 
 An Advanced Find-style query builder for Dynamics 365. Build complex filter conditions with AND/OR logic, serialize to FetchXML or OData, and validate queries against the Dynamics 365 API.
 
-![QueryBuilder Component](assets/screenshot-querybuilder.png)
+![QueryBuilder](assets/screenshot-querybuilder.png)
 
 ### CommandBar
 
@@ -70,12 +76,17 @@ An Advanced Find-style query builder for Dynamics 365. Build complex filter cond
 A Dynamics-style command bar. Commands that no longer fit collapse into a "More commands" menu
 rather than wrapping to a second row or being clipped.
 
+![CommandBar](assets/screenshot-commandbar.png)
+
 ### EntityGrid
 
-> **🚧 Beta**
+> **🧪 Experimental / in development** — the API and behaviour are still moving. Not recommended
+> for production use yet.
 
 A subgrid backed by the Web API: columns named from entity metadata, server-side paging and
 sorting, and lookups rendered as names rather than GUIDs.
+
+![EntityGrid](assets/screenshot-entitygrid.png)
 
 ### DateTimeField
 
@@ -84,6 +95,8 @@ sorting, and lookups rendered as names rather than GUIDs.
 A date/time field that respects the attribute's Dynamics `DateTimeBehavior`, so `DateOnly` values
 cannot drift a day across timezones.
 
+![DateTimeField](assets/screenshot-datetimefield.png)
+
 ### OptionSetField
 
 > **🚧 Beta**
@@ -91,12 +104,39 @@ cannot drift a day across timezones.
 An optionset / multi-select picklist field that loads its options from metadata, including global
 option sets, and round-trips multi-selects in the comma-separated form Dynamics stores.
 
+![OptionSetField](assets/screenshot-optionset-closed.png)
+
+![OptionSetField open](assets/screenshot-optionset-open.png)
+
 ### RecordHoverCard
 
 > **🚧 Beta**
 
 A hover card for a record reference. The record is fetched lazily once the pointer settles, and the
 result is held so re-opening costs nothing.
+
+![RecordHoverCard](assets/screenshot-hovercard.png)
+
+### SystemUserPersona
+
+> **🚧 Beta**
+
+A Dynamics systemuser persona with the contact card a persona shows on a model-driven form.
+
+![SystemUserPersona](assets/screenshot-persona.png)
+
+![SystemUserPersona contact card](assets/screenshot-persona-card.png)
+
+### OwnerLookup
+
+> **🚧 Beta**
+
+A preconfigured `Lookup` for `ownerid`. An owner is a user *or* a team, so both are searched;
+selections render as the usual Lookup badges and multi-select comes for free.
+
+![OwnerLookup resolved](assets/screenshot-ownerlookup-rest.png)
+
+![OwnerLookup users and teams](assets/screenshot-ownerlookup-open.png)
 
 ## Quick Start
 
@@ -923,6 +963,8 @@ clipped rather than moved.
 
 ## EntityGrid
 
+> **🧪 Experimental / in development.** Expect the API to change.
+
 A subgrid backed by the Web API. `DataGrid` renders rows you already have; `EntityGrid` fetches them.
 
 Paging uses `Prefer: odata.maxpagesize` and follows `@odata.nextLink`, rather than `$top`/`$skip` —
@@ -1096,6 +1138,161 @@ Pass `record` directly to skip loading entirely when the calling grid already ha
 
 ---
 
+## SystemUserPersona
+
+A Dynamics `systemuser` persona: avatar, name, job title, and the contact card a persona shows on a
+model-driven form. The record loads lazily — only once the pointer settles on the persona — so a grid
+column of them costs one request per card actually looked at, not one per row.
+
+```tsx
+import { SystemUserPersona } from 'fluentui-extended';
+
+<SystemUserPersona
+  userId={record._ownerid_value}
+  presence="available"                  // Teams presence: supply it, Dynamics does not expose it
+  cardActions={<Link onClick={open}>Open record</Link>}
+/>
+```
+
+Pass `user` instead of `userId` to skip loading when the caller already has the record. The photo is
+addressed at `systemusers(id)/entityimage/$value` rather than selected as a column — `entityimage` is
+binary, and selecting it inline bloats every search response. Pass `imageUrl={null}` to force initials.
+
+### SystemUserPersona Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `userId` | `string` | - | systemuser GUID to load |
+| `user` | `SystemUserRecord` | - | Supply the record and skip loading |
+| `presence` | `PresenceBadgeStatus` | - | Teams presence badge |
+| `size` | `'small' \| 'medium' \| 'large'` | `'medium'` | Avatar and text scale |
+| `avatarOnly` | `boolean` | `false` | Hide the name; it moves to a tooltip |
+| `showHoverCard` | `boolean` | `true` | Reveal the contact card on hover |
+| `additionalContact` | `SystemUserContactItem[]` | - | Extra rows in the Contact section |
+| `cardActions` | `React.ReactNode` | - | Footer content on the card |
+| `onClick` | `(user) => void` | - | Called when the name is clicked |
+
+`SystemUserCard` is exported separately for rendering the card body outside a popover.
+
+---
+
+## Hover Cards
+
+Any `Lookup` can reveal a record card when the pointer settles on an option — in the dropdown, on the
+resolved badge, or both. It is off by default and adds no wrapper to the DOM until enabled.
+
+```tsx
+<Lookup
+  options={accounts.map((a) => ({ ...a, entityName: 'account' }))}
+  showHoverCard
+  hoverCardColumns={['accountnumber', 'telephone1', 'primarycontactid']}
+  hoverCardActions={<Link onClick={open}>Open record</Link>}
+/>
+```
+
+![Lookup with a hover card](assets/screenshot-lookup-hovercard.png)
+
+Each option carries its own reference — `entityName`, plus `recordId` when the key is not the GUID —
+and that is what the card fetches from. Loading is **lazy and gated on hover intent**: nothing is
+requested until a pointer has rested on a row for `hoverCardDelayMs` (400 by default), so a list of
+fifty results costs no extra requests until one is actually hovered, and dragging across the list
+fires nothing at all. Results are cached per anchor; failures are not, so the next hover retries.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `showHoverCard` | `boolean` | `false` | Enable the card |
+| `hoverCardColumns` | `string[]` | - | Columns fetched and listed on the card |
+| `renderHoverCard` | `(option) => ReactNode` | - | Build the body yourself; return `null` to suppress |
+| `hoverCardTarget` | `'list' \| 'rest' \| 'both'` | `'both'` | Which surfaces offer the card |
+| `hoverCardDelayMs` | `number` | `400` | Hover-intent delay before opening and fetching |
+| `hoverCardActions` | `React.ReactNode` | - | Footer content on the card |
+
+---
+
+## OwnerLookup
+
+`ownerid` is polymorphic: an owner is a **systemuser or a team**. `OwnerLookup` is a preconfigured
+`Lookup` that knows this — it owns the querying and how owners present, and hands everything else to
+Lookup, so the resolved value is the same badge any lookup uses and multi-select needs no extra work.
+
+```tsx
+import { OwnerLookup } from 'fluentui-extended';
+
+<OwnerLookup
+  label="Owner"
+  selectedOwner={owner}
+  onOwnerSelect={setOwner}
+  onOwnerClick={(o) => openRecord(o.type, o.id)}
+/>
+
+// Multi-select
+<OwnerLookup multiSelect selectedOwners={owners} onOwnersSelect={setOwners} />
+```
+
+![OwnerLookup multi-select](assets/screenshot-ownerlookup-multi.png)
+
+`types` defaults to `['systemuser']`. Pass both and the lookup **grows a header automatically**,
+letting the user narrow to Users or Teams the way a polymorphic Dynamics lookup does — no extra
+wiring:
+
+```tsx
+<OwnerLookup types={['systemuser', 'team']} selectedOwner={owner} onOwnerSelect={setOwner} />
+```
+
+![OwnerLookup users and teams](assets/screenshot-ownerlookup-open.png)
+
+Users and teams are queried in parallel and merged with users first, matching how the Dynamics owner
+lookup groups results. One type failing does not lose the other — a caller with no read access to
+teams still gets users. Users are filtered to enabled interactive accounts, and teams to
+`teamtype eq 0`: access teams and AAD-managed teams cannot own records, so offering them would
+produce an unassignable selection.
+
+Hovering a user shows the full persona contact card; a team shows its description, business unit and
+administrator. Pass `types={['systemuser']}` for a people-only picker.
+
+### OwnerLookup Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `selectedOwner` | `OwnerRecord \| null` | - | Selection (controlled) |
+| `onOwnerSelect` | `(owner \| null) => void` | - | Selection handler |
+| `multiSelect` | `boolean` | `false` | Render selections as badges |
+| `selectedOwners` / `onOwnersSelect` | | - | Multi-select selection |
+| `types` | `OwnerType[]` | `['systemuser']` | Pass both to get the Users/Teams header |
+| `owners` | `OwnerRecord[]` | - | Supply a roster instead of querying |
+| `onSearch` | `(text) => Promise<OwnerRecord[]>` | - | Custom search |
+| `includeDisabled` | `boolean` | `false` | Include disabled user accounts |
+| `presence` | `Record<string, PresenceBadgeStatus>` | - | Presence keyed by owner id |
+| `showHoverCard` | `boolean` | `true` | Contact card on results and badges |
+| `onOwnerClick` | `(owner) => void` | - | Called when a resolved name is clicked |
+
+---
+
+## Documentation Screenshots
+
+Component screenshots are generated, not taken by hand:
+
+```bash
+npm run shots              # capture everything into assets/
+npm run shots lookup-open  # or just one
+```
+
+`?shot=<id>` on the harness renders a **single populated component** with no surrounding chrome —
+no header, no tabs, no sibling examples — inside a fixed-width `#shot-frame`. The capture script
+visits each one and screenshots that element, so the output is already a tight crop at a stable size,
+with no manual cropping. `?shot=index` lists what is available.
+
+Components that open a surface get one shot per state (`lookup-rest` / `lookup-open`,
+`optionset-closed` / `optionset-open` / `optionset-multi`), because a capture script cannot reliably
+drive a pointer, and those states are what the docs need to show.
+
+Data-backed components are populated from fixtures rather than a live org: shot mode swaps the
+library transport via `setWebApiFetch`, so captures never depend on what happens to be in someone's
+environment and no real customer data reaches the docs. Add or edit shots in
+[`testHarness/shots/registry.tsx`](testHarness/shots/registry.tsx).
+
+---
+
 ## Web API Client
 
 The metadata-aware components share one Web API client with a process-wide metadata cache, so two
@@ -1139,7 +1336,21 @@ This library extends [Microsoft's Fluent UI React v9](https://react.fluentui.dev
 
 ### Unreleased
 
-Five new Dynamics 365 components, plus the shared Web API client they sit on.
+Seven new Dynamics 365 components, plus the shared Web API client they sit on.
+
+- ✨ **[SystemUserPersona](#systemuserpersona)** — a `systemuser` persona with the contact card a
+  persona shows on a model-driven form. Loads lazily on hover intent; the record photo is addressed
+  by URL rather than selected inline, since `entityimage` is binary and bloats every response.
+- ✨ **[OwnerLookup](#ownerlookup)** — a preconfigured `Lookup` for `ownerid`, which is polymorphic:
+  an owner is a systemuser *or* a team. Both are searched in parallel, results render as personas or
+  team glyphs, selections show as the usual Lookup badges, and multi-select comes from Lookup.
+- ✨ **[Lookup hover cards](#hover-cards)** — `showHoverCard` adds a lazy record card to the dropdown
+  rows, the resolved badge, or both. Supply `hoverCardColumns` to have it fetched from the Web API,
+  or `renderHoverCard` to build the body yourself. Nothing loads until a pointer settles.
+- 🔧 **[Generated documentation screenshots](#documentation-screenshots).** `npm run shots` captures
+  each component in isolation via `?shot=<id>`, populated from fixtures rather than a live org.
+- ✨ `open` on `OptionSetField` and `RecordHoverCard` for rendering an expanded state without
+  driving a pointer — used by the captures, and useful in tests.
 
 - 💄 **`filled-darker` is now the default appearance** across every field component — Lookup,
   QueryBuilder, DateTimeField and OptionSetField — matching native Dynamics 365. Fluent's default is

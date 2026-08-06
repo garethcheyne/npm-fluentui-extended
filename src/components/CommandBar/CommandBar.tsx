@@ -129,6 +129,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
 }) => {
   const styles = useCommandBarStyles();
   const regionRef = React.useRef<HTMLDivElement>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
   const itemRefs = React.useRef(new Map<string, HTMLDivElement>());
   const [visibleCount, setVisibleCount] = React.useState(items.length);
 
@@ -143,6 +144,10 @@ export const CommandBar: React.FC<CommandBarProps> = ({
   /**
    * Decide how many commands fit. Widths are read from the live DOM rather than
    * estimated, because label length and icon presence vary too much to guess.
+   *
+   * The row's flex `gap` has to be part of the budget: n commands occupy
+   * sum(widths) + (n - 1) * gap, and ignoring that term is enough to overrun the
+   * container and let `overflow: hidden` clip the last command.
    */
   const measure = React.useCallback(() => {
     const region = regionRef.current;
@@ -151,17 +156,29 @@ export const CommandBar: React.FC<CommandBarProps> = ({
     const available = region.clientWidth;
     if (available === 0) return;
 
+    // Read the gap rather than hardcoding it, so it tracks the spacing token
+    const gap = Number.parseFloat(getComputedStyle(region).columnGap) || 0;
     const widths = items.map((item) => itemRefs.current.get(item.key)?.offsetWidth ?? 0);
+
+    const rowWidth = (count: number, sum: number) => sum + Math.max(0, count - 1) * gap;
     const totalWidth = widths.reduce((sum, width) => sum + width, 0);
 
-    if (totalWidth <= available) {
+    if (rowWidth(items.length, totalWidth) <= available) {
       setVisibleCount(items.length);
       return;
     }
 
+    // Reserve room for the overflow trigger only while it is absent. Once it renders it
+    // is a flex sibling of this region, so `clientWidth` already excludes it - reserving
+    // again would double-count and drop one more command than necessary on every pass.
+    const reserved = triggerRef.current ? 0 : OVERFLOW_TRIGGER_WIDTH + gap;
+    const budget = available - reserved;
+
     // Pinned commands never collapse, so their width comes off the budget first
-    const pinnedWidth = items.reduce((sum, item, index) => (item.pinned ? sum + widths[index] : sum), 0);
-    let budget = available - OVERFLOW_TRIGGER_WIDTH - pinnedWidth;
+    let used = items.reduce(
+      (sum, item, index) => (item.pinned ? sum + widths[index] + gap : sum),
+      0,
+    );
 
     let count = 0;
     for (let index = 0; index < items.length; index += 1) {
@@ -169,8 +186,9 @@ export const CommandBar: React.FC<CommandBarProps> = ({
         count += 1;
         continue;
       }
-      if (budget - widths[index] < 0) break;
-      budget -= widths[index];
+      const next = used + widths[index] + gap;
+      if (next > budget) break;
+      used = next;
       count += 1;
     }
 
@@ -208,16 +226,16 @@ export const CommandBar: React.FC<CommandBarProps> = ({
         className={mergeClasses(styles.itemsRegion, disableOverflow && styles.itemsRegionScrolling)}
       >
         {items.map((item, index) => (
-          <React.Fragment key={item.key}>
-            {item.dividerBefore && index < visibleCount && <div className={styles.divider} aria-hidden />}
-            <div
-              ref={(element) => setItemRef(item.key, element)}
-              className={mergeClasses(styles.command, isHidden(item, index) && styles.commandHidden)}
-              aria-hidden={isHidden(item, index) || undefined}
-            >
-              <CommandButton item={item} size={size} className={styles.command} />
-            </div>
-          </React.Fragment>
+          <div
+            key={item.key}
+            ref={(element) => setItemRef(item.key, element)}
+            className={mergeClasses(styles.command, isHidden(item, index) && styles.commandHidden)}
+            aria-hidden={isHidden(item, index) || undefined}
+          >
+            {/* Inside the measured wrapper so the divider's width is budgeted for */}
+            {item.dividerBefore && index > 0 && <span className={styles.divider} aria-hidden />}
+            <CommandButton item={item} size={size} className={styles.commandButton} />
+          </div>
         ))}
       </div>
 
@@ -225,6 +243,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
         <Menu>
           <MenuTrigger disableButtonEnhancement>
             <Button
+              ref={triggerRef}
               size={size}
               appearance="subtle"
               icon={<MoreHorizontalRegular />}

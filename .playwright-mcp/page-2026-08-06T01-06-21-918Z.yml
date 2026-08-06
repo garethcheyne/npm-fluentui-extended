@@ -1,0 +1,54 @@
+- generic [ref=f1e4]:
+  - banner [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - heading "FluentUI Extended — Test Harness" [level=1] [ref=f1e7]
+      - button [ref=f1e131]
+    - tablist [ref=f1e9]:
+      - tab "Lookup" [ref=f1e11] [cursor=pointer]
+      - tab "QueryBuilder" [ref=f1e16] [cursor=pointer]
+      - tab "CommandBar" [ref=f1e21] [cursor=pointer]
+      - tab "EntityGrid" [active] [selected] [ref=f1e26] [cursor=pointer]
+      - tab "DateTimeField" [ref=f1e31] [cursor=pointer]
+      - tab "OptionSetField" [ref=f1e36] [cursor=pointer]
+      - tab "HoverCard" [ref=f1e41] [cursor=pointer]
+  - generic [ref=f1e624]:
+    - heading "Entity Grid In Development" [level=2] [ref=f1e625]:
+      - text: Entity Grid
+      - generic [ref=f1e626]: In Development
+    - paragraph [ref=f1e627]:
+      - text: Server-side paging via
+      - code [ref=f1e628]: "Prefer: odata.maxpagesize"
+      - text: and
+      - code [ref=f1e629]: "@odata.nextLink"
+      - text: ", sorting pushed to the server, and lookups rendered from their formatted-value annotations."
+    - generic [ref=f1e630]:
+      - generic [ref=f1e631]: Accounts
+      - grid [ref=f1e633]:
+        - progressbar "Loading records..." [ref=f1e635]
+    - paragraph [ref=f1e639]:
+      - text: "Selected:"
+      - strong [ref=f1e640]: "0"
+      - text: record(s)
+    - generic [ref=f1e641]:
+      - strong [ref=f1e642]: "Grid features:"
+      - list [ref=f1e643]:
+        - listitem [ref=f1e644]:
+          - strong [ref=f1e645]: "Virtualization:"
+          - text: Only visible rows are rendered (TanStack Virtual)
+        - listitem [ref=f1e646]:
+          - strong [ref=f1e647]: "Server paging:"
+          - text: Uses
+          - code [ref=f1e648]: "Prefer: odata.maxpagesize"
+          - text: header
+        - listitem [ref=f1e649]:
+          - strong [ref=f1e650]: "Continuation:"
+          - text: Follows
+          - code [ref=f1e651]: "@odata.nextLink"
+          - text: for next page
+        - listitem [ref=f1e652]:
+          - strong [ref=f1e653]: "Sorting:"
+          - text: Click column headers to sort (pushed to server)
+        - listitem [ref=f1e654]:
+          - strong [ref=f1e655]: "Lookups:"
+          - text: Displayed using
+          - code [ref=f1e656]: "@OData.Community.Display.V1.FormattedValue"

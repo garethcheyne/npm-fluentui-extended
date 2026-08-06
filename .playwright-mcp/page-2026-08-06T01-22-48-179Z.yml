@@ -1,0 +1,41 @@
+- generic [ref=f5e5]:
+  - heading "Entity Grid In Development" [level=2] [ref=f5e6]:
+    - text: Entity Grid
+    - generic [ref=f5e7]: In Development
+  - paragraph [ref=f5e8]:
+    - text: Server-side paging via
+    - code [ref=f5e9]: "Prefer: odata.maxpagesize"
+    - text: and
+    - code [ref=f5e10]: "@odata.nextLink"
+    - text: ", sorting pushed to the server, and lookups rendered from their formatted-value annotations."
+  - generic [ref=f5e11]:
+    - generic [ref=f5e12]: Accounts
+    - grid [ref=f5e14]:
+      - progressbar "Loading records..." [ref=f5e16]
+  - paragraph [ref=f5e20]:
+    - text: "Selected:"
+    - strong [ref=f5e21]: "0"
+    - text: record(s)
+  - generic [ref=f5e22]:
+    - strong [ref=f5e23]: "Grid features:"
+    - list [ref=f5e24]:
+      - listitem [ref=f5e25]:
+        - strong [ref=f5e26]: "Virtualization:"
+        - text: Only visible rows are rendered (TanStack Virtual)
+      - listitem [ref=f5e27]:
+        - strong [ref=f5e28]: "Server paging:"
+        - text: Uses
+        - code [ref=f5e29]: "Prefer: odata.maxpagesize"
+        - text: header
+      - listitem [ref=f5e30]:
+        - strong [ref=f5e31]: "Continuation:"
+        - text: Follows
+        - code [ref=f5e32]: "@odata.nextLink"
+        - text: for next page
+      - listitem [ref=f5e33]:
+        - strong [ref=f5e34]: "Sorting:"
+        - text: Click column headers to sort (pushed to server)
+      - listitem [ref=f5e35]:
+        - strong [ref=f5e36]: "Lookups:"
+        - text: Displayed using
+        - code [ref=f5e37]: "@OData.Community.Display.V1.FormattedValue"

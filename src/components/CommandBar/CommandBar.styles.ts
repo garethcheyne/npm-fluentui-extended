@@ -23,6 +23,9 @@ export const useCommandBarStyles = makeStyles({
     gap: tokens.spacingHorizontalXS,
     flexGrow: 1,
     minWidth: 0,
+    // Contains the absolutely-positioned hidden commands. Without it they escape to
+    // the nearest positioned ancestor and can widen the page.
+    position: 'relative',
     // Hidden rather than auto: commands that do not fit move to the overflow menu,
     // so a scrollbar here would only ever appear when overflow is disabled
     overflow: 'hidden',
@@ -40,7 +43,14 @@ export const useCommandBarStyles = makeStyles({
     flexShrink: 0,
   },
 
+  /**
+   * Wrapper around each command. The divider lives inside it so that a measured
+   * offsetWidth covers everything the command contributes to the row - measuring the
+   * button alone under-counts and the last command ends up clipped.
+   */
   command: {
+    display: 'inline-flex',
+    alignItems: 'center',
     flexShrink: 0,
     whiteSpace: 'nowrap',
   },
@@ -55,12 +65,17 @@ export const useCommandBarStyles = makeStyles({
     pointerEvents: 'none',
   },
 
+  /** Button inside the measured wrapper */
+  commandButton: {
+    whiteSpace: 'nowrap',
+  },
+
   divider: {
     flexShrink: 0,
     width: '1px',
-    alignSelf: 'stretch',
+    height: '20px',
     marginLeft: tokens.spacingHorizontalXXS,
-    marginRight: tokens.spacingHorizontalXXS,
+    marginRight: tokens.spacingHorizontalXS,
     backgroundColor: tokens.colorNeutralStroke2,
   },
 

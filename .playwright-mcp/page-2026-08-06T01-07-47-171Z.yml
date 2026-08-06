@@ -1,0 +1,51 @@
+- generic [ref=f1e4]:
+  - banner [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - heading "FluentUI Extended — Test Harness" [level=1] [ref=f1e7]
+      - button [ref=f1e131]
+    - tablist [ref=f1e9]:
+      - tab "Lookup" [ref=f1e11] [cursor=pointer]
+      - tab "QueryBuilder" [ref=f1e16] [cursor=pointer]
+      - tab "CommandBar" [ref=f1e21] [cursor=pointer]
+      - tab "EntityGrid" [ref=f1e26] [cursor=pointer]
+      - tab "DateTimeField" [ref=f1e31] [cursor=pointer]
+      - tab "OptionSetField" [ref=f1e36] [cursor=pointer]
+      - tab "HoverCard" [active] [selected] [ref=f1e41] [cursor=pointer]
+  - generic [ref=f1e39130]:
+    - heading "Record Hover Card" [level=2] [ref=f1e39131]
+    - paragraph [ref=f1e39132]: Hover a record reference to reveal its details. The fetch waits for the pointer to settle, so dragging across a column does not fire a request per row.
+    - generic [ref=f1e39133]:
+      - button "007 PROJECTS PTY LTD" [ref=f1e39134] [cursor=pointer]
+      - button "Jane Smith" [ref=f1e39135] [cursor=pointer]
+    - generic [ref=f1e39136]:
+      - strong [ref=f1e39137]: "Static mode usage:"
+      - list [ref=f1e39138]:
+        - listitem [ref=f1e39139]:
+          - text: Pass
+          - code [ref=f1e39140]: record
+          - text: prop with pre-loaded data
+        - listitem [ref=f1e39141]: No network requests — ideal for offline demos or cached data
+        - listitem [ref=f1e39142]:
+          - text: Use
+          - code [ref=f1e39143]: actions
+          - text: slot for custom buttons/links
+    - heading "Live records" [level=3] [ref=f1e39144]
+    - paragraph [ref=f1e39145]: Real accounts, each fetching its own columns on hover. Open the network tab to see that nothing is requested until a pointer settles.
+    - generic [ref=f1e39146]: Loading accounts...
+    - generic [ref=f1e39148]:
+      - strong [ref=f1e39149]: "Live mode behavior:"
+      - list [ref=f1e39150]:
+        - listitem [ref=f1e39151]:
+          - strong [ref=f1e39152]: "Debounced:"
+          - text: Waits ~300ms for pointer to settle before fetching
+        - listitem [ref=f1e39153]:
+          - strong [ref=f1e39154]: "Efficient:"
+          - text: Dragging across rows doesn't fire requests
+        - listitem [ref=f1e39155]:
+          - strong [ref=f1e39156]: "Cached:"
+          - text: Re-hovering same record uses cached data
+        - listitem [ref=f1e39157]:
+          - strong [ref=f1e39158]: "Columns:"
+          - text: Only specified columns are fetched (
+          - code [ref=f1e39159]: $select
+          - text: )

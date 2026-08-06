@@ -34,6 +34,11 @@ export interface OptionSetFieldProps {
    * option sets have no colours configured and the swatches would all be grey.
    */
   showColors?: boolean;
+  /**
+   * Render options with a colour as a coloured badge (pill). When true, options
+   * that have a `color` configured will display with that colour as the background.
+   */
+  asBadge?: boolean;
   placeholder?: string;
   disabled?: boolean;
   /**
@@ -43,6 +48,11 @@ export interface OptionSetFieldProps {
   appearance?: FieldAppearance;
   /** Allow clearing back to no selection. Defaults to true. */
   clearable?: boolean;
+  /**
+   * Force the listbox open. Chiefly for documentation captures and tests, where an
+   * expanded control has to be rendered without driving a real pointer.
+   */
+  open?: boolean;
   /** Label rendered above the control */
   label?: string | React.ReactElement;
   /** Validation message rendered below the control */

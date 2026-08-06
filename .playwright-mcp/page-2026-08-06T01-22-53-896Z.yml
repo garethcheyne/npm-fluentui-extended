@@ -1,0 +1,222 @@
+- generic [ref=f6e4]:
+  - generic [ref=f6e5]:
+    - heading "DateTimeBehavior" [level=2] [ref=f6e6]
+    - paragraph [ref=f6e7]:
+      - text: The same picked date serialized three ways.
+      - strong [ref=f6e8]: DateOnly
+      - text: and
+      - strong [ref=f6e9]: TimeZoneIndependent
+      - text: never pass through UTC, so they cannot drift a day the way
+      - code [ref=f6e10]: toISOString()
+      - text: does in a positive UTC offset.
+    - generic [ref=f6e11]:
+      - generic [ref=f6e12]:
+        - generic [ref=f6e13]:
+          - generic [ref=f6e14]: UserLocal
+          - combobox [ref=f6e16] [cursor=pointer]:
+            - generic [ref=f6e17]: Select a date...
+        - generic [ref=f6e21]: (empty)
+      - generic [ref=f6e22]:
+        - generic [ref=f6e23]:
+          - generic [ref=f6e24]: DateOnly
+          - combobox [ref=f6e26] [cursor=pointer]:
+            - generic [ref=f6e27]: Select a date...
+          - generic [ref=f6e31]: Date only - stored without a time or timezone
+        - generic [ref=f6e32]: (empty)
+      - generic [ref=f6e33]:
+        - generic [ref=f6e34]:
+          - generic [ref=f6e35]: TimeZoneIndependent
+          - combobox [ref=f6e37] [cursor=pointer]:
+            - generic [ref=f6e38]: Select a date...
+          - generic [ref=f6e42]: Timezone independent - stored exactly as entered
+        - generic [ref=f6e43]: (empty)
+    - generic [ref=f6e44]:
+      - strong [ref=f6e45]: "Behavior differences:"
+      - list [ref=f6e46]:
+        - listitem [ref=f6e47]:
+          - strong [ref=f6e48]: "UserLocal:"
+          - text: Converts to UTC for storage (may shift date in + UTC offsets)
+        - listitem [ref=f6e49]:
+          - strong [ref=f6e50]: "DateOnly:"
+          - text: No time component, stored as
+          - code [ref=f6e51]: YYYY-MM-DD
+        - listitem [ref=f6e52]:
+          - strong [ref=f6e53]: "TimeZoneIndependent:"
+          - text: Stored exactly as entered, no UTC conversion
+  - generic [ref=f6e54]:
+    - heading "Advanced Props" [level=2] [ref=f6e55]
+    - paragraph [ref=f6e56]: Additional props for customizing input behavior and time formatting.
+    - generic [ref=f6e57]:
+      - generic [ref=f6e58]:
+        - heading "Free-Type Input" [level=4] [ref=f6e59]
+        - paragraph [ref=f6e60]:
+          - code [ref=f6e61]: allowFreeType
+          - text: — Type directly, supports natural date/time parsing.
+        - generic [ref=f6e62]:
+          - generic [ref=f6e63]: Free-Type Date/Time
+          - combobox [ref=f6e65] [cursor=pointer]:
+            - textbox "Free-Type Date/Time" [ref=f6e66]:
+              - /placeholder: Type a date like 'Jan 15, 2025 3:30 PM'
+            - button "Open date picker" [ref=f6e67]
+        - generic [ref=f6e70]: "Stored: (empty)"
+      - generic [ref=f6e71]:
+        - heading "12-Hour Format" [level=4] [ref=f6e72]
+        - paragraph [ref=f6e73]:
+          - code [ref=f6e74]: timeFormat="12h"
+          - text: — Displays times as 3:30 PM.
+        - generic [ref=f6e75]:
+          - generic [ref=f6e76]: 12h Time Format
+          - combobox [ref=f6e78] [cursor=pointer]:
+            - generic [ref=f6e79]: Select a date...
+        - generic [ref=f6e83]: "Stored: (empty)"
+      - generic [ref=f6e84]:
+        - heading "24-Hour Format" [level=4] [ref=f6e85]
+        - paragraph [ref=f6e86]:
+          - code [ref=f6e87]: timeFormat="24h"
+          - text: — Military time format (default).
+        - generic [ref=f6e88]:
+          - generic [ref=f6e89]: 24h Time Format
+          - combobox [ref=f6e91] [cursor=pointer]:
+            - generic [ref=f6e92]: Select a date...
+        - generic [ref=f6e96]: "Stored: (empty)"
+      - generic [ref=f6e97]:
+        - heading "Restricted Time Window" [level=4] [ref=f6e98]
+        - paragraph [ref=f6e99]:
+          - code [ref=f6e100]: minTime="08:00"
+          - text: /
+          - code [ref=f6e101]: maxTime="17:00"
+          - text: — Business hours only.
+        - generic [ref=f6e102]:
+          - generic [ref=f6e103]: Business Hours Only
+          - combobox [ref=f6e105] [cursor=pointer]:
+            - generic [ref=f6e106]: Select a date...
+        - generic [ref=f6e110]: "Stored: (empty)"
+      - generic [ref=f6e111]:
+        - heading "Custom Time Interval" [level=4] [ref=f6e112]
+        - paragraph [ref=f6e113]:
+          - code [ref=f6e114]: timeIntervalMinutes=15
+          - text: — 15-minute increments.
+        - generic [ref=f6e115]:
+          - generic [ref=f6e116]: 15-Minute Intervals
+          - combobox [ref=f6e118] [cursor=pointer]:
+            - generic [ref=f6e119]: Select a date...
+        - generic [ref=f6e123]: "Stored: (empty)"
+      - generic [ref=f6e124]:
+        - heading "Time Only Picker" [level=4] [ref=f6e125]
+        - paragraph [ref=f6e126]:
+          - code [ref=f6e127]: timeOnly
+          - text: — No calendar, just time selection.
+        - generic [ref=f6e128]:
+          - generic [ref=f6e129]: Select Time Only
+          - combobox [ref=f6e131] [cursor=pointer]:
+            - generic [ref=f6e132]: Select a time...
+        - generic [ref=f6e136]: "Stored: (empty)"
+    - generic [ref=f6e137]:
+      - strong [ref=f6e138]: "Props summary:"
+      - list [ref=f6e139]:
+        - listitem [ref=f6e140]:
+          - code [ref=f6e141]: allowFreeType
+          - text: — Enable direct keyboard input with date/time parsing
+        - listitem [ref=f6e142]:
+          - code [ref=f6e143]: timeFormat
+          - text: —
+          - code [ref=f6e144]: "\"12h\""
+          - text: or
+          - code [ref=f6e145]: "\"24h\""
+          - text: time display
+        - listitem [ref=f6e146]:
+          - code [ref=f6e147]: minTime
+          - text: /
+          - code [ref=f6e148]: maxTime
+          - text: — Restrict selectable time window
+        - listitem [ref=f6e149]:
+          - code [ref=f6e150]: timeIntervalMinutes
+          - text: — Time slot intervals (15, 30, 60, etc.)
+        - listitem [ref=f6e151]:
+          - code [ref=f6e152]: timeOnly
+          - text: — Hide the calendar, show only time picker
+  - generic [ref=f6e153]:
+    - heading "Custom Display Format" [level=2] [ref=f6e154]
+    - paragraph [ref=f6e155]:
+      - text: Use
+      - code [ref=f6e156]: displayFormat
+      - text: to customize how dates and times are displayed using format tokens.
+    - generic [ref=f6e157]:
+      - generic [ref=f6e158]:
+        - heading "Full Custom Format" [level=4] [ref=f6e159]
+        - paragraph [ref=f6e160]:
+          - code [ref=f6e161]: displayFormat="ddd Do MMMM, YYYY h:mm a"
+        - generic [ref=f6e162]:
+          - generic [ref=f6e163]: Custom Format
+          - combobox [ref=f6e165] [cursor=pointer]:
+            - generic [ref=f6e166]: Select a date...
+        - generic [ref=f6e170]: "Stored: (empty)"
+      - generic [ref=f6e171]:
+        - heading "Short Date" [level=4] [ref=f6e172]
+        - paragraph [ref=f6e173]:
+          - code [ref=f6e174]: displayFormat="DD/MM/YYYY"
+        - generic [ref=f6e175]:
+          - generic [ref=f6e176]: DD/MM/YYYY
+          - combobox [ref=f6e178] [cursor=pointer]:
+            - generic [ref=f6e179]: Select a date...
+        - generic [ref=f6e183]: "Stored: (empty)"
+      - generic [ref=f6e184]:
+        - heading "US Date Format" [level=4] [ref=f6e185]
+        - paragraph [ref=f6e186]:
+          - code [ref=f6e187]: displayFormat="MMM D, YYYY"
+        - generic [ref=f6e188]:
+          - generic [ref=f6e189]: MMM D, YYYY
+          - combobox [ref=f6e191] [cursor=pointer]:
+            - generic [ref=f6e192]: Select a date...
+        - generic [ref=f6e196]: "Stored: (empty)"
+      - generic [ref=f6e197]:
+        - heading "ISO Format" [level=4] [ref=f6e198]
+        - paragraph [ref=f6e199]:
+          - code [ref=f6e200]: displayFormat="YYYY-MM-DD HH:mm"
+        - generic [ref=f6e201]:
+          - generic [ref=f6e202]: ISO Format
+          - combobox [ref=f6e204] [cursor=pointer]:
+            - generic [ref=f6e205]: Select a date...
+        - generic [ref=f6e209]: "Stored: (empty)"
+      - generic [ref=f6e210]:
+        - heading "Time Only with Format" [level=4] [ref=f6e211]
+        - paragraph [ref=f6e212]:
+          - code [ref=f6e213]: timeOnly displayFormat="h:mm A"
+        - generic [ref=f6e214]:
+          - generic [ref=f6e215]: Time Only
+          - combobox [ref=f6e217] [cursor=pointer]:
+            - generic [ref=f6e218]: Select time...
+        - generic [ref=f6e222]: "Stored: (empty)"
+      - generic [ref=f6e223]:
+        - heading "Weekday + Date" [level=4] [ref=f6e224]
+        - paragraph [ref=f6e225]:
+          - code [ref=f6e226]: displayFormat="dddd, MMMM Do"
+        - generic [ref=f6e227]:
+          - generic [ref=f6e228]: Weekday Format
+          - combobox [ref=f6e230] [cursor=pointer]:
+            - generic [ref=f6e231]: Select a date...
+        - generic [ref=f6e235]: "Stored: (empty)"
+    - generic [ref=f6e236]:
+      - strong [ref=f6e237]: "Format tokens:"
+      - generic [ref=f6e238]:
+        - generic [ref=f6e239]:
+          - strong [ref=f6e240]: "Year:"
+          - text: YYYY (2024), YY (24)
+        - generic [ref=f6e241]:
+          - strong [ref=f6e242]: "Month:"
+          - text: MMMM (October), MMM (Oct), MM (10), M (10)
+        - generic [ref=f6e243]:
+          - strong [ref=f6e244]: "Day:"
+          - text: Do (9th), DD (09), D (9)
+        - generic [ref=f6e245]:
+          - strong [ref=f6e246]: "Weekday:"
+          - text: dddd (Monday), ddd (Mon)
+        - generic [ref=f6e247]:
+          - strong [ref=f6e248]: "Hour:"
+          - text: HH (14), H (14), hh (02), h (2)
+        - generic [ref=f6e249]:
+          - strong [ref=f6e250]: "Minute:"
+          - text: mm (30), m (30)
+        - generic [ref=f6e251]:
+          - strong [ref=f6e252]: "AM/PM:"
+          - text: A (PM), a (pm)

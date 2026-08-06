@@ -1,0 +1,462 @@
+- generic [ref=f1e1]:
+  - generic [ref=f1e4]:
+    - banner [ref=f1e5]:
+      - generic [ref=f1e6]:
+        - heading "FluentUI Extended — Test Harness" [level=1] [ref=f1e7]
+        - button [ref=f1e131]
+      - tablist [ref=f1e9]:
+        - tab "Lookup" [ref=f1e11] [cursor=pointer]
+        - tab "QueryBuilder" [ref=f1e16] [cursor=pointer]
+        - tab "CommandBar" [ref=f1e21] [cursor=pointer]
+        - tab "EntityGrid" [ref=f1e26] [cursor=pointer]
+        - tab "DateTimeField" [selected] [ref=f1e31] [cursor=pointer]
+        - tab "OptionSetField" [ref=f1e36] [cursor=pointer]
+        - tab "HoverCard" [ref=f1e41] [cursor=pointer]
+    - generic [ref=f1e38442]:
+      - heading "DateTimeBehavior" [level=2] [ref=f1e38443]
+      - paragraph [ref=f1e38444]:
+        - text: The same picked date serialized three ways.
+        - strong [ref=f1e38445]: DateOnly
+        - text: and
+        - strong [ref=f1e38446]: TimeZoneIndependent
+        - text: never pass through UTC, so they cannot drift a day the way
+        - code [ref=f1e38447]: toISOString()
+        - text: does in a positive UTC offset.
+      - generic [ref=f1e38448]:
+        - generic [ref=f1e38449]:
+          - generic [ref=f1e38450]:
+            - generic [ref=f1e38451]: UserLocal
+            - combobox [expanded] [active] [ref=f1e38453] [cursor=pointer]:
+              - generic [ref=f1e38454]: Select a date...
+          - generic [ref=f1e38458]: (empty)
+        - generic [ref=f1e38459]:
+          - generic [ref=f1e38460]:
+            - generic [ref=f1e38461]: DateOnly
+            - combobox [ref=f1e38463] [cursor=pointer]:
+              - generic [ref=f1e38464]: Select a date...
+            - generic [ref=f1e38468]: Date only - stored without a time or timezone
+          - generic [ref=f1e38469]: (empty)
+        - generic [ref=f1e38470]:
+          - generic [ref=f1e38471]:
+            - generic [ref=f1e38472]: TimeZoneIndependent
+            - combobox [ref=f1e38474] [cursor=pointer]:
+              - generic [ref=f1e38475]: Select a date...
+            - generic [ref=f1e38479]: Timezone independent - stored exactly as entered
+          - generic [ref=f1e38480]: (empty)
+      - generic [ref=f1e38481]:
+        - strong [ref=f1e38482]: "Behavior differences:"
+        - list [ref=f1e38483]:
+          - listitem [ref=f1e38484]:
+            - strong [ref=f1e38485]: "UserLocal:"
+            - text: Converts to UTC for storage (may shift date in + UTC offsets)
+          - listitem [ref=f1e38486]:
+            - strong [ref=f1e38487]: "DateOnly:"
+            - text: No time component, stored as
+            - code [ref=f1e38488]: YYYY-MM-DD
+          - listitem [ref=f1e38489]:
+            - strong [ref=f1e38490]: "TimeZoneIndependent:"
+            - text: Stored exactly as entered, no UTC conversion
+      - generic [ref=f1e38491]:
+        - heading "Behavior from live metadata" [level=3] [ref=f1e38492]
+        - paragraph [ref=f1e38493]:
+          - code [ref=f1e38494]: account.createdon
+          - text: — behavior comes from attribute metadata.
+        - generic [ref=f1e38495]:
+          - generic [ref=f1e38496]: Created On (live)
+          - combobox [ref=f1e38498] [cursor=pointer]:
+            - generic [ref=f1e38499]: Select a date...
+        - generic [ref=f1e38503]: (empty)
+    - generic [ref=f1e38504]:
+      - heading "Advanced Props" [level=2] [ref=f1e38505]
+      - paragraph [ref=f1e38506]: Additional props for customizing input behavior and time formatting.
+      - generic [ref=f1e38507]:
+        - generic [ref=f1e38508]:
+          - heading "Free-Type Input" [level=4] [ref=f1e38509]
+          - paragraph [ref=f1e38510]:
+            - code [ref=f1e38511]: allowFreeType
+            - text: — Type directly, supports natural date/time parsing.
+          - generic [ref=f1e38512]:
+            - generic [ref=f1e38513]: Free-Type Date/Time
+            - combobox [ref=f1e38515] [cursor=pointer]:
+              - textbox "Free-Type Date/Time" [ref=f1e38516]:
+                - /placeholder: Type a date like 'Jan 15, 2025 3:30 PM'
+              - button "Open date picker" [ref=f1e38517]
+          - generic [ref=f1e38520]: "Stored: (empty)"
+        - generic [ref=f1e38521]:
+          - heading "12-Hour Format" [level=4] [ref=f1e38522]
+          - paragraph [ref=f1e38523]:
+            - code [ref=f1e38524]: timeFormat="12h"
+            - text: — Displays times as 3:30 PM.
+          - generic [ref=f1e38525]:
+            - generic [ref=f1e38526]: 12h Time Format
+            - combobox [ref=f1e38528] [cursor=pointer]:
+              - generic [ref=f1e38529]: Select a date...
+          - generic [ref=f1e38533]: "Stored: (empty)"
+        - generic [ref=f1e38534]:
+          - heading "24-Hour Format" [level=4] [ref=f1e38535]
+          - paragraph [ref=f1e38536]:
+            - code [ref=f1e38537]: timeFormat="24h"
+            - text: — Military time format (default).
+          - generic [ref=f1e38538]:
+            - generic [ref=f1e38539]: 24h Time Format
+            - combobox [ref=f1e38541] [cursor=pointer]:
+              - generic [ref=f1e38542]: Select a date...
+          - generic [ref=f1e38546]: "Stored: (empty)"
+        - generic [ref=f1e38547]:
+          - heading "Restricted Time Window" [level=4] [ref=f1e38548]
+          - paragraph [ref=f1e38549]:
+            - code [ref=f1e38550]: minTime="08:00"
+            - text: /
+            - code [ref=f1e38551]: maxTime="17:00"
+            - text: — Business hours only.
+          - generic [ref=f1e38552]:
+            - generic [ref=f1e38553]: Business Hours Only
+            - combobox [ref=f1e38555] [cursor=pointer]:
+              - generic [ref=f1e38556]: Select a date...
+          - generic [ref=f1e38560]: "Stored: (empty)"
+        - generic [ref=f1e38561]:
+          - heading "Custom Time Interval" [level=4] [ref=f1e38562]
+          - paragraph [ref=f1e38563]:
+            - code [ref=f1e38564]: timeIntervalMinutes=15
+            - text: — 15-minute increments.
+          - generic [ref=f1e38565]:
+            - generic [ref=f1e38566]: 15-Minute Intervals
+            - combobox [ref=f1e38568] [cursor=pointer]:
+              - generic [ref=f1e38569]: Select a date...
+          - generic [ref=f1e38573]: "Stored: (empty)"
+        - generic [ref=f1e38574]:
+          - heading "Time Only Picker" [level=4] [ref=f1e38575]
+          - paragraph [ref=f1e38576]:
+            - code [ref=f1e38577]: timeOnly
+            - text: — No calendar, just time selection.
+          - generic [ref=f1e38578]:
+            - generic [ref=f1e38579]: Select Time Only
+            - combobox [ref=f1e38581] [cursor=pointer]:
+              - generic [ref=f1e38582]: Select a time...
+          - generic [ref=f1e38586]: "Stored: (empty)"
+      - generic [ref=f1e38587]:
+        - strong [ref=f1e38588]: "Props summary:"
+        - list [ref=f1e38589]:
+          - listitem [ref=f1e38590]:
+            - code [ref=f1e38591]: allowFreeType
+            - text: — Enable direct keyboard input with date/time parsing
+          - listitem [ref=f1e38592]:
+            - code [ref=f1e38593]: timeFormat
+            - text: —
+            - code [ref=f1e38594]: "\"12h\""
+            - text: or
+            - code [ref=f1e38595]: "\"24h\""
+            - text: time display
+          - listitem [ref=f1e38596]:
+            - code [ref=f1e38597]: minTime
+            - text: /
+            - code [ref=f1e38598]: maxTime
+            - text: — Restrict selectable time window
+          - listitem [ref=f1e38599]:
+            - code [ref=f1e38600]: timeIntervalMinutes
+            - text: — Time slot intervals (15, 30, 60, etc.)
+          - listitem [ref=f1e38601]:
+            - code [ref=f1e38602]: timeOnly
+            - text: — Hide the calendar, show only time picker
+    - generic [ref=f1e38603]:
+      - heading "Custom Display Format" [level=2] [ref=f1e38604]
+      - paragraph [ref=f1e38605]:
+        - text: Use
+        - code [ref=f1e38606]: displayFormat
+        - text: to customize how dates and times are displayed using format tokens.
+      - generic [ref=f1e38607]:
+        - generic [ref=f1e38608]:
+          - heading "Full Custom Format" [level=4] [ref=f1e38609]
+          - paragraph [ref=f1e38610]:
+            - code [ref=f1e38611]: displayFormat="ddd Do MMMM, YYYY h:mm a"
+          - generic [ref=f1e38612]:
+            - generic [ref=f1e38613]: Custom Format
+            - combobox [ref=f1e38615] [cursor=pointer]:
+              - generic [ref=f1e38616]: Select a date...
+          - generic [ref=f1e38620]: "Stored: (empty)"
+        - generic [ref=f1e38621]:
+          - heading "Short Date" [level=4] [ref=f1e38622]
+          - paragraph [ref=f1e38623]:
+            - code [ref=f1e38624]: displayFormat="DD/MM/YYYY"
+          - generic [ref=f1e38625]:
+            - generic [ref=f1e38626]: DD/MM/YYYY
+            - combobox [ref=f1e38628] [cursor=pointer]:
+              - generic [ref=f1e38629]: Select a date...
+          - generic [ref=f1e38633]: "Stored: (empty)"
+        - generic [ref=f1e38634]:
+          - heading "US Date Format" [level=4] [ref=f1e38635]
+          - paragraph [ref=f1e38636]:
+            - code [ref=f1e38637]: displayFormat="MMM D, YYYY"
+          - generic [ref=f1e38638]:
+            - generic [ref=f1e38639]: MMM D, YYYY
+            - combobox [ref=f1e38641] [cursor=pointer]:
+              - generic [ref=f1e38642]: Select a date...
+          - generic [ref=f1e38646]: "Stored: (empty)"
+        - generic [ref=f1e38647]:
+          - heading "ISO Format" [level=4] [ref=f1e38648]
+          - paragraph [ref=f1e38649]:
+            - code [ref=f1e38650]: displayFormat="YYYY-MM-DD HH:mm"
+          - generic [ref=f1e38651]:
+            - generic [ref=f1e38652]: ISO Format
+            - combobox [ref=f1e38654] [cursor=pointer]:
+              - generic [ref=f1e38655]: Select a date...
+          - generic [ref=f1e38659]: "Stored: (empty)"
+        - generic [ref=f1e38660]:
+          - heading "Time Only with Format" [level=4] [ref=f1e38661]
+          - paragraph [ref=f1e38662]:
+            - code [ref=f1e38663]: timeOnly displayFormat="h:mm A"
+          - generic [ref=f1e38664]:
+            - generic [ref=f1e38665]: Time Only
+            - combobox [ref=f1e38667] [cursor=pointer]:
+              - generic [ref=f1e38668]: Select time...
+          - generic [ref=f1e38672]: "Stored: (empty)"
+        - generic [ref=f1e38673]:
+          - heading "Weekday + Date" [level=4] [ref=f1e38674]
+          - paragraph [ref=f1e38675]:
+            - code [ref=f1e38676]: displayFormat="dddd, MMMM Do"
+          - generic [ref=f1e38677]:
+            - generic [ref=f1e38678]: Weekday Format
+            - combobox [ref=f1e38680] [cursor=pointer]:
+              - generic [ref=f1e38681]: Select a date...
+          - generic [ref=f1e38685]: "Stored: (empty)"
+      - generic [ref=f1e38686]:
+        - strong [ref=f1e38687]: "Format tokens:"
+        - generic [ref=f1e38688]:
+          - generic [ref=f1e38689]:
+            - strong [ref=f1e38690]: "Year:"
+            - text: YYYY (2024), YY (24)
+          - generic [ref=f1e38691]:
+            - strong [ref=f1e38692]: "Month:"
+            - text: MMMM (October), MMM (Oct), MM (10), M (10)
+          - generic [ref=f1e38693]:
+            - strong [ref=f1e38694]: "Day:"
+            - text: Do (9th), DD (09), D (9)
+          - generic [ref=f1e38695]:
+            - strong [ref=f1e38696]: "Weekday:"
+            - text: dddd (Monday), ddd (Mon)
+          - generic [ref=f1e38697]:
+            - strong [ref=f1e38698]: "Hour:"
+            - text: HH (14), H (14), hh (02), h (2)
+          - generic [ref=f1e38699]:
+            - strong [ref=f1e38700]: "Minute:"
+            - text: mm (30), m (30)
+          - generic [ref=f1e38701]:
+            - strong [ref=f1e38702]: "AM/PM:"
+            - text: A (PM), a (pm)
+  - generic [ref=f1e38703]:
+    - generic [ref=f1e38704]:
+      - generic [ref=f1e38706]:
+        - generic [ref=f1e38707]: Selected date August 6, 2026
+        - generic [ref=f1e38708]:
+          - generic [ref=f1e38709]:
+            - generic [ref=f1e38710]: August 2026
+            - generic [ref=f1e38711]:
+              - button "Previous month July" [ref=f1e38712]
+              - button "Next month September" [ref=f1e38715]
+          - grid "August 2026, Selected date August 6, 2026, Today's date August 6, 2026" [ref=f1e38719]:
+            - rowgroup [ref=f1e38720]:
+              - row [ref=f1e38721]:
+                - columnheader "Sunday" [ref=f1e38722] [cursor=pointer]: S
+                - columnheader "Monday" [ref=f1e38723] [cursor=pointer]: M
+                - columnheader "Tuesday" [ref=f1e38724] [cursor=pointer]: T
+                - columnheader "Wednesday" [ref=f1e38725] [cursor=pointer]: W
+                - columnheader "Thursday" [ref=f1e38726] [cursor=pointer]: T
+                - columnheader "Friday" [ref=f1e38727] [cursor=pointer]: F
+                - columnheader "Saturday" [ref=f1e38728] [cursor=pointer]: S
+              - gridcell [ref=f1e38729] [cursor=pointer]:
+                - button [ref=f1e38730]: "19"
+              - gridcell [ref=f1e38731] [cursor=pointer]:
+                - button [ref=f1e38732]: "20"
+              - gridcell [ref=f1e38733] [cursor=pointer]:
+                - button [ref=f1e38734]: "21"
+              - gridcell [ref=f1e38735] [cursor=pointer]:
+                - button [ref=f1e38736]: "22"
+              - gridcell [ref=f1e38737] [cursor=pointer]:
+                - button [ref=f1e38738]: "23"
+              - gridcell [ref=f1e38739] [cursor=pointer]:
+                - button [ref=f1e38740]: "24"
+              - gridcell [ref=f1e38741] [cursor=pointer]:
+                - button [ref=f1e38742]: "25"
+              - row [ref=f1e38743]:
+                - gridcell [ref=f1e38744] [cursor=pointer]:
+                  - button "26, July, 2026" [ref=f1e38745]: "26"
+                - gridcell [ref=f1e38746] [cursor=pointer]:
+                  - button "27, July, 2026" [ref=f1e38747]: "27"
+                - gridcell [ref=f1e38748] [cursor=pointer]:
+                  - button "28, July, 2026" [ref=f1e38749]: "28"
+                - gridcell [ref=f1e38750] [cursor=pointer]:
+                  - button "29, July, 2026" [ref=f1e38751]: "29"
+                - gridcell [ref=f1e38752] [cursor=pointer]:
+                  - button "30, July, 2026" [ref=f1e38753]: "30"
+                - gridcell [ref=f1e38754] [cursor=pointer]:
+                  - button "31, July, 2026" [ref=f1e38755]: "31"
+                - gridcell [ref=f1e38756] [cursor=pointer]:
+                  - button "1, August, 2026" [ref=f1e38757]: "1"
+              - row [ref=f1e38758]:
+                - gridcell [ref=f1e38759] [cursor=pointer]:
+                  - button "2, August, 2026" [ref=f1e38760]: "2"
+                - gridcell [ref=f1e38761] [cursor=pointer]:
+                  - button "3, August, 2026" [ref=f1e38762]: "3"
+                - gridcell [ref=f1e38763] [cursor=pointer]:
+                  - button "4, August, 2026" [ref=f1e38764]: "4"
+                - gridcell [ref=f1e38765] [cursor=pointer]:
+                  - button "5, August, 2026" [ref=f1e38766]: "5"
+                - gridcell [selected] [ref=f1e38767] [cursor=pointer]:
+                  - button "6, August, 2026" [ref=f1e38768]:
+                    - generic [ref=f1e38769]: "6"
+                - gridcell [ref=f1e38770] [cursor=pointer]:
+                  - button "7, August, 2026" [ref=f1e38771]: "7"
+                - gridcell [ref=f1e38772] [cursor=pointer]:
+                  - button "8, August, 2026" [ref=f1e38773]: "8"
+              - row [ref=f1e38774]:
+                - gridcell [ref=f1e38775] [cursor=pointer]:
+                  - button "9, August, 2026" [ref=f1e38776]: "9"
+                - gridcell [ref=f1e38777] [cursor=pointer]:
+                  - button "10, August, 2026" [ref=f1e38778]: "10"
+                - gridcell [ref=f1e38779] [cursor=pointer]:
+                  - button "11, August, 2026" [ref=f1e38780]: "11"
+                - gridcell [ref=f1e38781] [cursor=pointer]:
+                  - button "12, August, 2026" [ref=f1e38782]: "12"
+                - gridcell [ref=f1e38783] [cursor=pointer]:
+                  - button "13, August, 2026" [ref=f1e38784]: "13"
+                - gridcell [ref=f1e38785] [cursor=pointer]:
+                  - button "14, August, 2026" [ref=f1e38786]: "14"
+                - gridcell [ref=f1e38787] [cursor=pointer]:
+                  - button "15, August, 2026" [ref=f1e38788]: "15"
+              - row [ref=f1e38789]:
+                - gridcell [ref=f1e38790] [cursor=pointer]:
+                  - button "16, August, 2026" [ref=f1e38791]: "16"
+                - gridcell [ref=f1e38792] [cursor=pointer]:
+                  - button "17, August, 2026" [ref=f1e38793]: "17"
+                - gridcell [ref=f1e38794] [cursor=pointer]:
+                  - button "18, August, 2026" [ref=f1e38795]: "18"
+                - gridcell [ref=f1e38796] [cursor=pointer]:
+                  - button "19, August, 2026" [ref=f1e38797]: "19"
+                - gridcell [ref=f1e38798] [cursor=pointer]:
+                  - button "20, August, 2026" [ref=f1e38799]: "20"
+                - gridcell [ref=f1e38800] [cursor=pointer]:
+                  - button "21, August, 2026" [ref=f1e38801]: "21"
+                - gridcell [ref=f1e38802] [cursor=pointer]:
+                  - button "22, August, 2026" [ref=f1e38803]: "22"
+              - row [ref=f1e38804]:
+                - gridcell [ref=f1e38805] [cursor=pointer]:
+                  - button "23, August, 2026" [ref=f1e38806]: "23"
+                - gridcell [ref=f1e38807] [cursor=pointer]:
+                  - button "24, August, 2026" [ref=f1e38808]: "24"
+                - gridcell [ref=f1e38809] [cursor=pointer]:
+                  - button "25, August, 2026" [ref=f1e38810]: "25"
+                - gridcell [ref=f1e38811] [cursor=pointer]:
+                  - button "26, August, 2026" [ref=f1e38812]: "26"
+                - gridcell [ref=f1e38813] [cursor=pointer]:
+                  - button "27, August, 2026" [ref=f1e38814]: "27"
+                - gridcell [ref=f1e38815] [cursor=pointer]:
+                  - button "28, August, 2026" [ref=f1e38816]: "28"
+                - gridcell [ref=f1e38817] [cursor=pointer]:
+                  - button "29, August, 2026" [ref=f1e38818]: "29"
+              - row [ref=f1e38819]:
+                - gridcell [ref=f1e38820] [cursor=pointer]:
+                  - button "30, August, 2026" [ref=f1e38821]: "30"
+                - gridcell [ref=f1e38822] [cursor=pointer]:
+                  - button "31, August, 2026" [ref=f1e38823]: "31"
+                - gridcell [ref=f1e38824] [cursor=pointer]:
+                  - button "1, September, 2026" [ref=f1e38825]: "1"
+                - gridcell [ref=f1e38826] [cursor=pointer]:
+                  - button "2, September, 2026" [ref=f1e38827]: "2"
+                - gridcell [ref=f1e38828] [cursor=pointer]:
+                  - button "3, September, 2026" [ref=f1e38829]: "3"
+                - gridcell [ref=f1e38830] [cursor=pointer]:
+                  - button "4, September, 2026" [ref=f1e38831]: "4"
+                - gridcell [ref=f1e38832] [cursor=pointer]:
+                  - button "5, September, 2026" [ref=f1e38833]: "5"
+              - gridcell [ref=f1e38834] [cursor=pointer]:
+                - button [ref=f1e38835]: "6"
+              - gridcell [ref=f1e38836] [cursor=pointer]:
+                - button [ref=f1e38837]: "7"
+              - gridcell [ref=f1e38838] [cursor=pointer]:
+                - button [ref=f1e38839]: "8"
+              - gridcell [ref=f1e38840] [cursor=pointer]:
+                - button [ref=f1e38841]: "9"
+              - gridcell [ref=f1e38842] [cursor=pointer]:
+                - button [ref=f1e38843]: "10"
+              - gridcell [ref=f1e38844] [cursor=pointer]:
+                - button [ref=f1e38845]: "11"
+              - gridcell [ref=f1e38846] [cursor=pointer]:
+                - button [ref=f1e38847]: "12"
+        - generic [ref=f1e38851]:
+          - generic [ref=f1e38852]:
+            - button "2026, change year" [ref=f1e38853]: "2026"
+            - generic [ref=f1e38854]:
+              - button "Previous year 2025" [ref=f1e38855]
+              - button "Next year 2027" [ref=f1e38858]
+          - grid "2026" [ref=f1e38861]:
+            - row [ref=f1e38863]:
+              - gridcell "January" [ref=f1e38864]: Jan
+              - gridcell "February" [ref=f1e38865]: Feb
+              - gridcell "March" [ref=f1e38866]: Mar
+              - gridcell "April" [ref=f1e38867]: Apr
+            - row [ref=f1e38868]:
+              - gridcell "May" [ref=f1e38869]
+              - gridcell "June" [ref=f1e38870]: Jun
+              - gridcell "July" [ref=f1e38871]: Jul
+              - gridcell "August" [selected] [ref=f1e38872]: Aug
+            - row [ref=f1e38873]:
+              - gridcell "September" [ref=f1e38874]: Sep
+              - gridcell "October" [ref=f1e38875]: Oct
+              - gridcell "November" [ref=f1e38876]: Nov
+              - gridcell "December" [ref=f1e38877]: Dec
+      - generic [ref=f1e38879]:
+        - generic [ref=f1e38880]: Time
+        - generic [ref=f1e38881]:
+          - generic [ref=f1e38882] [cursor=pointer]: 00:00
+          - generic [ref=f1e38883] [cursor=pointer]: 00:30
+          - generic [ref=f1e38884] [cursor=pointer]: 01:00
+          - generic [ref=f1e38885] [cursor=pointer]: 01:30
+          - generic [ref=f1e38886] [cursor=pointer]: 02:00
+          - generic [ref=f1e38887] [cursor=pointer]: 02:30
+          - generic [ref=f1e38888] [cursor=pointer]: 03:00
+          - generic [ref=f1e38889] [cursor=pointer]: 03:30
+          - generic [ref=f1e38890] [cursor=pointer]: 04:00
+          - generic [ref=f1e38891] [cursor=pointer]: 04:30
+          - generic [ref=f1e38892] [cursor=pointer]: 05:00
+          - generic [ref=f1e38893] [cursor=pointer]: 05:30
+          - generic [ref=f1e38894] [cursor=pointer]: 06:00
+          - generic [ref=f1e38895] [cursor=pointer]: 06:30
+          - generic [ref=f1e38896] [cursor=pointer]: 07:00
+          - generic [ref=f1e38897] [cursor=pointer]: 07:30
+          - generic [ref=f1e38898] [cursor=pointer]: 08:00
+          - generic [ref=f1e38899] [cursor=pointer]: 08:30
+          - generic [ref=f1e38900] [cursor=pointer]: 09:00
+          - generic [ref=f1e38901] [cursor=pointer]: 09:30
+          - generic [ref=f1e38902] [cursor=pointer]: 10:00
+          - generic [ref=f1e38903] [cursor=pointer]: 10:30
+          - generic [ref=f1e38904] [cursor=pointer]: 11:00
+          - generic [ref=f1e38905] [cursor=pointer]: 11:30
+          - generic [ref=f1e38906] [cursor=pointer]: 12:00
+          - generic [ref=f1e38907] [cursor=pointer]: 12:30
+          - generic [ref=f1e38908] [cursor=pointer]: 13:00
+          - generic [ref=f1e38909] [cursor=pointer]: 13:30
+          - generic [ref=f1e38910] [cursor=pointer]: 14:00
+          - generic [ref=f1e38911] [cursor=pointer]: 14:30
+          - generic [ref=f1e38912] [cursor=pointer]: 15:00
+          - generic [ref=f1e38913] [cursor=pointer]: 15:30
+          - generic [ref=f1e38914] [cursor=pointer]: 16:00
+          - generic [ref=f1e38915] [cursor=pointer]: 16:30
+          - generic [ref=f1e38916] [cursor=pointer]: 17:00
+          - generic [ref=f1e38917] [cursor=pointer]: 17:30
+          - generic [ref=f1e38918] [cursor=pointer]: 18:00
+          - generic [ref=f1e38919] [cursor=pointer]: 18:30
+          - generic [ref=f1e38920] [cursor=pointer]: 19:00
+          - generic [ref=f1e38921] [cursor=pointer]: 19:30
+          - generic [ref=f1e38922] [cursor=pointer]: 20:00
+          - generic [ref=f1e38923] [cursor=pointer]: 20:30
+          - generic [ref=f1e38924] [cursor=pointer]: 21:00
+          - generic [ref=f1e38925] [cursor=pointer]: 21:30
+          - generic [ref=f1e38926] [cursor=pointer]: 22:00
+          - generic [ref=f1e38927] [cursor=pointer]: 22:30
+          - generic [ref=f1e38928] [cursor=pointer]: 23:00
+          - generic [ref=f1e38929] [cursor=pointer]: 23:30
+    - generic [ref=f1e38930]:
+      - generic [ref=f1e38931]:
+        - button "Today" [ref=f1e38932]
+        - button "Time Now" [ref=f1e38933]
+      - button "Done" [ref=f1e38935]

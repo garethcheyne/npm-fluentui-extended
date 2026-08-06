@@ -1,0 +1,117 @@
+- generic [ref=f3e5]:
+  - generic [ref=f3e6]:
+    - heading "QueryBuilder — Unknown / Invalid Fields" [level=2] [ref=f3e7]
+    - paragraph [ref=f3e8]: When existing FetchXML is loaded and contains attributes that don't match any known field, each unmatched condition is preserved and flagged with a warning banner so the user knows what needs to be fixed before saving.
+    - generic [ref=f3e9]:
+      - generic [ref=f3e10]: "Query Builder: Products"
+      - generic [ref=f3e13]:
+        - button [ref=f3e14]
+        - button [ref=f3e18]
+        - button [ref=f3e22]
+        - button [ref=f3e26]
+        - button [ref=f3e30]
+        - button [ref=f3e34]
+        - button [ref=f3e38]
+        - button [ref=f3e42]
+      - generic [ref=f3e46]:
+        - generic [ref=f3e47]:
+          - generic [ref=f3e49]:
+            - combobox [disabled] [ref=f3e50]: AND
+            - button "Open" [disabled] [ref=f3e51]
+          - grid "Filter group 1" [ref=f3e58]:
+            - generic [ref=f3e61]:
+              - combobox "Group logic" [ref=f3e62]: AND
+              - button "Open Group logic" [ref=f3e63] [cursor=pointer]
+            - row [ref=f3e66]:
+              - generic [ref=f3e67]: Field
+              - generic [ref=f3e68]: Operator
+              - generic [ref=f3e69]: Value
+            - generic [ref=f3e70]:
+              - row [ref=f3e75]:
+                - gridcell "Product Name" [ref=f3e76]
+                - gridcell [ref=f3e86]:
+                  - combobox "Operator" [ref=f3e88] [cursor=pointer]: Contains
+                - gridcell [ref=f3e92]:
+                  - textbox "Value" [ref=f3e94]: Widget
+                - gridcell [ref=f3e95]:
+                  - button "Row options" [ref=f3e96]
+              - generic [ref=f3e104]:
+                - generic [ref=f3e105]: ⚠
+                - generic [ref=f3e106]:
+                  - text: Unknown field
+                  - strong [ref=f3e107]: sample_unknownfield
+                  - text: — not found in entity metadata. Update or remove this condition before saving.
+                - button "Remove" [ref=f3e108]
+              - row [ref=f3e113]:
+                - gridcell "Status" [ref=f3e114]
+                - gridcell [ref=f3e124]:
+                  - combobox "Operator" [ref=f3e126] [cursor=pointer]: Equals
+                - gridcell [ref=f3e130]:
+                  - combobox "Value" [ref=f3e132] [cursor=pointer]: Active
+                - gridcell [ref=f3e136]:
+                  - button "Row options" [ref=f3e137]
+              - generic [ref=f3e145]:
+                - generic [ref=f3e146]: ⚠
+                - generic [ref=f3e147]:
+                  - text: Unknown field
+                  - strong [ref=f3e148]: sample_custom_obsolete_flag
+                  - text: — not found in entity metadata. Update or remove this condition before saving.
+                - button "Remove" [ref=f3e149]
+              - button [ref=f3e154]
+          - button [ref=f3e162]
+        - generic [ref=f3e166]:
+          - generic [ref=f3e167]:
+            - generic [ref=f3e168]: FetchXML Preview
+            - button "Copy to clipboard" [ref=f3e169]
+          - generic [ref=f3e173]: <fetch version="1.0" mapping="logical" no-lock="false" distinct="false"> <entity name="product"> <filter type="and"> <condition attribute="name" operator="like" value="%Widget%" /> <condition attribute="sample_unknownfield" operator="eq" value="1" /> <condition attribute="statecode" operator="eq" value="0" /> <condition attribute="sample_custom_obsolete_flag" operator="eq" value="true" /> </filter> </entity> </fetch>
+    - paragraph [ref=f3e174]:
+      - strong [ref=f3e175]: "Note:"
+      - text: The yellow warning banners indicate conditions referencing
+      - code [ref=f3e176]: sample_unknownfield
+      - text: and
+      - code [ref=f3e177]: sample_custom_obsolete_flag
+      - text: — fields that don't exist in the provided schema. The component preserves these conditions but warns the user they need attention.
+  - generic [ref=f3e178]:
+    - heading "Query Builder" [level=2] [ref=f3e179]
+    - paragraph [ref=f3e180]: Requires connection to Dynamics 365 to load entity metadata.
+    - generic [ref=f3e181]:
+      - generic [ref=f3e182]:
+        - generic [ref=f3e185]: Connect to Dynamics 365
+        - generic [ref=f3e186]: QueryBuilder requires a live connection to load entity metadata, fields, and relationships.
+        - button "Connecting..." [disabled] [ref=f3e187]
+        - generic [ref=f3e188]: Configure environment variables to enable connection
+      - generic [ref=f3e189]:
+        - generic [ref=f3e190]: "Query Builder: Accounts"
+        - generic [ref=f3e193]:
+          - button [ref=f3e194]
+          - button [ref=f3e198]
+          - button [ref=f3e202]
+          - button [ref=f3e206]
+          - button [ref=f3e210]
+          - button [ref=f3e214]
+          - button [ref=f3e218]
+          - button [ref=f3e222]
+        - generic [ref=f3e226]:
+          - progressbar "Loading fields..." [ref=f3e228]
+          - generic [ref=f3e232]:
+            - generic [ref=f3e233]:
+              - generic [ref=f3e234]: OData Preview
+              - button "Copy to clipboard" [ref=f3e235]
+            - generic [ref=f3e239]: contains(name, '')
+          - generic [ref=f3e240]:
+            - generic [ref=f3e241]:
+              - generic [ref=f3e242]: FetchXML Preview
+              - button "Copy to clipboard" [ref=f3e243]
+            - generic [ref=f3e247]: <fetch version="1.0" mapping="logical" no-lock="false" distinct="true"> <entity name="account"> <filter type="and"> <condition attribute="name" operator="like" value="%%" /> </filter> </entity> </fetch>
+    - generic [ref=f3e248]:
+      - generic [ref=f3e249]:
+        - text: Live State
+        - generic [ref=f3e250]: "{ \"groups\": [ { \"id\": \"grp_1785979352252_5421\", \"logic\": \"and\", \"conditions\": [ { \"id\": \"cond_1785979352252_7629\", \"kind\": \"field\", \"fieldId\": \"name\", \"operator\": \"contains\", \"value\": \"\", \"value2\": \"\" } ] } ] }"
+      - generic [ref=f3e251]:
+        - text: Serialized Output
+        - generic [ref=f3e252]: "null"
+    - paragraph [ref=f3e253]:
+      - strong [ref=f3e254]: "State Panel:"
+      - text: Shows the internal working state including conditions, groups, and UI state.
+      - strong [ref=f3e255]: "Serialized Output:"
+      - text: Shows the generated FetchXML/OData query ready for use in API calls.

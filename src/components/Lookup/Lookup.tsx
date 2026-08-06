@@ -1,15 +1,15 @@
 import * as React from 'react';
 import {
-  Input,
   Spinner,
   mergeClasses,
-  Button,
   Portal,
   useId,
+  Checkbox,
 } from '@fluentui/react-components';
 import { DismissRegular, ChevronDownRegular, SearchRegular } from '@fluentui/react-icons';
 import { useLookupStyles } from './Lookup.styles';
 import { DEFAULT_FIELD_APPEARANCE } from '../../types/appearance';
+import { LookupHoverCard } from './Lookup.HoverCard';
 import type { LookupProps, LookupOption } from './Lookup.types';
 
 export const Lookup: React.FC<LookupProps> = ({
@@ -38,6 +38,20 @@ export const Lookup: React.FC<LookupProps> = ({
   entityImage,
   recordLinkAppearance = true,
   onRecordClick,
+  // Size prop for matching other FluentUI controls (small = 24px, medium = 32px)
+  size = 'medium',
+  // Multi-select props
+  showHoverCard = false,
+  hoverCardColumns,
+  renderHoverCard,
+  hoverCardTarget = 'both',
+  hoverCardDelayMs = 400,
+  hoverCardActions,
+  multiSelect = false,
+  maxSelection,
+  selectedKeys: selectedKeysProp,
+  selectedOptions: selectedOptionsProp,
+  onOptionsSelect,
   ...inputProps
 }) => {
   const styles = useLookupStyles();
@@ -68,6 +82,8 @@ export const Lookup: React.FC<LookupProps> = ({
   const [highlightedIndex, setHighlightedIndex] = React.useState(-1);
   const [expandedKeys, setExpandedKeys] = React.useState<Set<string>>(new Set());
   const [internalSelectedOption, setInternalSelectedOption] = React.useState<LookupOption | null>(null);
+  // Multi-select internal state
+  const [internalSelectedOptions, setInternalSelectedOptions] = React.useState<LookupOption[]>([]);
 
   const inputRef = React.useRef<HTMLInputElement>(null);
   const inputWrapperRef = React.useRef<HTMLDivElement>(null);
@@ -75,11 +91,34 @@ export const Lookup: React.FC<LookupProps> = ({
   const debounceRef = React.useRef<ReturnType<typeof setTimeout>>();
   const justSelectedRef = React.useRef(false);
   const [dropdownPosition, setDropdownPosition] = React.useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
+  // Track whether position has been calculated to prevent flash at 0,0
+  const [dropdownPositionReady, setDropdownPositionReady] = React.useState(false);
 
   // Find the selected option - prefer props, fallback to internal state
   const selectedOption = React.useMemo(
     () => selectedOptionProp ?? options.find((opt) => opt.key === selectedKey) ?? internalSelectedOption,
     [selectedOptionProp, options, selectedKey, internalSelectedOption]
+  );
+
+  // Multi-select: find all selected options - prefer props, fallback to internal state
+  const selectedOptions = React.useMemo<LookupOption[]>(() => {
+    if (selectedOptionsProp) return selectedOptionsProp;
+    if (selectedKeysProp) {
+      return options.filter((opt) => selectedKeysProp.includes(opt.key));
+    }
+    return internalSelectedOptions;
+  }, [selectedOptionsProp, selectedKeysProp, options, internalSelectedOptions]);
+
+  // Check if an option is selected (for multi-select mode)
+  const isOptionSelected = React.useCallback(
+    (optionKey: string) => selectedOptions.some((opt) => opt.key === optionKey),
+    [selectedOptions]
+  );
+
+  // Check if max selection reached
+  const isMaxSelectionReached = React.useMemo(
+    () => multiSelect && maxSelection !== undefined && maxSelection > 0 && selectedOptions.length >= maxSelection,
+    [multiSelect, maxSelection, selectedOptions.length]
   );
 
   // Filter options based on search text (skip if disableClientFilter is true)
@@ -117,38 +156,34 @@ export const Lookup: React.FC<LookupProps> = ({
     return `${lookupId}-option-${filteredOptions[highlightedIndex].key}`;
   }, [filteredOptions, highlightedIndex, isOpen, lookupId]);
 
-  // Display value in input
-  const displayValue = React.useMemo(() => {
-    if (isOpen) {
-      return searchText;
-    }
-    return selectedOption?.text ?? '';
-  }, [isOpen, searchText, selectedOption]);
 
   /**
-   * "At rest" is a resolved lookup that is not currently being searched. Dynamics
-   * presents that state differently from an empty or open field: entity icon, and the
-   * record name as a link rather than plain input text.
+   * Wrap a row or badge in its hover card when one is configured for that surface.
+   * Returns the element untouched otherwise, so the card is entirely opt-in and adds
+   * no wrapper to the DOM when it is off.
    */
-  const isAtRest = !isOpen && Boolean(selectedOption);
+  const withHoverCard = React.useCallback(
+    (option: LookupOption, element: React.ReactElement, surface: 'list' | 'rest'): React.ReactElement => {
+      if (!showHoverCard) return element;
+      if (hoverCardTarget !== 'both' && hoverCardTarget !== surface) return element;
 
-  /** Entity image wins over an icon, matching how Dynamics renders a table with one set. */
-  const restIcon = React.useMemo((): React.ReactElement | undefined => {
-    if (!isAtRest) return undefined;
-
-    if (entityImage) {
-      return <img src={entityImage} alt="" className={styles.entityImage} />;
-    }
-
-    const icon = entityIcon ?? selectedOption?.icon;
-    if (!icon) return undefined;
-
-    return (
-      <span className={styles.entityIcon} aria-hidden>
-        {icon}
-      </span>
-    );
-  }, [isAtRest, entityImage, entityIcon, selectedOption, styles]);
+      return (
+        <LookupHoverCard
+          // The wrapper becomes the element returned from .map(), so the key has to
+          // live here - one on the child inside is invisible to React
+          key={option.key}
+          option={option}
+          renderHoverCard={renderHoverCard}
+          columns={hoverCardColumns}
+          delayMs={hoverCardDelayMs}
+          actions={hoverCardActions}
+        >
+          {element}
+        </LookupHoverCard>
+      );
+    },
+    [showHoverCard, hoverCardTarget, renderHoverCard, hoverCardColumns, hoverCardDelayMs, hoverCardActions],
+  );
 
   // ─── Open / close helpers ────────────────────────────────────────
   const openDropdown = React.useCallback(() => {
@@ -198,28 +233,37 @@ export const Lookup: React.FC<LookupProps> = ({
     (option: LookupOption) => {
       if (option.disabled) return;
 
-      justSelectedRef.current = true;
-      setInternalSelectedOption(option);
-      onOptionSelect?.(option);
-      setSearchText('');
-      setIsOpen(false);
-      setHighlightedIndex(-1);
-      inputRef.current?.focus();
+      if (multiSelect) {
+        // Multi-select mode: toggle selection
+        const alreadySelected = isOptionSelected(option.key);
+        
+        let newSelections: LookupOption[];
+        if (alreadySelected) {
+          // Remove from selection
+          newSelections = selectedOptions.filter((opt) => opt.key !== option.key);
+        } else {
+          // Add to selection (if not at max)
+          if (isMaxSelectionReached) return;
+          newSelections = [...selectedOptions, option];
+        }
+        
+        setInternalSelectedOptions(newSelections);
+        onOptionsSelect?.(newSelections);
+        // Keep dropdown open in multi-select mode
+        setSearchText('');
+        inputRef.current?.focus();
+      } else {
+        // Single-select mode
+        justSelectedRef.current = true;
+        setInternalSelectedOption(option);
+        onOptionSelect?.(option);
+        setSearchText('');
+        setIsOpen(false);
+        setHighlightedIndex(-1);
+        inputRef.current?.focus();
+      }
     },
-    [onOptionSelect]
-  );
-
-  // Handle clear
-  const handleClear = React.useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      setInternalSelectedOption(null);
-      onOptionSelect?.(null);
-      setSearchText('');
-      setHighlightedIndex(-1);
-      inputRef.current?.focus();
-    },
-    [onOptionSelect]
+    [multiSelect, isOptionSelected, selectedOptions, isMaxSelectionReached, onOptionsSelect, onOptionSelect]
   );
 
   // Handle keyboard navigation
@@ -294,20 +338,6 @@ export const Lookup: React.FC<LookupProps> = ({
     }
   }, [disabled, isOpen, openDropdown]);
 
-  /**
-   * Clicking the resolved value opens the record when a handler is supplied. Without
-   * one the click falls through to the wrapper and opens the dropdown as before, so
-   * the link styling never becomes a dead end.
-   */
-  const handleValueClick = React.useCallback(
-    (e: React.MouseEvent<HTMLInputElement>) => {
-      if (!isAtRest || !onRecordClick || !selectedOption) return;
-      e.stopPropagation();
-      onRecordClick(selectedOption);
-    },
-    [isAtRest, onRecordClick, selectedOption],
-  );
-
   // Cleanup debounce on unmount
   React.useEffect(() => {
     return () => {
@@ -329,7 +359,11 @@ export const Lookup: React.FC<LookupProps> = ({
 
   // ─── Position the dropdown below the input ─────────────────────
   React.useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      // Reset position ready state when dropdown closes
+      setDropdownPositionReady(false);
+      return;
+    }
 
     const updatePosition = () => {
       const rect = inputWrapperRef.current?.getBoundingClientRect();
@@ -341,6 +375,8 @@ export const Lookup: React.FC<LookupProps> = ({
           left: rect.left + ownerWin.scrollX,
           width: matchInputWidth ? rect.width : 0,
         });
+        // Mark position as ready after first calculation
+        setDropdownPositionReady(true);
       }
     };
 
@@ -405,62 +441,160 @@ export const Lookup: React.FC<LookupProps> = ({
 
   const showDropdown = isOpen && !disabled;
 
+  // Determine which items to show as badges (both single and multi-select)
+  // When maxSelection is set, show only up to maxSelection badges and indicate overflow
+  const visibleBadgeCount = maxSelection && maxSelection > 0 ? Math.min(maxSelection, 3) : undefined;
+  const allBadgeItems: LookupOption[] = multiSelect
+    ? selectedOptions
+    : selectedOption
+    ? [selectedOption]
+    : [];
+  const badgeItems = visibleBadgeCount !== undefined && allBadgeItems.length > visibleBadgeCount
+    ? allBadgeItems.slice(0, visibleBadgeCount)
+    : allBadgeItems;
+  const overflowCount = allBadgeItems.length - badgeItems.length;
+
+  // Should we show the input field? In single-select at-rest, we might hide the text input
+  // In multi-select or when searching, always show
+  const showTextInput = multiSelect || isOpen || !selectedOption;
+
+  // Helper to remove a badge (works for both single and multi)
+  const handleBadgeDismiss = React.useCallback(
+    (optionKey: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (multiSelect) {
+        const newSelections = selectedOptions.filter((opt) => opt.key !== optionKey);
+        setInternalSelectedOptions(newSelections);
+        onOptionsSelect?.(newSelections);
+      } else {
+        setInternalSelectedOption(null);
+        onOptionSelect?.(null);
+      }
+      inputRef.current?.focus();
+    },
+    [multiSelect, selectedOptions, onOptionsSelect, onOptionSelect]
+  );
+
   return (
     <div className={styles.root}>
       <div
-        className={styles.inputWrapper}
+        className={mergeClasses(
+          styles.tagInputWrapper,
+          appearance === 'filled-darker' || appearance === 'filled-lighter'
+            ? styles.tagInputWrapperFilled
+            : undefined,
+          size === 'small' ? styles.tagInputWrapperSmall : undefined,
+          disabled ? styles.tagInputWrapperDisabled : undefined
+        )}
         ref={inputWrapperRef}
         onClick={handleWrapperClick}
       >
-        <Input
-          {...inputProps}
-          id={lookupId}
-          ref={inputRef}
-          appearance={appearance}
-          className={mergeClasses(styles.input, inputProps.className)}
-          // The link styling belongs on the text itself, so it applies to the value
-          // rather than the whole field chrome
-          input={{
-            className: mergeClasses(isAtRest && recordLinkAppearance && styles.inputSelectedText),
-            onClick: handleValueClick,
-          }}
-          contentBefore={restIcon}
-          value={displayValue}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          onFocus={handleFocus}
-          placeholder={placeholder}
-          disabled={disabled}
-          aria-expanded={isOpen}
-          aria-haspopup="listbox"
-          aria-controls={isOpen ? `${lookupId}-listbox` : undefined}
-          aria-autocomplete="list"
-          aria-activedescendant={highlightedOptionId}
-          aria-label={ariaLabelledBy ? undefined : ariaLabel ?? placeholder ?? 'Lookup'}
-          contentAfter={
-            <span className={styles.iconContainer}>
-              {clearable && selectedOption && !disabled && (
-                <Button
-                  appearance="subtle"
-                  size="small"
-                  icon={<DismissRegular />}
-                  onClick={handleClear}
-                  className={styles.iconButton}
-                  aria-label="Clear selection"
-                />
-              )}
-              {loading ? (
-                <Spinner size="tiny" />
-              ) : (
-                <span className={styles.chevronIcon}>
-                  {/* Dynamics marks a lookup with a magnifier; the chevron reads as a
-                      plain dropdown and loses that distinction */}
-                  {isAtRest ? <SearchRegular /> : <ChevronDownRegular />}
+        {/* Badges area - contains selected items as badges */}
+        <div className={styles.tagInputBadgesArea}>
+          {badgeItems.map((opt) => withHoverCard(
+            opt,
+            <span key={opt.key} className={styles.inlineBadge}>
+              {/* Entity icon/image */}
+              {(entityImage || entityIcon || opt.icon) && (
+                <span className={styles.inlineBadgeIcon}>
+                  {entityImage ? (
+                    <img
+                      src={entityImage}
+                      alt=""
+                      style={{ width: '16px', height: '16px', borderRadius: '2px', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    entityIcon ?? opt.icon
+                  )}
                 </span>
               )}
+              <span
+                className={mergeClasses(
+                  styles.inlineBadgeText,
+                  recordLinkAppearance === false && styles.inlineBadgeTextPlain,
+                )}
+                // Clicking a resolved record opens it, the way a Dynamics lookup does.
+                // Without a handler the click falls through to the wrapper and opens
+                // the dropdown, so the link styling is never a dead end.
+                onClick={
+                  onRecordClick
+                    ? (event) => {
+                        event.stopPropagation();
+                        onRecordClick(opt);
+                      }
+                    : undefined
+                }
+                role={onRecordClick ? 'link' : undefined}
+                tabIndex={onRecordClick ? 0 : undefined}
+                onKeyDown={
+                  onRecordClick
+                    ? (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          onRecordClick(opt);
+                        }
+                      }
+                    : undefined
+                }
+              >
+                {opt.text}
+              </span>
+              {!disabled && clearable && (
+                <button
+                  type="button"
+                  className={styles.inlineBadgeDismiss}
+                  onClick={(e) => handleBadgeDismiss(opt.key, e)}
+                  aria-label={`Remove ${opt.text}`}
+                >
+                  <DismissRegular fontSize={10} />
+                </button>
+              )}
+            </span>,
+            'rest',
+          ))}
+
+          {/* Overflow indicator when maxSelection limits visible badges */}
+          {overflowCount > 0 && (
+            <span className={styles.overflowBadge} title={`${overflowCount} more selected`}>
+              +{overflowCount}
             </span>
-          }
-        />
+          )}
+
+          {/* Text input for searching */}
+          {(showTextInput || badgeItems.length === 0) && (
+            <input
+              id={lookupId}
+              ref={inputRef}
+              type="text"
+              className={styles.tagInputField}
+              value={searchText}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              onFocus={handleFocus}
+              placeholder={badgeItems.length > 0 ? '' : placeholder}
+              disabled={disabled}
+              aria-expanded={isOpen}
+              aria-haspopup="listbox"
+              aria-controls={isOpen ? `${lookupId}-listbox` : undefined}
+              aria-autocomplete="list"
+              aria-activedescendant={highlightedOptionId}
+              aria-label={ariaLabelledBy ? undefined : ariaLabel ?? placeholder ?? 'Lookup'}
+            />
+          )}
+        </div>
+
+        {/* Icons on the right */}
+        <span className={styles.tagInputIcons}>
+          {loading ? (
+            <Spinner size="tiny" />
+          ) : (
+            <span className={styles.chevronIcon}>
+              <SearchRegular />
+            </span>
+          )}
+        </span>
       </div>
 
       {showDropdown && (
@@ -470,6 +604,8 @@ export const Lookup: React.FC<LookupProps> = ({
             style={{
               top: dropdownPosition.top,
               left: dropdownPosition.left,
+              // Hide until position is calculated to prevent flash at 0,0
+              visibility: dropdownPositionReady ? 'visible' : 'hidden',
               ...(matchInputWidth && dropdownPosition.width > 0
                 ? { width: dropdownPosition.width }
                 : { minWidth: 220 }),
@@ -499,6 +635,11 @@ export const Lookup: React.FC<LookupProps> = ({
                     {filteredOptions.map((option, index) => {
                       const isExpanded = expandedKeys.has(option.key);
                       const hasDetails = option.details && option.details.length > 0;
+                      const isSelected = multiSelect
+                        ? isOptionSelected(option.key)
+                        : option.key === selectedOption?.key;
+                      // In multiSelect mode, disable option if max reached and not already selected
+                      const isDisabledByMax = multiSelect && isMaxSelectionReached && !isSelected;
 
                       const handleExpandClick = (e: React.MouseEvent) => {
                         e.stopPropagation();
@@ -513,23 +654,38 @@ export const Lookup: React.FC<LookupProps> = ({
                         });
                       };
 
-                      return (
+                      return withHoverCard(
+                        option,
                         <div
                           key={option.key}
                           id={`${lookupId}-option-${option.key}`}
                           role="option"
                           data-index={index}
-                          aria-selected={option.key === selectedOption?.key}
-                          aria-disabled={option.disabled || undefined}
+                          aria-selected={isSelected}
+                          aria-disabled={option.disabled || isDisabledByMax || undefined}
                           className={mergeClasses(
                             styles.option,
                             index === highlightedIndex && styles.optionHighlighted,
-                            option.key === selectedOption?.key && styles.optionSelected,
-                            option.disabled && styles.optionDisabled
+                            isSelected && styles.optionSelected,
+                            (option.disabled || isDisabledByMax) && styles.optionDisabled
                           )}
                           onClick={() => handleSelectOption(option)}
                           onMouseEnter={() => setHighlightedIndex(index)}
                         >
+                          {/* Show checkbox in multiSelect mode */}
+                          {multiSelect && (
+                            <span className={mergeClasses(
+                              styles.optionCheckbox,
+                              !!option.secondaryText && styles.optionCheckboxWithSecondary
+                            )}>
+                              <Checkbox
+                                checked={isSelected}
+                                disabled={option.disabled || isDisabledByMax}
+                                onChange={() => {/* handled by parent onClick */}}
+                                tabIndex={-1}
+                              />
+                            </span>
+                          )}
                           {option.icon && (
                             <span className={mergeClasses(
                               styles.optionIcon,
@@ -574,7 +730,8 @@ export const Lookup: React.FC<LookupProps> = ({
                               <ChevronDownRegular />
                             </span>
                           )}
-                        </div>
+                        </div>,
+                        'list',
                       );
                     })}
                   </div>

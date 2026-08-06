@@ -23,6 +23,28 @@ export interface EntityGridSort {
   direction: EntityGridSortDirection;
 }
 
+/**
+ * Load mode for the grid:
+ * - `paged`: Traditional prev/next pagination (default)
+ * - `infinite`: Automatically loads more as user scrolls
+ * - `manual`: Shows a "Load More" button
+ */
+export type EntityGridLoadMode = 'paged' | 'infinite' | 'manual';
+
+/**
+ * State for a single column's visibility, pinning, and width.
+ */
+export interface ColumnState {
+  /** Column name (matches EntityGridColumn.name) */
+  name: string;
+  /** Whether the column is visible */
+  visible: boolean;
+  /** Whether the column is pinned to the left */
+  pinned: boolean;
+  /** Current width in pixels */
+  width?: number;
+}
+
 export interface EntityGridProps {
   /** Entity logical name, e.g. "account" */
   entityName: string;
@@ -38,7 +60,7 @@ export interface EntityGridProps {
   filter?: string;
   /** Initial sort. Defaults to the primary name attribute ascending. */
   defaultSort?: EntityGridSort;
-  /** Rows per page. Defaults to 25. */
+  /** Rows per page. Defaults to 50 for virtualized mode, 25 for paged. */
   pageSize?: number;
   /** Heading rendered above the grid */
   title?: React.ReactNode;
@@ -54,9 +76,68 @@ export interface EntityGridProps {
   emptyMessage?: React.ReactNode;
   /** Called whenever a page fails to load */
   onLoadError?: (error: Error) => void;
-  /** Fixed height for the scrolling body, e.g. 400. Omit to grow with content. */
+  /** Fixed height for the scrolling body, e.g. 400. Required for virtualized/infinite modes. */
   height?: number | string;
   className?: string;
+
+  // ─── Virtualization & Infinite Scroll ─────────────────────────────────────
+
+  /**
+   * How to load records:
+   * - `paged`: Traditional prev/next pagination (no virtualization)
+   * - `infinite`: Virtualized with automatic loading on scroll
+   * - `manual`: Virtualized with a "Load More" button
+   * @default 'paged'
+   */
+  loadMode?: EntityGridLoadMode;
+
+  /**
+   * Estimated height of each row in pixels. Used for scroll calculations.
+   * @default 36
+   */
+  estimatedRowHeight?: number;
+
+  /**
+   * Number of rows to render outside the visible area (reduces blank rows during fast scroll).
+   * @default 5
+   */
+  overscan?: number;
+
+  /**
+   * Scroll progress (0-1) at which to trigger loading more records in infinite mode.
+   * @default 0.8
+   */
+  loadThreshold?: number;
+
+  // ─── Column Features ──────────────────────────────────────────────────────
+
+  /**
+   * Enable column resizing by dragging column borders.
+   * @default false
+   */
+  enableColumnResize?: boolean;
+
+  /**
+   * Enable column pinning to fix columns to the left.
+   * @default false
+   */
+  enableColumnPinning?: boolean;
+
+  /**
+   * Show column visibility menu to hide/show columns.
+   * @default false
+   */
+  enableColumnVisibility?: boolean;
+
+  /**
+   * Called when column state changes (visibility, pinning, width).
+   */
+  onColumnsChange?: (columns: ColumnState[]) => void;
+
+  /**
+   * Initial column state. If not provided, all columns are visible and unpinned.
+   */
+  defaultColumnState?: ColumnState[];
 }
 
 export interface EntityGridPage {

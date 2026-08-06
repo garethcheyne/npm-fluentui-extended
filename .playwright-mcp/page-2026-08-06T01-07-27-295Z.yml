@@ -1,0 +1,175 @@
+- generic [ref=f1e4]:
+  - banner [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - heading "FluentUI Extended — Test Harness" [level=1] [ref=f1e7]
+      - button [ref=f1e131]
+    - tablist [ref=f1e9]:
+      - tab "Lookup" [ref=f1e11] [cursor=pointer]
+      - tab "QueryBuilder" [ref=f1e16] [cursor=pointer]
+      - tab "CommandBar" [ref=f1e21] [cursor=pointer]
+      - tab "EntityGrid" [ref=f1e26] [cursor=pointer]
+      - tab "DateTimeField" [ref=f1e31] [cursor=pointer]
+      - tab "OptionSetField" [active] [selected] [ref=f1e36] [cursor=pointer]
+      - tab "HoverCard" [ref=f1e41] [cursor=pointer]
+  - generic [ref=f1e38936]:
+    - heading "Basic Usage" [level=2] [ref=f1e38937]
+    - paragraph [ref=f1e38938]:
+      - text: Options loaded live from
+      - strong [ref=f1e38939]: account
+      - text: attribute metadata.
+    - generic [ref=f1e38940]:
+      - generic [ref=f1e38941]:
+        - heading "Single Select" [level=4] [ref=f1e38942]
+        - paragraph [ref=f1e38943]: Basic single-selection dropdown.
+        - generic [ref=f1e38944]:
+          - generic [ref=f1e38945]: Status Reason (live)
+          - combobox "Status Reason (live)" [ref=f1e38947] [cursor=pointer]: "---"
+        - generic [ref=f1e38951]: (empty)
+      - generic [ref=f1e38952]:
+        - heading "Multi Select" [level=4] [ref=f1e38953]
+        - paragraph [ref=f1e38954]:
+          - code [ref=f1e38955]: multiselect
+          - text: — Checkbox-style selection.
+        - generic [ref=f1e38956]:
+          - generic [ref=f1e38957]: Industry (live)
+          - combobox "Industry (live)" [ref=f1e38959] [cursor=pointer]: "---"
+        - generic [ref=f1e38963]: (empty)
+      - generic [ref=f1e38964]:
+        - heading "Color Indicators" [level=4] [ref=f1e38965]
+        - paragraph [ref=f1e38966]:
+          - code [ref=f1e38967]: showColors
+          - text: — Visual status badges.
+        - generic [ref=f1e38968]:
+          - generic [ref=f1e38969]: Priority
+          - combobox "Priority" [ref=f1e38971] [cursor=pointer]: "---"
+        - generic [ref=f1e38975]: (empty)
+    - generic [ref=f1e38976]:
+      - strong [ref=f1e38977]: "Features:"
+      - list [ref=f1e38978]:
+        - listitem [ref=f1e38979]:
+          - strong [ref=f1e38980]: "Static mode:"
+          - text: Pass
+          - code [ref=f1e38981]: options
+          - text: array for offline use
+        - listitem [ref=f1e38982]:
+          - strong [ref=f1e38983]: "Live mode:"
+          - text: Pass
+          - code [ref=f1e38984]: entityName
+          - text: +
+          - code [ref=f1e38985]: attributeName
+          - text: to fetch from metadata
+        - listitem [ref=f1e38986]:
+          - strong [ref=f1e38987]: "Colors:"
+          - text: Set
+          - code [ref=f1e38988]: showColors
+          - text: and provide
+          - code [ref=f1e38989]: color
+          - text: in options
+        - listitem [ref=f1e38990]:
+          - strong [ref=f1e38991]: "Multi-select:"
+          - text: Set
+          - code [ref=f1e38992]: multiselect
+          - text: for checkbox-style selection
+  - generic [ref=f1e38993]:
+    - heading "Field States" [level=2] [ref=f1e38994]
+    - paragraph [ref=f1e38995]: Different visual states for the option set field.
+    - generic [ref=f1e38996]:
+      - generic [ref=f1e38997]:
+        - heading "Required Field" [level=4] [ref=f1e38998]
+        - paragraph [ref=f1e38999]:
+          - code [ref=f1e39000]: required
+          - text: — Shows required indicator.
+        - generic [ref=f1e39001]:
+          - generic [ref=f1e39002]: Status*
+          - combobox "Status" [ref=f1e39004] [cursor=pointer]: "---"
+      - generic [ref=f1e39008]:
+        - heading "Disabled Field" [level=4] [ref=f1e39009]
+        - paragraph [ref=f1e39010]:
+          - code [ref=f1e39011]: disabled
+          - text: — Cannot be changed.
+        - generic [ref=f1e39012]:
+          - generic [ref=f1e39013]: Status (Disabled)
+          - combobox "Status (Disabled)" [disabled] [ref=f1e39015]: Active
+      - generic [ref=f1e39019]:
+        - heading "Custom Placeholder" [level=4] [ref=f1e39020]
+        - paragraph [ref=f1e39021]:
+          - code [ref=f1e39022]: placeholder
+          - text: — Custom empty state text.
+        - generic [ref=f1e39023]:
+          - generic [ref=f1e39024]: Priority
+          - combobox "Priority" [ref=f1e39026] [cursor=pointer]: Choose a priority level...
+  - generic [ref=f1e39030]:
+    - heading "Badge Style" [level=2] [ref=f1e39031]
+    - paragraph [ref=f1e39032]:
+      - text: Coloured options displayed as pill badges using
+      - code [ref=f1e39033]: asBadge
+      - text: .
+    - generic [ref=f1e39034]:
+      - generic [ref=f1e39035]:
+        - heading "Badge Mode" [level=4] [ref=f1e39036]
+        - paragraph [ref=f1e39037]:
+          - code [ref=f1e39038]: asBadge
+          - text: — Options with a colour show as badges.
+        - generic [ref=f1e39039]:
+          - generic [ref=f1e39040]: Priority
+          - combobox "Priority" [ref=f1e39042] [cursor=pointer]: "---"
+        - generic [ref=f1e39046]: (empty)
+      - generic [ref=f1e39047]:
+        - heading "Status Badges" [level=4] [ref=f1e39048]
+        - paragraph [ref=f1e39049]: Status options shown as coloured pills.
+        - generic [ref=f1e39050]:
+          - generic [ref=f1e39051]: Status
+          - combobox "Status" [ref=f1e39053] [cursor=pointer]: "---"
+        - generic [ref=f1e39057]: (empty)
+      - generic [ref=f1e39058]:
+        - heading "Swatch vs Badge" [level=4] [ref=f1e39059]
+        - paragraph [ref=f1e39060]:
+          - text: Compare
+          - code [ref=f1e39061]: showColors
+          - text: (swatch) vs
+          - code [ref=f1e39062]: asBadge
+          - text: (pill).
+        - generic [ref=f1e39063]:
+          - generic [ref=f1e39064]:
+            - generic [ref=f1e39065]: Swatch Style
+            - combobox "Swatch Style" [ref=f1e39067] [cursor=pointer]: "---"
+          - generic [ref=f1e39071]:
+            - generic [ref=f1e39072]: Badge Style
+            - combobox "Badge Style" [ref=f1e39074] [cursor=pointer]: "---"
+      - generic [ref=f1e39078]:
+        - heading "Multi-Select Badges" [level=4] [ref=f1e39079]
+        - paragraph [ref=f1e39080]:
+          - code [ref=f1e39081]: multiselect + asBadge
+          - text: — Multiple badges displayed.
+        - generic [ref=f1e39082]:
+          - generic [ref=f1e39083]: Tags
+          - combobox "Tags" [ref=f1e39085] [cursor=pointer]:
+            - generic [ref=f1e39086]:
+              - generic [ref=f1e39087]: Frontend
+              - generic [ref=f1e39088]: Backend
+        - generic [ref=f1e39092]: 1, 2
+  - generic [ref=f1e39093]:
+    - heading "Appearance Variants" [level=2] [ref=f1e39094]
+    - paragraph [ref=f1e39095]: Different visual styles for the dropdown.
+    - generic [ref=f1e39096]:
+      - generic [ref=f1e39097]:
+        - heading "Outline (Default)" [level=4] [ref=f1e39098]
+        - paragraph [ref=f1e39099]:
+          - code [ref=f1e39100]: appearance="outline"
+        - generic [ref=f1e39101]:
+          - generic [ref=f1e39102]: Status
+          - combobox "Status" [ref=f1e39104] [cursor=pointer]: "---"
+      - generic [ref=f1e39108]:
+        - heading "Underline" [level=4] [ref=f1e39109]
+        - paragraph [ref=f1e39110]:
+          - code [ref=f1e39111]: appearance="underline"
+        - generic [ref=f1e39112]:
+          - generic [ref=f1e39113]: Status
+          - combobox "Status" [ref=f1e39115] [cursor=pointer]: "---"
+      - generic [ref=f1e39119]:
+        - heading "Filled Darker" [level=4] [ref=f1e39120]
+        - paragraph [ref=f1e39121]:
+          - code [ref=f1e39122]: appearance="filled-darker"
+        - generic [ref=f1e39123]:
+          - generic [ref=f1e39124]: Status
+          - combobox "Status" [ref=f1e39126] [cursor=pointer]: "---"

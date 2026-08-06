@@ -52,8 +52,17 @@ export const useEntityGridStyles = makeStyles({
     minWidth: 'max-content',
   },
 
+  // Sticky table header for virtualized scrolling
+  stickyHeader: {
+    position: 'sticky',
+    top: 0,
+    zIndex: 1,
+    backgroundColor: tokens.colorNeutralBackground1,
+  },
+
   headerCell: {
     whiteSpace: 'nowrap',
+    position: 'relative',
   },
 
   sortableHeader: {
@@ -68,6 +77,15 @@ export const useEntityGridStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalXXS,
+    width: '100%',
+  },
+
+  headerLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXXS,
+    flexGrow: 1,
+    cursor: 'pointer',
   },
 
   sortIcon: {
@@ -75,12 +93,64 @@ export const useEntityGridStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
   },
 
+  // Column actions (pin button, etc.)
+  columnActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '2px',
+    opacity: 0,
+    transition: 'opacity 0.1s',
+  },
+
+  columnAction: {
+    minWidth: '20px',
+    width: '20px',
+    height: '20px',
+    padding: 0,
+  },
+
+  columnActionActive: {
+    color: tokens.colorBrandForeground1,
+    opacity: 1,
+  },
+
+  // Resize handle
+  resizeHandle: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: '4px',
+    height: '100%',
+    cursor: 'col-resize',
+    backgroundColor: 'transparent',
+    ':hover': {
+      backgroundColor: tokens.colorBrandBackground,
+    },
+  },
+
+  // Pinned column styling
+  pinnedColumn: {
+    position: 'sticky',
+    left: 0,
+    zIndex: 1,
+    backgroundColor: tokens.colorNeutralBackground1,
+    boxShadow: `2px 0 4px ${tokens.colorNeutralShadowAmbient}`,
+  },
+
   row: {
     cursor: 'default',
+    ':focus': {
+      outline: `2px solid ${tokens.colorBrandStroke1}`,
+      outlineOffset: '-2px',
+    },
   },
 
   rowClickable: {
     cursor: 'pointer',
+  },
+
+  rowSelected: {
+    backgroundColor: tokens.colorNeutralBackground1Selected,
   },
 
   cell: {
@@ -105,6 +175,16 @@ export const useEntityGridStyles = makeStyles({
     color: tokens.colorStatusDangerForeground1,
   },
 
+  // Loading more indicator for infinite scroll
+  loadingMore: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    color: tokens.colorNeutralForeground3,
+  },
+
   footer: {
     display: 'flex',
     alignItems: 'center',
@@ -121,6 +201,23 @@ export const useEntityGridStyles = makeStyles({
   footerText: {
     color: tokens.colorNeutralForeground3,
     fontSize: tokens.fontSizeBase200,
+  },
+
+  // Progress bar for infinite scroll
+  progressContainer: {
+    width: '100px',
+    height: '4px',
+    backgroundColor: tokens.colorNeutralBackground3,
+    borderRadius: tokens.borderRadiusSmall,
+    overflow: 'hidden',
+    marginLeft: tokens.spacingHorizontalS,
+    marginRight: tokens.spacingHorizontalS,
+  },
+
+  progressBar: {
+    height: '100%',
+    backgroundColor: tokens.colorBrandBackground,
+    transition: 'width 0.3s ease',
   },
 
   pager: {

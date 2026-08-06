@@ -1,6 +1,9 @@
 import type { InputProps } from '@fluentui/react-components';
 import type * as React from 'react';
 
+/** Size variants matching FluentUI Input component */
+export type LookupSize = 'small' | 'medium';
+
 export interface LookupOptionDetail {
   /** Label for the detail row - can be a string or React element */
   label?: React.ReactNode;
@@ -30,7 +33,17 @@ export interface LookupOption {
   data?: unknown;
   /** Whether the option is disabled */
   disabled?: boolean;
+  /**
+   * Logical name of the record this option refers to, e.g. "account". Together with
+   * `recordId` this is what lets the hover card fetch the record on demand.
+   */
+  entityName?: string;
+  /** Record GUID. Defaults to `key`, which is usually already the id. */
+  recordId?: string;
 }
+
+/** Where a Lookup's hover card is offered. */
+export type LookupHoverCardTarget = 'list' | 'rest' | 'both';
 
 export interface LookupProps extends Omit<InputProps, 'onChange' | 'value'> {
   /** Unique identifier for the lookup - auto-generated if not provided */
@@ -99,5 +112,80 @@ export interface LookupProps extends Omit<InputProps, 'onChange' | 'value'> {
    * Without it the click falls through to opening the dropdown as before.
    */
   onRecordClick?: (option: LookupOption) => void;
-}
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // MULTI-SELECT MODE
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Enable multi-select mode. When true, multiple options can be selected and
+   * they are displayed as badges with a dismiss button. Defaults to `false`.
+   */
+  multiSelect?: boolean;
+
+  /**
+   * Maximum number of selections allowed in multi-select mode. Set to `undefined`
+   * or `0` for unlimited selections. Only applies when `multiSelect` is true.
+   */
+  maxSelection?: number;
+
+  /**
+   * Currently selected option keys in multi-select mode (use with options array lookup).
+   * Only used when `multiSelect` is true.
+   */
+  selectedKeys?: string[];
+
+  /**
+   * Currently selected options in multi-select mode (use for controlled selection).
+   * Only used when `multiSelect` is true.
+   */
+  selectedOptions?: LookupOption[];
+
+  /**
+   * Callback when selection changes in multi-select mode - receives array of selected options.
+   * Only called when `multiSelect` is true.
+   */
+  onOptionsSelect?: (options: LookupOption[]) => void;
+
+  /**
+   * Size of the input control. Matches FluentUI Input sizing.
+   * - 'small': 24px height (use in compact layouts like QueryBuilder)
+   * - 'medium': 32px height (default, matches standard form fields)
+   */
+  size?: LookupSize;
+
+  // ── Hover card ──────────────────────────────────────────────────────────────
+
+  /**
+   * Reveal a record card when the pointer settles on an option. Off by default.
+   *
+   * With `hoverCardColumns` the card is populated from the Web API using the option's
+   * `entityName` and `recordId` - nothing is fetched until a card is actually opened,
+   * so a list of fifty results costs no extra requests until one is hovered.
+   *
+   * Supply `renderHoverCard` instead to build the card content yourself.
+   */
+  showHoverCard?: boolean;
+  /**
+   * Columns to fetch and list on the card. Requires each option to carry `entityName`
+   * (and `recordId`, when the key is not the record's GUID).
+   */
+  hoverCardColumns?: string[];
+  /**
+   * Build the card body yourself. Receives the option; return `null` to suppress the
+   * card for that option. Takes precedence over `hoverCardColumns`.
+   */
+  renderHoverCard?: (option: LookupOption) => React.ReactNode;
+  /**
+   * Which surfaces offer the card: the dropdown rows, the resolved value at rest, or
+   * both. Defaults to `'both'`.
+   */
+  hoverCardTarget?: LookupHoverCardTarget;
+  /**
+   * Delay in ms before a hover opens the card and triggers its fetch. Defaults to 400,
+   * which stops a pointer crossing the list from firing a request per row.
+   */
+  hoverCardDelayMs?: number;
+  /** Content rendered at the bottom of the card, e.g. an "Open record" link */
+  hoverCardActions?: React.ReactNode;
+}
