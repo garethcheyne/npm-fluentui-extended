@@ -141,6 +141,12 @@ export const useLookupStyles = makeStyles({
     flexShrink: 0,
   },
 
+  /** Single-select rest state should consume the available field width before truncating. */
+  inlineBadgeSingle: {
+    maxWidth: '100%',
+    flexShrink: 1,
+  },
+
   /** Entity icon inside the inline badge */
   inlineBadgeIcon: {
     display: 'flex',
@@ -157,6 +163,8 @@ export const useLookupStyles = makeStyles({
   inlineBadgeText: {
     color: tokens.colorBrandForeground1,
     cursor: 'pointer',
+    flex: '1 1 auto',
+    minWidth: 0,
     ':hover': {
       textDecorationLine: 'underline',
     },
@@ -180,19 +188,19 @@ export const useLookupStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '14px',
-    height: '14px',
+    width: '16px',
+    height: '16px',
     padding: 0,
     border: 'none',
     borderRadius: tokens.borderRadiusCircular,
     backgroundColor: 'transparent',
     cursor: 'pointer',
-    color: tokens.colorNeutralForeground3,
+    color: tokens.colorBrandForeground1,
     flexShrink: 0,
 
     ':hover': {
       backgroundColor: tokens.colorNeutralBackground1Hover,
-      color: tokens.colorNeutralForeground1,
+      color: tokens.colorBrandForeground1,
     },
   },
 

@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
+  anchorTimeOnlyDate,
   buildTimeOptions,
   formatLocalDate,
   formatLocalTime,
   formatStoredValue,
+  formatTimeOnlyValue,
+  parseTimeOnlyValue,
   parseStoredValue,
   withTime,
 } from './DateTimeField.utils';
@@ -120,5 +123,28 @@ describe('buildTimeOptions', () => {
   it('falls back to 30 minutes for a nonsensical interval', () => {
     expect(buildTimeOptions(0)).toHaveLength(48);
     expect(buildTimeOptions(-5)).toHaveLength(48);
+  });
+});
+
+describe('timeOnly helpers', () => {
+  it('parses HH:mm to a date anchored to 1970-01-01', () => {
+    const parsed = parseTimeOnlyValue('14:30');
+
+    expect(parsed).not.toBeNull();
+    expect(formatLocalDate(parsed!)).toBe('1970-01-01');
+    expect(formatLocalTime(parsed!)).toBe('14:30');
+  });
+
+  it('rebases a full date onto the time-only anchor day', () => {
+    const anchored = anchorTimeOnlyDate(new Date(2026, 7, 6, 9, 15, 10));
+
+    expect(formatLocalDate(anchored)).toBe('1970-01-01');
+    expect(formatLocalTime(anchored)).toBe('09:15');
+    expect(anchored.getSeconds()).toBe(10);
+  });
+
+  it('serializes time-only values as HH:mm', () => {
+    expect(formatTimeOnlyValue(new Date(1970, 0, 1, 8, 45, 12))).toBe('08:45');
+    expect(formatTimeOnlyValue(null)).toBeNull();
   });
 });

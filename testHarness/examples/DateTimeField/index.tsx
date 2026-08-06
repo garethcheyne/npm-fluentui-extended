@@ -17,7 +17,7 @@
  */
 
 import React, { useState } from 'react';
-import { DateTimeField } from '../../../src';
+import { DateTimeField, DateTimeRangeField } from '../../../src';
 import type { ExampleProps } from '../shared/types';
 
 // =============================================================================
@@ -56,6 +56,17 @@ export function DateTimeFieldExamples({ dynamicsConnected }: ExampleProps) {
   const [restrictedTimeValue, setRestrictedTimeValue] = useState<string | null>(null);
   const [intervalValue, setIntervalValue] = useState<string | null>(null);
   const [timeOnlyValue, setTimeOnlyValue] = useState<string | null>(null);
+  const [rangeValue, setRangeValue] = useState<{
+    startValue: string | null;
+    endValue: string | null;
+    startDate: Date | null;
+    endDate: Date | null;
+  }>({
+    startValue: null,
+    endValue: null,
+    startDate: null,
+    endDate: null,
+  });
 
   // Custom Display Format section - individual state for each example
   const [fullFormatValue, setFullFormatValue] = useState<string | null>(null);
@@ -311,7 +322,54 @@ export function DateTimeFieldExamples({ dynamicsConnected }: ExampleProps) {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          SECTION 3: Custom Display Format
+          SECTION 3: Range / Between
+          ═══════════════════════════════════════════════════════════════════════ */}
+      <section style={{ marginBottom: 40 }}>
+        <h2>Date / Time Between</h2>
+        <p style={{ color: '#666', marginBottom: 12 }}>
+          Use <code>DateTimeRangeField</code> when you need a start and end value together,
+          with the callback exposing both serialized stored values and both resolved <code>Date</code> objects.
+        </p>
+
+        <div
+          style={{
+            border: '1px solid #e1dfdd',
+            borderRadius: 8,
+            padding: 16,
+            background: '#fff',
+            maxWidth: 640,
+          }}
+        >
+          <DateTimeRangeField
+            label="Booking window"
+            startLabel="Start date"
+            endLabel="End date"
+            showTime
+            timeFormat="12h"
+            value={{
+              start: rangeValue.startValue,
+              end: rangeValue.endValue,
+            }}
+            onChange={setRangeValue}
+          />
+
+          <pre style={{ margin: '12px 0 0', fontSize: 12, color: '#666', whiteSpace: 'pre-wrap' }}>
+            {JSON.stringify(
+              {
+                startValue: rangeValue.startValue,
+                endValue: rangeValue.endValue,
+                startDate: rangeValue.startDate?.toISOString() ?? null,
+                endDate: rangeValue.endDate?.toISOString() ?? null,
+              },
+              null,
+              2,
+            )}
+          </pre>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          SECTION 4: Custom Display Format
           ═══════════════════════════════════════════════════════════════════════ */}
       <section style={{ marginBottom: 40 }}>
         <h2>Custom Display Format</h2>

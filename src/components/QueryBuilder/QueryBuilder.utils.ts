@@ -213,13 +213,18 @@ const isValueEmpty = (value: any): boolean => {
 const normalizeAttributeType = (typeValue: unknown): string =>
     String(typeValue ?? '').toLowerCase().replace(/type$/, '');
 
+/** Preserve the original Dynamics attribute type token for UI-level distinctions. */
+export const attributeTypeFromAttribute = (attribute: any): string => {
+    const typeValue = attribute?.AttributeTypeName?.Value || attribute?.AttributeType || attribute?.Type || '';
+    return normalizeAttributeType(typeValue);
+};
+
 /**
  * Infer data type from Dynamics 365 attribute metadata
  */
 export const dataTypeFromAttribute = (attribute: any): QueryBuilderDataType => {
     // Handle both AttributeType (string) and AttributeTypeName (object with Value property)
-    const typeValue = attribute?.AttributeTypeName?.Value || attribute?.AttributeType || attribute?.Type || '';
-    const type = normalizeAttributeType(typeValue);
+    const type = attributeTypeFromAttribute(attribute);
 
     // Check if the attribute has Targets array - definitive indicator of lookup
     if (attribute?.Targets && Array.isArray(attribute.Targets) && attribute.Targets.length > 0) {

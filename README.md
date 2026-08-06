@@ -63,15 +63,11 @@ A searchable dropdown component styled after Dynamics 365 lookup fields. Support
 
 ### QueryBuilder
 
-> **🚧 Beta** - This component is in beta. Please report any issues on [GitHub](https://github.com/garethcheyne/npm-fluentui-extended/issues).
-
 An Advanced Find-style query builder for Dynamics 365. Build complex filter conditions with AND/OR logic, serialize to FetchXML or OData, and validate queries against the Dynamics 365 API.
 
 ![QueryBuilder](assets/screenshot-querybuilder.png)
 
 ### CommandBar
-
-> **🚧 Beta**
 
 A Dynamics-style command bar. Commands that no longer fit collapse into a "More commands" menu
 rather than wrapping to a second row or being clipped.
@@ -80,8 +76,7 @@ rather than wrapping to a second row or being clipped.
 
 ### EntityGrid
 
-> **🧪 Experimental / in development** — the API and behaviour are still moving. Not recommended
-> for production use yet.
+> **🚧 Beta** — this is the only component in the library still marked as not yet stable.
 
 A subgrid backed by the Web API: columns named from entity metadata, server-side paging and
 sorting, and lookups rendered as names rather than GUIDs.
@@ -90,16 +85,12 @@ sorting, and lookups rendered as names rather than GUIDs.
 
 ### DateTimeField
 
-> **🚧 Beta**
-
 A date/time field that respects the attribute's Dynamics `DateTimeBehavior`, so `DateOnly` values
 cannot drift a day across timezones.
 
 ![DateTimeField](assets/screenshot-datetimefield.png)
 
 ### OptionSetField
-
-> **🚧 Beta**
 
 An optionset / multi-select picklist field that loads its options from metadata, including global
 option sets, and round-trips multi-selects in the comma-separated form Dynamics stores.
@@ -110,16 +101,12 @@ option sets, and round-trips multi-selects in the comma-separated form Dynamics 
 
 ### RecordHoverCard
 
-> **🚧 Beta**
-
 A hover card for a record reference. The record is fetched lazily once the pointer settles, and the
 result is held so re-opening costs nothing.
 
 ![RecordHoverCard](assets/screenshot-hovercard.png)
 
 ### SystemUserPersona
-
-> **🚧 Beta**
 
 A Dynamics systemuser persona with the contact card a persona shows on a model-driven form.
 
@@ -128,8 +115,6 @@ A Dynamics systemuser persona with the contact card a persona shows on a model-d
 ![SystemUserPersona contact card](assets/screenshot-persona-card.png)
 
 ### OwnerLookup
-
-> **🚧 Beta**
 
 A preconfigured `Lookup` for `ownerid`. An owner is a user *or* a team, so both are searched;
 selections render as the usual Lookup badges and multi-select comes for free.
@@ -399,9 +384,87 @@ button, and a magnifier rather than a chevron.
 />
 ```
 
-Without `onRecordClick` the link styling is still applied but the click falls through to opening the
-dropdown, so the affordance never becomes a dead end. Set `recordLinkAppearance={false}` to render the
-value as plain input text instead.
+If the selected option carries Dynamics record metadata (`entityName` plus `recordId` or `key`), the
+Lookup now behaves like a native Dynamics field by default:
+
+- Clicking the resolved value opens the record
+- `Xrm.Navigation.openForm(...)` is used when available
+- Outside a form, it falls back to a Dynamics `main.aspx` entity-record URL
+
+Pass `onRecordClick` to override that default navigation. Set `recordLinkAppearance={false}` to render
+the value as plain input text instead.
+
+### Lookup Setup Modes
+
+The same component supports three distinct setups:
+
+#### 1. Plain custom values
+
+Use this when the lookup is just a searchable picker and does not represent a Dynamics table row.
+
+```tsx
+const options: LookupOption[] = [
+  { key: 'draft', text: 'Draft' },
+  { key: 'submitted', text: 'Submitted' },
+  { key: 'approved', text: 'Approved' },
+];
+
+<Lookup
+  options={options}
+  selectedOption={selected}
+  onOptionSelect={setSelected}
+/>
+```
+
+Only `key` and `text` are required. In this mode there is no record navigation and no Web API-backed
+hover card unless you provide your own custom card body.
+
+#### 2. Dynamics-backed records
+
+Use this when each option represents a real Dataverse / Dynamics record.
+
+```tsx
+const options: LookupOption[] = [
+  {
+    key: '00000000-0000-0000-0000-000000000001',
+    text: 'Contoso Ltd',
+    entityName: 'account',
+    recordId: '00000000-0000-0000-0000-000000000001',
+  },
+];
+
+<Lookup
+  options={options}
+  selectedOption={selected}
+  onOptionSelect={setSelected}
+/>
+```
+
+When `entityName` and `recordId` are present, the selected value can behave like a native Dynamics
+lookup link and the built-in record hover card can fetch the record lazily.
+
+#### 3. Dynamics-backed records with hover cards
+
+Turn on `showHoverCard` when you want the lookup to reveal record details on hover.
+
+```tsx
+<Lookup
+  options={options}
+  selectedOption={selected}
+  onOptionSelect={setSelected}
+  showHoverCard
+  hoverCardColumns={['accountnumber', 'telephone1', 'primarycontactid']}
+  hoverCardTarget="both"
+/>
+```
+
+Two hover-card modes are supported:
+
+- Built-in record card: provide `entityName` and `recordId` on each option, plus `hoverCardColumns`
+- Custom card body: provide `renderHoverCard={(option) => ...}`
+
+If a rest-state hover card is active, the component does not also show the compacted-value tooltip on
+that same surface.
 
 ### Lookup Props
 
@@ -412,7 +475,7 @@ value as plain input text instead.
 | `entityIcon` | `React.ReactNode` | option's `icon` | Table icon shown at rest |
 | `entityImage` | `string` | - | Entity image URL, shown in place of the icon |
 | `recordLinkAppearance` | `boolean` | `true` | Render the resolved value as a link |
-| `onRecordClick` | `(option: LookupOption) => void` | - | Called when the resolved value is clicked |
+| `onRecordClick` | `(option: LookupOption) => void` | - | Overrides the default Dynamics record navigation when the resolved value is clicked |
 | `options` | `LookupOption[]` | `[]` | Options to display in the dropdown |
 | `selectedKey` | `string \| null` | - | Selected option key (controlled) |
 | `selectedOption` | `LookupOption \| null` | - | Selected option object (recommended for async) |
@@ -431,6 +494,12 @@ value as plain input text instead.
 | `open` | `boolean` | - | Controlled open state for the dropdown |
 | `onOpenChange` | `(open: boolean) => void` | - | Callback when dropdown open state changes |
 | `disableClientFilter` | `boolean` | `false` | Disable client-side filtering of options. Use this when filtering is performed server-side via `onSearchChange` |
+| `showHoverCard` | `boolean` | `false` | Reveal a hover card on lookup rows and/or the resolved value |
+| `hoverCardColumns` | `string[]` | - | Columns fetched and listed by the built-in record card |
+| `renderHoverCard` | `(option: LookupOption) => ReactNode` | - | Build the hover card body yourself |
+| `hoverCardTarget` | `'list' \| 'rest' \| 'both'` | `'both'` | Which lookup surfaces offer the hover card |
+| `hoverCardDelayMs` | `number` | `400` | Hover-intent delay before opening the card |
+| `hoverCardActions` | `ReactNode` | - | Footer actions rendered on the card |
 | `searchFields` | `string` | - | Hidden searchable text (never rendered). Use this to include additional searchable content (codes, IDs) while displaying JSX in `secondaryText` |
 
 ### Client-Side Filtering
@@ -508,6 +577,8 @@ interface LookupOption {
   details?: LookupOptionDetail[];   // Expandable details (chevron appears)
   data?: unknown;                   // Custom data payload for your app
   disabled?: boolean;               // Disable this option
+  entityName?: string;              // Dynamics table logical name, e.g. 'account'
+  recordId?: string;                // Dynamics record GUID; falls back to key when omitted
 }
 
 interface LookupOptionDetail {
@@ -517,6 +588,10 @@ interface LookupOptionDetail {
 ```
 
 > **Note:** Both `secondaryText` and `details` support React elements, not just strings. See [Rich Secondary Text](#rich-secondary-text-with-react-elements) for examples. When using JSX in `secondaryText`, use `searchFields` to provide hidden searchable text (see [Client-Side Filtering](#client-side-filtering)).
+
+`entityName` plus `recordId` are what switch a generic option into a Dynamics-backed record option.
+That metadata is used by the default selected-value navigation path and by the built-in hover-card
+fetch path.
 
 ## Keyboard Navigation
 
@@ -963,7 +1038,7 @@ clipped rather than moved.
 
 ## EntityGrid
 
-> **🧪 Experimental / in development.** Expect the API to change.
+> **🚧 Beta.** EntityGrid is the only component still marked as not yet stable.
 
 A subgrid backed by the Web API. `DataGrid` renders rows you already have; `EntityGrid` fetches them.
 
@@ -1031,14 +1106,37 @@ west of Greenwich, while `toISOString()` on a local date shifts the day for any 
 `DateTimeField` handles both explicitly.
 
 ```tsx
-import { DateTimeField } from 'fluentui-extended';
+import { useState } from 'react';
+import { DateTimeField, DateTimeRangeField } from 'fluentui-extended';
 
-<DateTimeField
-  label="Estimated Close Date"
-  behavior="DateOnly"
-  value={value}
-  onChange={(stored) => setValue(stored)}  // "2026-08-06", never an ISO timestamp
-/>
+function Example() {
+  const [value, setValue] = useState<string | null>(null);
+  const [range, setRange] = useState({
+    startValue: null as string | null,
+    endValue: null as string | null,
+  });
+
+  return (
+    <>
+      <DateTimeField
+        label="Estimated Close Date"
+        behavior="DateOnly"
+        value={value}
+        onChange={(stored) => setValue(stored)}  // "2026-08-06", never an ISO timestamp
+      />
+
+      <DateTimeRangeField
+        label="Booking window"
+        showTime
+        value={{ start: range.startValue, end: range.endValue }}
+        onChange={({ startValue, endValue, startDate, endDate }) => {
+          setRange({ startValue, endValue });
+          console.log(startDate, endDate);
+        }}
+      />
+    </>
+  );
+}
 ```
 
 Pass `entityName` and `attributeName` to read the behavior from metadata instead of declaring it.
@@ -1050,6 +1148,10 @@ import { parseStoredValue, formatStoredValue } from 'fluentui-extended';
 const date = parseStoredValue('2026-08-06', 'DateOnly');   // local midnight on the 6th
 const stored = formatStoredValue(date, 'DateOnly');        // "2026-08-06"
 ```
+
+`DateTimeRangeField` is a composed helper for "between" inputs. It renders a start and end
+`DateTimeField` side by side and emits both the serialized values (`startValue`, `endValue`) and the
+resolved `Date` objects (`startDate`, `endDate`) in one callback.
 
 ### DateTimeField Props
 
@@ -1088,6 +1190,10 @@ dropdown that should be populated comes back empty. And a **multi-select picklis
 as a comma-separated string, so `"1,2"` and `[1, 2]` have to mean the same thing; `parseSelectedValues`
 and `formatMultiSelectValue` are exported for that conversion.
 
+When an option set has many values, the popup list stays constrained and scrolls inside the listbox
+instead of growing indefinitely. The control also supports typing to filter options by label, which
+is especially useful for long status-reason, industry, or category lists.
+
 ### OptionSetField Props
 
 | Prop | Type | Default | Description |
@@ -1099,6 +1205,13 @@ and `formatMultiSelectValue` are exported for that conversion.
 | `onChange` | `(value: number \| number[] \| null) => void` | - | Selection handler |
 | `showColors` | `boolean` | `false` | Render metadata colours as swatches |
 | `clearable` | `boolean` | `true` | Allow clearing the selection |
+
+### OptionSetField Behaviour
+
+- Type in the field to filter the available options by label
+- Long option lists are capped and scroll inside the popup
+- `multiselect` keeps the Dynamics-style multi-value semantics while still allowing filter-by-typing
+- `value` still accepts Dynamics' stored comma-separated string form for multi-select picklists
 
 ---
 

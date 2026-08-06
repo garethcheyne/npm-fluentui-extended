@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Dropdown, Field, Option, Spinner, Text, mergeClasses } from '@fluentui/react-components';
+import { Combobox, Field, Option, Spinner, Text, mergeClasses } from '@fluentui/react-components';
 import { getAttributeOptions } from '../../api/metadata';
 import { DEFAULT_FIELD_APPEARANCE, toListboxAppearance } from '../../types/appearance';
 import { useOptionSetFieldStyles } from './OptionSetField.styles';
@@ -72,6 +72,8 @@ export const OptionSetField: React.FC<OptionSetFieldProps> = ({
   const [loadedOptions, setLoadedOptions] = React.useState<OptionSetOption[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [filterText, setFilterText] = React.useState('');
+  const [isOpen, setIsOpen] = React.useState(Boolean(open));
 
   const shouldAutoLoad = !providedOptions?.length && Boolean(entityName && attributeName);
 
@@ -104,15 +106,27 @@ export const OptionSetField: React.FC<OptionSetFieldProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shouldAutoLoad, entityName, attributeName]);
 
+  React.useEffect(() => {
+    if (open !== undefined) {
+      setIsOpen(open);
+    }
+  }, [open]);
+
   const options = providedOptions?.length ? providedOptions : loadedOptions;
   const selectedValues = React.useMemo(() => parseSelectedValues(value), [value]);
   const displayLabels = React.useMemo(() => selectedLabels(options, selectedValues), [options, selectedValues]);
+  const filteredOptions = React.useMemo(() => {
+    const query = filterText.trim().toLowerCase();
+    if (!query) return options;
+    return options.filter((option) => option.label.toLowerCase().includes(query));
+  }, [options, filterText]);
 
   // Get full selected option objects for badge rendering
   const selectedOptions = React.useMemo(
     () => options.filter((opt) => selectedValues.includes(opt.value)),
     [options, selectedValues],
   );
+  const showBadgeValueOverlay = asBadge && selectedOptions.length > 0 && !isOpen;
 
   const handleOptionSelect = React.useCallback(
     (_: unknown, data: { optionValue?: string; selectedOptions: string[] }) => {
@@ -132,63 +146,96 @@ export const OptionSetField: React.FC<OptionSetFieldProps> = ({
         return;
       }
       onChange?.(next);
+      setFilterText('');
     },
     [multiselect, onChange, clearable, selectedValues],
   );
+  const handleInputChange = React.useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setFilterText(event.target.value);
+  }, []);
 
-  // Build the button content when asBadge is enabled
-  const badgeButtonContent =
-    asBadge && selectedOptions.length > 0 ? (
-      <span className={styles.badgeContainer}>
-        {selectedOptions.map((opt) =>
-          opt.color ? (
-            <span
-              key={opt.value}
-              className={mergeClasses(styles.badge, getBadgeTextClass(opt.color, styles))}
-              style={{ backgroundColor: opt.color }}
-            >
-              {opt.label}
-            </span>
-          ) : (
-            <span key={opt.value} className={styles.badgeNoColor}>
-              {opt.label}
-            </span>
-          ),
-        )}
-      </span>
-    ) : undefined;
+  const handleOpenChange = React.useCallback((_: unknown, data: { open: boolean }) => {
+    setIsOpen(data.open);
+    if (!data.open) {
+      setFilterText('');
+    }
+  }, []);
+
+  const displayValue = isOpen ? filterText : showBadgeValueOverlay ? '' : displayLabels.join(', ');
 
   const control = (
     <>
-      <Dropdown
-        className={styles.dropdown}
-        listbox={{ className: styles.listbox }}
-        open={open}
-        // Dropdown never supported the deprecated shadow fills, so they are narrowed
-        appearance={toListboxAppearance(appearance)}
-        multiselect={multiselect}
-        placeholder={loading ? 'Loading...' : placeholder}
-        disabled={disabled || loading}
-        value={badgeButtonContent ? '' : displayLabels.join(', ')}
-        selectedOptions={selectedValues.map(String)}
-        onOptionSelect={handleOptionSelect}
-        button={badgeButtonContent ? { children: badgeButtonContent } : undefined}
-      >
-        {options.map((option) => (
-          <Option key={option.value} value={String(option.value)} text={option.label} disabled={option.disabled}>
-            <span className={styles.optionContent}>
-              {showColors && (
-                <span
-                  className={styles.swatch}
-                  style={option.color ? { backgroundColor: option.color } : undefined}
-                  aria-hidden
-                />
+      <div className={styles.controlShell}>
+        <Combobox
+          className={mergeClasses(styles.dropdown, showBadgeValueOverlay && styles.comboboxWithBadgeValue)}
+          listbox={{ className: styles.listbox }}
+          open={open}
+          // Dropdown never supported the deprecated shadow fills, so they are narrowed
+          appearance={toListboxAppearance(appearance)}
+          multiselect={multiselect}
+          placeholder={loading ? 'Loading...' : placeholder}
+          disabled={disabled || loading}
+          value={displayValue}
+          selectedOptions={selectedValues.map(String)}
+          onOptionSelect={handleOptionSelect}
+          onChange={handleInputChange}
+          onOpenChange={handleOpenChange}
+        >
+          {filteredOptions.length > 0 ? (
+            filteredOptions.map((option) => (
+              <Option key={option.value} value={String(option.value)} text={option.label} disabled={option.disabled}>
+                <span className={styles.optionContent}>
+                  {showColors && (
+                    <span
+                      className={styles.swatch}
+                      style={option.color ? { backgroundColor: option.color } : undefined}
+                      aria-hidden
+                    />
+                  )}
+                  <span className={styles.optionLabel}>
+                    {asBadge && option.color ? (
+                      <span
+                        className={mergeClasses(styles.badge, getBadgeTextClass(option.color, styles))}
+                        style={{ backgroundColor: option.color }}
+                      >
+                        {option.label}
+                      </span>
+                    ) : (
+                      option.label
+                    )}
+                  </span>
+                </span>
+              </Option>
+            ))
+          ) : (
+            <Option value="__no_matches__" disabled text="No matches found">
+              No matches found
+            </Option>
+          )}
+        </Combobox>
+
+        {showBadgeValueOverlay && (
+          <span className={styles.badgeValueOverlay}>
+            <span className={styles.badgeContainer}>
+              {selectedOptions.map((opt) =>
+                opt.color ? (
+                  <span
+                    key={opt.value}
+                    className={mergeClasses(styles.badge, getBadgeTextClass(opt.color, styles))}
+                    style={{ backgroundColor: opt.color }}
+                  >
+                    {opt.label}
+                  </span>
+                ) : (
+                  <span key={opt.value} className={styles.badgeNoColor}>
+                    {opt.label}
+                  </span>
+                ),
               )}
-              <span className={styles.optionLabel}>{option.label}</span>
             </span>
-          </Option>
-        ))}
-      </Dropdown>
+          </span>
+        )}
+      </div>
 
       {loading && (
         <div className={styles.loadingRow}>

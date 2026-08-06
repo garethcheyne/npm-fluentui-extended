@@ -1,5 +1,6 @@
 export { DateTimeField } from './DateTimeField';
-export type { DateTimeFieldProps, DateTimeBehavior } from './DateTimeField.types';
+export { DateTimeRangeField } from './DateTimeRangeField';
+export type { DateTimeFieldProps, DateTimeRangeFieldProps, DateTimeRangeFieldChange, DateTimeRangeValue, DateTimeBehavior } from './DateTimeField.types';
 export {
   parseStoredValue,
   formatStoredValue,

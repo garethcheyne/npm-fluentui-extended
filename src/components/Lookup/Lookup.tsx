@@ -1,6 +1,7 @@
 import * as React from 'react';
 import {
   Spinner,
+  Tooltip,
   mergeClasses,
   Portal,
   useId,
@@ -457,6 +458,54 @@ export const Lookup: React.FC<LookupProps> = ({
   // Should we show the input field? In single-select at-rest, we might hide the text input
   // In multi-select or when searching, always show
   const showTextInput = multiSelect || isOpen || !selectedOption;
+  const isSingleSelectAtRest = !multiSelect && !showTextInput;
+  const canAutoNavigateRecord = React.useCallback(
+    (option: LookupOption) => Boolean(option.entityName && (option.recordId ?? option.key)),
+    [],
+  );
+  const handleRecordActivate = React.useCallback(
+    (option: LookupOption) => {
+      if (onRecordClick) {
+        onRecordClick(option);
+        return;
+      }
+
+      const entityName = option.entityName;
+      const recordId = option.recordId ?? option.key;
+      if (!entityName || !recordId || typeof window === 'undefined') return;
+
+      const xrm = (window as Window & {
+        Xrm?: {
+          Navigation?: {
+            openForm?: (options: { entityName: string; entityId: string }) => unknown;
+          };
+        };
+      }).Xrm;
+
+      if (xrm?.Navigation?.openForm) {
+        void xrm.Navigation.openForm({ entityName, entityId: recordId });
+        return;
+      }
+
+      const url = new URL('/main.aspx', window.location.origin);
+      url.searchParams.set('pagetype', 'entityrecord');
+      url.searchParams.set('etn', entityName);
+      url.searchParams.set('id', recordId);
+      window.location.assign(url.toString());
+    },
+    [onRecordClick],
+  );
+  const hasRestHoverCard = React.useCallback(
+    (option: LookupOption) => {
+      if (!showHoverCard) return false;
+      if (hoverCardTarget !== 'both' && hoverCardTarget !== 'rest') return false;
+      if (renderHoverCard) return true;
+
+      const recordId = option.recordId ?? option.key;
+      return Boolean(option.entityName && recordId);
+    },
+    [showHoverCard, hoverCardTarget, renderHoverCard],
+  );
 
   // Helper to remove a badge (works for both single and multi)
   const handleBadgeDismiss = React.useCallback(
@@ -494,7 +543,13 @@ export const Lookup: React.FC<LookupProps> = ({
         <div className={styles.tagInputBadgesArea}>
           {badgeItems.map((opt) => withHoverCard(
             opt,
-            <span key={opt.key} className={styles.inlineBadge}>
+            <span
+              key={opt.key}
+              className={mergeClasses(
+                styles.inlineBadge,
+                isSingleSelectAtRest && styles.inlineBadgeSingle,
+              )}
+            >
               {/* Entity icon/image */}
               {(entityImage || entityIcon || opt.icon) && (
                 <span className={styles.inlineBadgeIcon}>
@@ -509,38 +564,75 @@ export const Lookup: React.FC<LookupProps> = ({
                   )}
                 </span>
               )}
-              <span
-                className={mergeClasses(
-                  styles.inlineBadgeText,
-                  recordLinkAppearance === false && styles.inlineBadgeTextPlain,
-                )}
-                // Clicking a resolved record opens it, the way a Dynamics lookup does.
-                // Without a handler the click falls through to the wrapper and opens
-                // the dropdown, so the link styling is never a dead end.
-                onClick={
-                  onRecordClick
-                    ? (event) => {
-                        event.stopPropagation();
-                        onRecordClick(opt);
-                      }
-                    : undefined
-                }
-                role={onRecordClick ? 'link' : undefined}
-                tabIndex={onRecordClick ? 0 : undefined}
-                onKeyDown={
-                  onRecordClick
-                    ? (event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
+              {hasRestHoverCard(opt) ? (
+                <span
+                  className={mergeClasses(
+                    styles.inlineBadgeText,
+                    recordLinkAppearance === false && styles.inlineBadgeTextPlain,
+                  )}
+                  // Clicking a resolved record opens it, the way a Dynamics lookup does.
+                  // Without a handler the click falls through to the wrapper and opens
+                  // the dropdown, so the link styling is never a dead end.
+                  onClick={
+                    (onRecordClick || canAutoNavigateRecord(opt))
+                      ? (event) => {
                           event.stopPropagation();
-                          onRecordClick(opt);
+                          handleRecordActivate(opt);
                         }
-                      }
-                    : undefined
-                }
-              >
-                {opt.text}
-              </span>
+                      : undefined
+                  }
+                  role={onRecordClick || canAutoNavigateRecord(opt) ? 'link' : undefined}
+                  tabIndex={onRecordClick || canAutoNavigateRecord(opt) ? 0 : undefined}
+                  onKeyDown={
+                    (onRecordClick || canAutoNavigateRecord(opt))
+                      ? (event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            handleRecordActivate(opt);
+                          }
+                        }
+                      : undefined
+                  }
+                >
+                  {opt.text}
+                </span>
+              ) : (
+                <Tooltip content={opt.text} relationship="label" withArrow>
+                  <span
+                    className={mergeClasses(
+                      styles.inlineBadgeText,
+                      recordLinkAppearance === false && styles.inlineBadgeTextPlain,
+                    )}
+                    // Clicking a resolved record opens it, the way a Dynamics lookup does.
+                    // Without a handler the click falls through to the wrapper and opens
+                    // the dropdown, so the link styling is never a dead end.
+                    onClick={
+                      (onRecordClick || canAutoNavigateRecord(opt))
+                        ? (event) => {
+                            event.stopPropagation();
+                            handleRecordActivate(opt);
+                          }
+                        : undefined
+                    }
+                    role={onRecordClick || canAutoNavigateRecord(opt) ? 'link' : undefined}
+                    tabIndex={onRecordClick || canAutoNavigateRecord(opt) ? 0 : undefined}
+                    onKeyDown={
+                      (onRecordClick || canAutoNavigateRecord(opt))
+                        ? (event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              handleRecordActivate(opt);
+                            }
+                          }
+                        : undefined
+                    }
+                  >
+                    {opt.text}
+                  </span>
+                </Tooltip>
+              )}
               {!disabled && clearable && (
                 <button
                   type="button"
@@ -548,7 +640,7 @@ export const Lookup: React.FC<LookupProps> = ({
                   onClick={(e) => handleBadgeDismiss(opt.key, e)}
                   aria-label={`Remove ${opt.text}`}
                 >
-                  <DismissRegular fontSize={10} />
+                  <DismissRegular fontSize={12} />
                 </button>
               )}
             </span>,

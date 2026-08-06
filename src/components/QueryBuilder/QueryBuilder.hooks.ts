@@ -6,7 +6,7 @@
 
 import * as React from 'react';
 import type { QueryBuilderField, QueryBuilderLookupTarget } from './QueryBuilder.types';
-import { buildFieldOptions, dataTypeFromAttribute } from './QueryBuilder.utils';
+import { attributeTypeFromAttribute, buildFieldOptions, dataTypeFromAttribute } from './QueryBuilder.utils';
 import { fetchOptionSetMetadata } from './QueryBuilder.enrichment';
 
 /**
@@ -14,6 +14,7 @@ import { fetchOptionSetMetadata } from './QueryBuilder.enrichment';
  */
 export const parseAttributeToField = (attr: any): QueryBuilderField => {
     const dataType = dataTypeFromAttribute(attr);
+    const attributeType = attributeTypeFromAttribute(attr);
     const options = buildFieldOptions(attr, dataType);
 
     const displayName = attr.DisplayName;
@@ -26,6 +27,7 @@ export const parseAttributeToField = (attr: any): QueryBuilderField => {
         label,
         schemaName: attr.SchemaName,
         dataType,
+        attributeType,
         options,
     };
 };

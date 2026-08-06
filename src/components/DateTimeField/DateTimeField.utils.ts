@@ -25,6 +25,68 @@ export const formatLocalDate = (date: Date): string =>
 /** Format a Date's local wall-clock time as HH:mm. */
 export const formatLocalTime = (date: Date): string => `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 
+/** The fixed calendar day used for time-only values. */
+const TIME_ONLY_ANCHOR = { year: 1970, month: 0, day: 1 } as const;
+
+/** Rebase a Date onto the time-only anchor day while preserving its wall-clock time. */
+export const anchorTimeOnlyDate = (date: Date): Date =>
+  new Date(
+    TIME_ONLY_ANCHOR.year,
+    TIME_ONLY_ANCHOR.month,
+    TIME_ONLY_ANCHOR.day,
+    date.getHours(),
+    date.getMinutes(),
+    date.getSeconds(),
+    date.getMilliseconds(),
+  );
+
+/** Parse a time-only stored value into a Date anchored to 1970-01-01. */
+export const parseTimeOnlyValue = (value: string | Date | null | undefined): Date | null => {
+  if (value === null || value === undefined || value === '') return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : anchorTimeOnlyDate(value);
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const timeOnly24h = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/;
+  const timeOnly12h = /^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM|am|pm)$/;
+
+  const plainMatch = timeOnly24h.exec(trimmed);
+  if (plainMatch) {
+    return new Date(
+      TIME_ONLY_ANCHOR.year,
+      TIME_ONLY_ANCHOR.month,
+      TIME_ONLY_ANCHOR.day,
+      Math.min(23, Number(plainMatch[1])),
+      Math.min(59, Number(plainMatch[2])),
+      Math.min(59, Number(plainMatch[3] ?? 0)),
+      0,
+    );
+  }
+
+  const twelveHourMatch = timeOnly12h.exec(trimmed);
+  if (twelveHourMatch) {
+    let hours = Number(twelveHourMatch[1]);
+    const minutes = Math.min(59, Number(twelveHourMatch[2]));
+    const seconds = Math.min(59, Number(twelveHourMatch[3] ?? 0));
+    const period = twelveHourMatch[4].toUpperCase();
+
+    if (period === 'PM' && hours < 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+
+    return new Date(TIME_ONLY_ANCHOR.year, TIME_ONLY_ANCHOR.month, TIME_ONLY_ANCHOR.day, hours, minutes, seconds, 0);
+  }
+
+  const parsed = parseStoredValue(trimmed, 'TimeZoneIndependent');
+  return parsed ? anchorTimeOnlyDate(parsed) : null;
+};
+
+/** Serialize a time-only Date as HH:mm. */
+export const formatTimeOnlyValue = (date: Date | null): string | null => {
+  if (!date || Number.isNaN(date.getTime())) return null;
+  return formatLocalTime(date);
+};
+
 /**
  * Parse a stored Dynamics value into a Date positioned correctly for display.
  * Returns null for empty or unparseable input rather than an Invalid Date.

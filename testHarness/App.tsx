@@ -53,6 +53,7 @@ import { DateTimeFieldExamples } from './examples/DateTimeField';
 import { OptionSetFieldExamples } from './examples/OptionSetField';
 import { HoverCardExamples } from './examples/HoverCard';
 import { PeopleExamples } from './examples/People';
+import { searchDynamicsRecords } from './examples/Lookup/dynamicsHelpers';
 
 // =============================================================================
 // TAB CONFIGURATION
@@ -127,6 +128,28 @@ export function App() {
    * Live account options fetched by Lookup, shared with HoverCard tab.
    */
   const [liveAccountOptions, setLiveAccountOptions] = useState<LookupOption[]>([]);
+
+  const loadLiveAccountOptions = useCallback(async () => {
+    try {
+      const results = await searchDynamicsRecords(
+        'accounts',
+        '',
+        'name',
+        'accountnumber',
+        ['telephone1', 'emailaddress1', 'address1_city'],
+      );
+      setLiveAccountOptions(results);
+    } catch (error) {
+      console.error('[App] Failed to seed live account options for HoverCard tab', error);
+      setLiveAccountOptions([]);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (activeTab === 'hovercard' && connected && liveAccountOptions.length === 0) {
+      void loadLiveAccountOptions();
+    }
+  }, [activeTab, connected, liveAccountOptions.length, loadLiveAccountOptions]);
 
   /**
    * Last command/action logged (displayed in header).

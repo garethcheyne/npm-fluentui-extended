@@ -8,13 +8,46 @@ export const useOptionSetFieldStyles = makeStyles({
     minWidth: 0,
   },
 
-  dropdown: {
+  controlShell: {
+    position: 'relative',
     width: '100%',
     minWidth: 0,
   },
 
+  dropdown: {
+    width: '100%',
+    minWidth: 0,
+
+    '& input': {
+      backgroundColor: 'transparent',
+      backgroundImage: 'none',
+    },
+  },
+
+  comboboxWithBadgeValue: {
+    '& input': {
+      color: 'transparent',
+      caretColor: 'transparent',
+    },
+  },
+
   listbox: {
     maxHeight: '320px',
+    overflowY: 'auto',
+    overscrollBehavior: 'contain',
+  },
+
+  badgeValueOverlay: {
+    position: 'absolute',
+    left: '12px',
+    right: '32px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    display: 'flex',
+    alignItems: 'center',
+    minWidth: 0,
+    pointerEvents: 'none',
+    overflow: 'hidden',
   },
 
   optionContent: {
@@ -46,6 +79,8 @@ export const useOptionSetFieldStyles = makeStyles({
     gap: '4px',
     alignItems: 'center',
     lineHeight: 1,
+    minWidth: 0,
+    overflow: 'hidden',
   },
 
   /** Badge style for options with a colour when asBadge is enabled */

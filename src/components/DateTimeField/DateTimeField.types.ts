@@ -28,7 +28,9 @@ export interface DateTimeFieldProps {
   showTime?: boolean;
   /**
    * Show only the time picker without a calendar. When true, the control displays
-   * and stores only a time value (HH:mm format). Useful for duration or time-only fields.
+    * and stores only a time value (HH:mm format). The Date passed to `onChange` is
+    * anchored to 1970-01-01 so consumers still get a stable time-carrying object.
+    * Useful for duration or time-only fields.
    */
   timeOnly?: boolean;
   /** Minutes between entries in the time dropdown. Defaults to 30. */
@@ -108,4 +110,30 @@ export interface DateTimeFieldProps {
   className?: string;
   /** Called when metadata auto-load fails */
   onLoadError?: (error: Error) => void;
+}
+
+export interface DateTimeRangeValue {
+  start?: string | Date | null;
+  end?: string | Date | null;
+}
+
+export interface DateTimeRangeFieldChange {
+  startValue: string | null;
+  endValue: string | null;
+  startDate: Date | null;
+  endDate: Date | null;
+}
+
+export interface DateTimeRangeFieldProps
+  extends Omit<DateTimeFieldProps, 'value' | 'onChange' | 'label' | 'placeholder' | 'validationMessage' | 'className'> {
+  value?: DateTimeRangeValue;
+  onChange?: (range: DateTimeRangeFieldChange) => void;
+  label?: string | React.ReactElement;
+  startLabel?: string | React.ReactElement;
+  endLabel?: string | React.ReactElement;
+  startPlaceholder?: string;
+  endPlaceholder?: string;
+  validationMessage?: string | React.ReactElement;
+  className?: string;
+  layout?: 'horizontal' | 'vertical';
 }

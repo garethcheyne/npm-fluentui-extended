@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { serializeQueryBuilderState, parseFetchXmlToState, validateQueryBuilderState } from './QueryBuilder';
-import { buildFieldOptions, dataTypeFromAttribute, formatDateOnly, getDefaultValueForField, isTrueValue } from './QueryBuilder.utils';
+import { attributeTypeFromAttribute, buildFieldOptions, dataTypeFromAttribute, formatDateOnly, getDefaultValueForField, isTrueValue } from './QueryBuilder.utils';
 import type { QueryBuilderField, QueryBuilderState } from './QueryBuilder.types';
 
 const testFields: QueryBuilderField[] = [
@@ -2013,6 +2013,14 @@ describe('dataTypeFromAttribute', () => {
 
     it('treats an attribute with Targets as a lookup', () => {
         expect(dataTypeFromAttribute({ AttributeType: 'Owner', Targets: ['systemuser'] })).toBe('lookup');
+    });
+});
+
+describe('attributeTypeFromAttribute', () => {
+    it('preserves the original normalized Dynamics type token for UI distinctions', () => {
+        expect(attributeTypeFromAttribute({ AttributeTypeName: { Value: 'MoneyType' } })).toBe('money');
+        expect(attributeTypeFromAttribute({ AttributeTypeName: { Value: 'DecimalType' } })).toBe('decimal');
+        expect(attributeTypeFromAttribute({ AttributeType: 'Integer' })).toBe('integer');
     });
 });
 

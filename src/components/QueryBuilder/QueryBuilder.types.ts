@@ -25,6 +25,8 @@ export interface QueryBuilderField {
   id: string;
   label: string;
   dataType: QueryBuilderDataType;
+  /** Original normalized Dynamics attribute type (e.g. money, decimal, integer). */
+  attributeType?: string;
   options?: QueryBuilderOption[];
   /** Schema name (PascalCase attribute name, e.g., "CreatedOn") */
   schemaName?: string;

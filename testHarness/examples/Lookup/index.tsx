@@ -169,9 +169,9 @@ export function LookupExamples({
   const hoverCardOptions = useMemo(
     () =>
       dynamicsConnected
-        ? dynamicOptions.map((option) => ({ ...option, entityName: 'account' }))
+        ? liveAccountOptions.map((option) => ({ ...option, entityName: 'account' }))
         : dynamicOptions,
-    [dynamicOptions, dynamicsConnected],
+    [dynamicOptions, dynamicsConnected, liveAccountOptions],
   );
 
   /**
@@ -251,6 +251,12 @@ export function LookupExamples({
   const handleLiveAccountFocus = useCallback(() => {
     if (dynamicsConnected && liveAccountOptions.length === 0) {
       handleLiveAccountSearch('');
+    }
+  }, [dynamicsConnected, liveAccountOptions.length, handleLiveAccountSearch]);
+
+  useEffect(() => {
+    if (dynamicsConnected && liveAccountOptions.length === 0) {
+      void handleLiveAccountSearch('');
     }
   }, [dynamicsConnected, liveAccountOptions.length, handleLiveAccountSearch]);
 
@@ -763,9 +769,9 @@ export function LookupExamples({
             options={hoverCardOptions}
             selectedOption={hoverCardSelection}
             onOptionSelect={setHoverCardSelection}
-            onSearchChange={handleSearchChange}
-            onFocus={handleFocus}
-            loading={isLoading}
+            onSearchChange={dynamicsConnected ? handleLiveAccountSearch : handleSearchChange}
+            onFocus={dynamicsConnected ? handleLiveAccountFocus : handleFocus}
+            loading={dynamicsConnected ? liveAccountLoading : isLoading}
             placeholder="Search accounts..."
             entityIcon={<BuildingRegular />}
             // Fetching a record needs a real GUID, so this variant is live-only

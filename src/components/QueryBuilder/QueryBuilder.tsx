@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Button, Combobox, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, DialogTrigger, Dropdown, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Option, Spinner, Text, Textarea } from '@fluentui/react-components';
 import { DatePicker } from '@fluentui/react-datepicker-compat';
-import { AddRegular, ArrowDownloadRegular, ArrowResetRegular, ArrowUploadRegular, CheckmarkCircleRegular, CopyRegular, DeleteRegular, DismissRegular, EditRegular, EyeOffRegular, EyeRegular, MoreHorizontalRegular, WarningRegular } from '@fluentui/react-icons';
+import { AddRegular, AppsListRegular, ArrowDownloadRegular, ArrowResetRegular, ArrowUploadRegular, CalendarRegular, CheckmarkCircleRegular, CheckboxCheckedRegular, CopyRegular, DeleteRegular, DismissRegular, EditRegular, EyeOffRegular, EyeRegular, MoreHorizontalRegular, NumberSymbolRegular, SearchRegular, TextTRegular, WarningRegular } from '@fluentui/react-icons';
 import { mergeClasses, useQueryBuilderStyles } from './QueryBuilder.styles';
 import { DEFAULT_FIELD_APPEARANCE, toListboxAppearance, toTextareaAppearance } from '../../types/appearance';
 import { CommandBar } from '../CommandBar';
@@ -24,6 +24,7 @@ import { parseFetchXmlToState, ParseFetchXmlResult } from './QueryBuilder.parser
 import {
     DEFAULT_BOOLEAN_OPTIONS,
     FALLBACK_FIELDS,
+    attributeTypeFromAttribute,
     buildFieldOptions,
     formatDateOnly,
     isTrueValue,
@@ -44,6 +45,56 @@ import { enrichLookupFields, enrichOptionsetFields, fetchOptionSetMetadata } fro
 export type { QueryBuilderValidationError, QueryBuilderValidationResult };
 export { validateQueryBuilderState, serializeQueryBuilderState, parseFetchXmlToState };
 export type { ParseFetchXmlResult };
+
+const QUERY_BUILDER_DATA_TYPE_LABELS: Record<QueryBuilderField['dataType'], string> = {
+    string: 'Text',
+    number: 'Number',
+    datetime: 'Date/Time',
+    boolean: 'Yes/No',
+    optionset: 'Choice',
+    lookup: 'Lookup',
+};
+
+const getQueryBuilderFieldTypeLabel = (field: QueryBuilderField): string => {
+    switch (field.attributeType) {
+        case 'money':
+            return 'Currency';
+        case 'decimal':
+        case 'double':
+            return 'Decimal';
+        case 'integer':
+        case 'int':
+        case 'bigint':
+            return 'Whole Number';
+        default:
+            return QUERY_BUILDER_DATA_TYPE_LABELS[field.dataType] || field.dataType;
+    }
+};
+
+const renderQueryBuilderDataTypeIcon = (field: QueryBuilderField): React.ReactNode => {
+    const commonProps = { fontSize: 16 };
+
+    if (field.attributeType === 'money') {
+        return <span aria-hidden="true" style={{ fontSize: 15, fontWeight: 700, lineHeight: 1 }}>$</span>;
+    }
+
+    switch (field.dataType) {
+        case 'string':
+            return <TextTRegular {...commonProps} />;
+        case 'number':
+            return <NumberSymbolRegular {...commonProps} />;
+        case 'datetime':
+            return <CalendarRegular {...commonProps} />;
+        case 'boolean':
+            return <CheckboxCheckedRegular {...commonProps} />;
+        case 'optionset':
+            return <AppsListRegular {...commonProps} />;
+        case 'lookup':
+            return <SearchRegular {...commonProps} />;
+        default:
+            return null;
+    }
+};
 
 export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
     const styles = useQueryBuilderStyles();
@@ -72,18 +123,6 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
 
     // Convert fields to LookupOption format for field selector
     const fieldLookupOptions: LookupOption[] = React.useMemo(() => {
-        const formatDataType = (dataType: QueryBuilderField['dataType']): string => {
-            const labels: Record<QueryBuilderField['dataType'], string> = {
-                string: 'Text',
-                number: 'Number',
-                datetime: 'Date/Time',
-                boolean: 'Yes/No',
-                optionset: 'Choice',
-                lookup: 'Lookup',
-            };
-            return labels[dataType] || dataType;
-        };
-
         // Deduplicate fields by id (take first occurrence)
         const uniqueFields = availableFields.reduce((acc, field) => {
             if (!acc.some(f => f.id === field.id)) {
@@ -95,10 +134,11 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
         return uniqueFields.map((field) => ({
             key: field.id,
             text: field.label,
+            icon: renderQueryBuilderDataTypeIcon(field),
             details: [
                 { label: 'Logical Name', value: field.id },
                 ...(field.schemaName ? [{ label: 'Schema Name', value: field.schemaName }] : []),
-                { label: 'Type', value: formatDataType(field.dataType) },
+                { label: 'Type', value: getQueryBuilderFieldTypeLabel(field) },
             ],
             data: field,
         }));
@@ -332,6 +372,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                             label,
                             schemaName: attribute.SchemaName,
                             dataType,
+                            attributeType: attributeTypeFromAttribute(attribute),
                             options: buildFieldOptions(attribute, dataType),
                             targets,
                         };
@@ -536,6 +577,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                 label,
                                 schemaName: attr.SchemaName,
                                 dataType,
+                                attributeType: attributeTypeFromAttribute(attr),
                                 // Store raw attribute for metadata fetching
                                 _raw: attr,
                             };
@@ -1503,25 +1545,14 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                                         const isNestedNullOp = !operatorRequiresValue(nestedCond.operator);
 
                                                                         // Build lookup options for nested field selector using same format as main field selector
-                                                                        const formatDataType = (dataType: QueryBuilderField['dataType']): string => {
-                                                                            const labels: Record<QueryBuilderField['dataType'], string> = {
-                                                                                string: 'Text',
-                                                                                number: 'Number',
-                                                                                datetime: 'Date/Time',
-                                                                                boolean: 'Yes/No',
-                                                                                optionset: 'Choice',
-                                                                                lookup: 'Lookup',
-                                                                            };
-                                                                            return labels[dataType] || dataType;
-                                                                        };
-
                                                                         const nestedFieldLookupOptions: LookupOption[] = nestedFields.map((f) => ({
                                                                             key: f.id,
                                                                             text: f.label,
+                                                                            icon: renderQueryBuilderDataTypeIcon(f),
                                                                             details: [
                                                                                 { label: 'Logical Name', value: f.id },
                                                                                 ...(f.schemaName ? [{ label: 'Schema Name', value: f.schemaName }] : []),
-                                                                                { label: 'Type', value: formatDataType(f.dataType) },
+                                                                                { label: 'Type', value: getQueryBuilderFieldTypeLabel(f) },
                                                                             ],
                                                                             data: f,
                                                                         }));
@@ -1535,10 +1566,20 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                                                     aria-label="Field"
                                                                                     options={nestedFieldLookupOptions}
                                                                                     selectedKey={nestedCond.fieldId}
-                                                                                    clearable={false}
+                                                                                    clearable
                                                                                     placeholder="Select field..."
                                                                                     onOptionSelect={(option) => {
-                                                                                        if (!option) return;
+                                                                                        if (!option) {
+                                                                                            updateNestedCondition(group.id, condition.id, nestedCond.id, (nc) => ({
+                                                                                                ...nc,
+                                                                                                fieldId: '',
+                                                                                                operator: getOperatorsForType(nestedDefaultField.dataType)[0].value as any,
+                                                                                                value: '',
+                                                                                                value2: '',
+                                                                                                valueDisplayName: undefined,
+                                                                                            }));
+                                                                                            return;
+                                                                                        }
                                                                                         const newField = (option.data as QueryBuilderField) || nestedFields.find(f => f.id === option.key) || nestedDefaultField;
                                                                                         updateNestedCondition(group.id, condition.id, nestedCond.id, (nc) => ({
                                                                                             ...nc,
@@ -1652,10 +1693,27 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                                 aria-label="Field"
                                                                 options={fieldLookupOptions}
                                                                 selectedKey={condition.fieldId}
-                                                                clearable={false}
+                                                                clearable
                                                                 placeholder="Select field..."
                                                                 onOptionSelect={(option) => {
-                                                                    if (!option) return;
+                                                                    if (!option) {
+                                                                        updateGroup(group.id, (current) => ({
+                                                                            ...current,
+                                                                            conditions: current.conditions.map((row) =>
+                                                                                row.id === condition.id
+                                                                                    ? {
+                                                                                        ...row,
+                                                                                        fieldId: '',
+                                                                                        operator: getOperatorsForType(defaultField.dataType)[0].value as any,
+                                                                                        value: '',
+                                                                                        value2: '',
+                                                                                        valueDisplayName: undefined,
+                                                                                    }
+                                                                                    : row,
+                                                                            ),
+                                                                        }));
+                                                                        return;
+                                                                    }
                                                                     const nextField = (option.data as QueryBuilderField) || availableFields.find((field) => field.id === option.key) || defaultField;
                                                                     updateGroup(group.id, (current) => ({
                                                                         ...current,

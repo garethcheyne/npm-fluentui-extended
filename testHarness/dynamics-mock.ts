@@ -265,7 +265,11 @@ export const mockXrm = {
     retrieveMultipleRecords: async (entitySetName: string, options?: string) => {
       console.log(`[Dynamics] Query: ${entitySetName}`, options);
       const query = options ? `${entitySetName}${options}` : entitySetName;
-      return callDynamicsApi(query);
+      const response = await callDynamicsApi<{ value?: Record<string, unknown>[]; [key: string]: unknown }>(query);
+      return {
+        ...response,
+        entities: Array.isArray(response.value) ? response.value : [],
+      };
     },
   },
 };

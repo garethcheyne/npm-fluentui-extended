@@ -8,9 +8,11 @@ import { useDateTimeFieldStyles } from './DateTimeField.styles';
 import {
   buildTimeOptions,
   filterTimeOptions,
+  formatTimeOnlyValue,
   formatDisplayValue,
   formatLocalTime,
   formatStoredValue,
+  parseTimeOnlyValue,
   formatTime12h,
   parseFreeFormDateTime,
   parseStoredValue,
@@ -101,7 +103,10 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
   // timeOnly mode also enables time selection
   const timeEnabled = (showTime || timeOnly) && behavior !== 'DateOnly';
 
-  const selectedDate = React.useMemo(() => parseStoredValue(value, behavior), [value, behavior]);
+  const selectedDate = React.useMemo(
+    () => (timeOnly ? parseTimeOnlyValue(value) : parseStoredValue(value, behavior)),
+    [value, behavior, timeOnly],
+  );
   const allTimeOptions = React.useMemo(() => buildTimeOptions(timeIntervalMinutes), [timeIntervalMinutes]);
   const timeOptions = React.useMemo(
     () => filterTimeOptions(allTimeOptions, minTime, maxTime),
@@ -144,9 +149,14 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
 
   const emit = React.useCallback(
     (next: Date | null) => {
+      if (timeOnly) {
+        const anchored = next ? parseTimeOnlyValue(next) : null;
+        onChange?.(formatTimeOnlyValue(anchored), anchored);
+        return;
+      }
       onChange?.(formatStoredValue(next, behavior), next);
     },
-    [onChange, behavior],
+    [onChange, behavior, timeOnly],
   );
 
   // Position the popup below the input
@@ -253,10 +263,9 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
     let finalDate: Date | null = null;
     
     if (timeOnly) {
-      // For time-only mode, emit a Date object with today's date and selected time
+      // For time-only mode, emit an anchored date on 1970-01-01 plus HH:mm storage
       if (pendingTime) {
-        const today = new Date();
-        finalDate = withTime(today, pendingTime);
+        finalDate = withTime(new Date(1970, 0, 1), pendingTime);
         emit(finalDate);
       }
     } else if (pendingDate) {
@@ -299,6 +308,12 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
     if (!inputText.trim()) {
       // Clear the value
       emit(null);
+      return;
+    }
+
+    if (timeOnly) {
+      const parsed = parseTimeOnlyValue(inputText);
+      emit(parsed);
       return;
     }
 

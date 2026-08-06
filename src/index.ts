@@ -18,7 +18,8 @@ export type {
 } from './components/EntityGrid';
 
 export { DateTimeField } from './components/DateTimeField';
-export type { DateTimeFieldProps, DateTimeBehavior } from './components/DateTimeField';
+export { DateTimeRangeField } from './components/DateTimeField';
+export type { DateTimeFieldProps, DateTimeRangeFieldProps, DateTimeRangeFieldChange, DateTimeRangeValue, DateTimeBehavior } from './components/DateTimeField';
 export { parseStoredValue, formatStoredValue } from './components/DateTimeField';
 
 export { OptionSetField } from './components/OptionSetField';
