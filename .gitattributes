@@ -1,0 +1,20 @@
+# Normalize to LF in the repository and in published tarballs.
+#
+# README.md is the reason this file exists: npm truncates the README it stores for the
+# package page at roughly 64KB, and CRLF was spending ~1.6KB of that budget on carriage
+# returns alone. Checked-out working copies are unaffected on Windows - git still
+# converts on checkout where core.autocrlf asks it to.
+* text=auto eol=lf
+
+# Binary assets must never be line-ending converted
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary

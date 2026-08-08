@@ -15,7 +15,6 @@
  */
 
 import React from 'react';
-import type { ReactNode } from 'react';
 import {
   AddRegular,
   EditRegular,
@@ -29,24 +28,17 @@ import {
   FilterRegular,
 } from '@fluentui/react-icons';
 
+// The library's own item type rather than a local copy. A copy had already drifted -
+// it allowed `appearance: 'secondary'`, which the CommandBar does not accept - so the
+// harness was type-checking against a shape the library never had.
+import type { CommandBarItem } from '../../../src';
+
 // =============================================================================
 // TYPE DEFINITIONS
 // =============================================================================
 
-/**
- * Individual command item for the CommandBar.
- */
-export interface CommandItem {
-  key: string;
-  text?: string;
-  title?: string;
-  icon?: ReactNode;
-  appearance?: 'primary' | 'secondary';
-  dividerBefore?: boolean;
-  pinned?: boolean;
-  onClick?: () => void;
-  subItems?: Array<{ key: string; text: string; onClick?: () => void }>;
-}
+/** Individual command item for the CommandBar. */
+export type CommandItem = CommandBarItem;
 
 // =============================================================================
 // FACTORY FUNCTIONS
@@ -80,6 +72,10 @@ export function createMainItems(onLog: (command: string) => void): CommandItem[]
       text: 'New',
       icon: <AddRegular />,
       appearance: 'primary',
+      // Rich tooltip: semibold title over a body line. Shows on hover even though
+      // the command already has a visible label.
+      title: 'New record',
+      description: 'Opens a blank form for this table.',
       onClick: () => onLog('New'),
     },
 
@@ -90,12 +86,21 @@ export function createMainItems(onLog: (command: string) => void): CommandItem[]
       key: 'edit',
       text: 'Edit',
       icon: <EditRegular />,
+      // Plain tooltip: title only, no description
+      title: 'Edit the selected record',
       onClick: () => onLog('Edit'),
     },
     {
       key: 'delete',
       text: 'Delete',
       icon: <DeleteRegular />,
+      title: 'Delete',
+      // `description` takes markup, so it can carry its own emphasis
+      description: (
+        <>
+          Permanently removes the selected record. <strong>This cannot be undone.</strong>
+        </>
+      ),
       onClick: () => onLog('Delete'),
     },
 
@@ -133,6 +138,10 @@ export function createMainItems(onLog: (command: string) => void): CommandItem[]
       key: 'export',
       text: 'Export',
       icon: <ArrowDownloadRegular />,
+      // A tooltip on a submenu command. This is the case that used to render nothing,
+      // because the Tooltip wrapped the Menu instead of the button inside it.
+      title: 'Export',
+      description: 'Download the current view as a file.',
       subItems: [
         { key: 'excel', text: 'Export to Excel', onClick: () => onLog('Export to Excel') },
         { key: 'csv', text: 'Export to CSV', onClick: () => onLog('Export to CSV') },
@@ -146,6 +155,16 @@ export function createMainItems(onLog: (command: string) => void): CommandItem[]
       key: 'flow',
       text: 'Flow',
       icon: <FlashRegular />,
+      // Fully custom tooltip content. `title` is still set so the command has a short
+      // accessible name instead of announcing this whole block.
+      title: 'Flow',
+      tooltip: (
+        <span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontWeight: 600 }}>Power Automate</span>
+          <span>Run or manage flows for this record.</span>
+          <span style={{ opacity: 0.75, fontSize: 12 }}>Ctrl+Shift+F</span>
+        </span>
+      ),
       onClick: () => onLog('Flow'),
     },
     {
@@ -170,7 +189,9 @@ export function createFarItems(onLog: (command: string) => void): CommandItem[] 
   return [
     {
       key: 'filter',
-      title: 'Filter', // Uses title instead of text for icon-only button
+      // Icon-only: `title` is both the tooltip and the button's accessible name
+      title: 'Filter',
+      description: 'Narrow the view to records matching your criteria.',
       icon: <FilterRegular />,
       onClick: () => onLog('Filter'),
     },

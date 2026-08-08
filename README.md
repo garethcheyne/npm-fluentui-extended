@@ -1034,6 +1034,66 @@ a toggle), `subItems` (renders a menu button, preserved as a submenu when overfl
 and `pinned`. A pinned command never collapses — use it sparingly, because one that does not fit is
 clipped rather than moved.
 
+### Tooltips
+
+Commands take Fluent tooltips in three forms, and they show on hover and focus whether or not the
+command has a visible label.
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `title` | `string` | Tooltip heading. Also the accessible name for icon-only commands |
+| `description` | `React.ReactNode` | Body text under the title. Its presence makes the tooltip rich |
+| `tooltip` | `React.ReactElement` | Fully custom content; overrides `title`/`description` as the body |
+
+```tsx
+<CommandBar
+  items={[
+    // Plain — a single line of text
+    { key: 'edit', text: 'Edit', title: 'Edit the selected record' },
+
+    // Rich — semibold heading over a body line
+    {
+      key: 'new',
+      text: 'New',
+      title: 'New record',
+      description: 'Opens a blank form for this table.',
+    },
+
+    // description takes markup, so it can carry its own emphasis
+    {
+      key: 'delete',
+      text: 'Delete',
+      title: 'Delete',
+      description: <>Permanently removes it. <strong>This cannot be undone.</strong></>,
+    },
+
+    // Fully custom content
+    {
+      key: 'flow',
+      text: 'Flow',
+      title: 'Flow',
+      tooltip: (
+        <span>
+          <strong>Power Automate</strong>
+          <br />Run or manage flows for this record.
+        </span>
+      ),
+    },
+  ]}
+/>
+```
+
+**Accessibility.** The tooltip's `relationship` is chosen for you from whether the command has a
+visible label. An icon-only command with a plain `title` uses `relationship="label"`, so the tooltip
+becomes its accessible name. A command with visible text uses `relationship="description"`, leaving
+the label as the name — otherwise a screen reader would announce the explanation instead of the
+command. When a rich or custom tooltip is used on an icon-only command, `title` still supplies a
+short accessible name rather than the whole tooltip body being read out, so it is worth setting
+alongside `tooltip`.
+
+Inside the overflow menu, only `description` and `tooltip` produce a tooltip. A `title`-only one is
+suppressed there, since the menu row already displays that exact text.
+
 ---
 
 ## EntityGrid
@@ -1445,179 +1505,9 @@ This library extends [Microsoft's Fluent UI React v9](https://react.fluentui.dev
 
 ## Changelog
 
+Release history lives in [CHANGELOG.md](CHANGELOG.md).
+
 > Version format: `YYYY.M.DD` (e.g., `2026.8.30` = August 30, 2026)
-
-### Unreleased
-
-Seven new Dynamics 365 components, plus the shared Web API client they sit on.
-
-- ✨ **[SystemUserPersona](#systemuserpersona)** — a `systemuser` persona with the contact card a
-  persona shows on a model-driven form. Loads lazily on hover intent; the record photo is addressed
-  by URL rather than selected inline, since `entityimage` is binary and bloats every response.
-- ✨ **[OwnerLookup](#ownerlookup)** — a preconfigured `Lookup` for `ownerid`, which is polymorphic:
-  an owner is a systemuser *or* a team. Both are searched in parallel, results render as personas or
-  team glyphs, selections show as the usual Lookup badges, and multi-select comes from Lookup.
-- ✨ **[Lookup hover cards](#hover-cards)** — `showHoverCard` adds a lazy record card to the dropdown
-  rows, the resolved badge, or both. Supply `hoverCardColumns` to have it fetched from the Web API,
-  or `renderHoverCard` to build the body yourself. Nothing loads until a pointer settles.
-- 🔧 **[Generated documentation screenshots](#documentation-screenshots).** `npm run shots` captures
-  each component in isolation via `?shot=<id>`, populated from fixtures rather than a live org.
-- ✨ `open` on `OptionSetField` and `RecordHoverCard` for rendering an expanded state without
-  driving a pointer — used by the captures, and useful in tests.
-
-- 💄 **`filled-darker` is now the default appearance** across every field component — Lookup,
-  QueryBuilder, DateTimeField and OptionSetField — matching native Dynamics 365. Fluent's default is
-  `outline`. **Breaking for anyone relying on the previous outline look**; pass
-  `appearance="outline"` to restore it. See [Appearance](#appearance).
-- 💄 **Resolved lookups now render like Dynamics at rest**: table icon or entity image, the record
-  name as a link, and a magnifier in place of the chevron. New `entityIcon`, `entityImage`,
-  `recordLinkAppearance` and `onRecordClick` props.
-- 🐛 **Attribute metadata requests failed against live environments.** `Format` was included in the
-  `$select` against the base `Attributes` collection, but it is declared on derived types — Dynamics
-  rejects the whole request with *"Could not find a property named 'Format' on type
-  'Microsoft.Dynamics.CRM.AttributeMetadata'"*. `Format` and `DateTimeBehavior` are now fetched
-  through cast segments and merged in, which also means `DateTimeField`'s metadata auto-load works
-  (it could never have resolved a behavior before).
-
-- ✨ **[CommandBar](#commandbar)** — commands that no longer fit collapse into a "More commands" menu
-  instead of wrapping or being clipped. Widths are measured from the DOM rather than estimated.
-- ✨ **[EntityGrid](#entitygrid)** — a subgrid with columns named from entity metadata, server-side
-  paging via `Prefer: odata.maxpagesize` and `@odata.nextLink`, server-side sorting, and lookups
-  rendered from their formatted-value annotations rather than as GUIDs.
-- ✨ **[DateTimeField](#datetimefield)** — respects the attribute's `DateTimeBehavior`, so `DateOnly`
-  and `TimeZoneIndependent` values never pass through UTC and cannot drift a day.
-- ✨ **[OptionSetField](#optionsetfield)** — optionset and multi-select picklist field that reads
-  global option sets as well as local ones, and round-trips multi-selects as the comma-separated
-  string Dynamics stores.
-- ✨ **[RecordHoverCard](#recordhovercard)** — lazy record loading gated on hover intent, so dragging
-  a pointer across a grid column does not fire a request per row.
-- ✨ **[Web API client](#web-api-client)** — one client with a process-wide metadata cache shared by
-  the new components. Promises are cached rather than values, so components mounting in the same tick
-  share a round trip; failures are not cached. Lookup and QueryBuilder are not yet migrated onto it.
-- 🔧 Test harness split into one tab per component.
-
-### 2026.8.40
-
-QueryBuilder layout and query options.
-
-- 🐛 **Toolbar was crushed when the query grew.** In a height-constrained parent the header and
-  toolbar were the only flex items able to shrink, so they were compressed and clipped instead of
-  the filter list scrolling. Header and toolbar are now pinned, and the filter groups plus previews
-  scroll together as one region. See [Layout and Scrolling](#layout-and-scrolling).
-- ✨ **Root `<fetch>` query options.** Generated FetchXML now carries `mapping`, `no-lock` and
-  `distinct`, matching what the Dynamics advanced-find editor emits. `distinct` defaults to `true`.
-  New `distinct`, `noLock` and `top` props override per instance, and options on an imported query
-  are preserved through a serialize round-trip rather than silently dropped.
-- ✨ Preview cards grow to fit their content instead of scrolling internally.
-- 💄 Component header now reads "Query Builder: {entity}" rather than "Edit filters: {entity}".
-- 🔧 Test harness split into **Lookup** and **Query Builder** tabs.
-
-### 2026.8.36
-
-QueryBuilder field-type and FetchXML correctness pass.
-
-- 🐛 **Every field resolved as `string`.** `dataTypeFromAttribute` compared `AttributeTypeName.Value`
-  (which is suffixed — `MoneyType`, `PicklistType`, `BooleanType`) against unsuffixed names, so only
-  lookups were typed correctly. Money fields offered "Contains", optionsets rendered a text box, and
-  booleans never reached their branch.
-- 🐛 **Optionset and boolean options were never loaded** for main-entity fields. The component's field
-  loader fetched attributes and lookup targets but no option metadata.
-- 🐛 **Global option sets returned no options** — only `OptionSet` was expanded, never `GlobalOptionSet`.
-- 🐛 **Boolean fields** now use their Dynamics labels ("Allowed" / "Not Allowed") instead of hardcoded
-  Yes/No, and match on truthiness so a saved `value="1"` no longer displays as "No".
-- 🐛 **"Does Not Contain" produced invalid FetchXML** (`operator="not-contain"`, which does not exist).
-  Now serialized as `not-like` with `%` wildcards.
-- 🐛 **Date picker shifted the day** in UTC+ timezones — `toISOString()` converted local midnight to
-  the previous UTC day.
-- 🐛 **`IsValidForAdvancedFind` was never requested**, so the filter meant to hide non-filterable
-  attributes did nothing.
-- 🐛 **"Has Value" left the value box enabled**; no-value operators now disable it correctly.
-- 🐛 **"Last X Days" rendered a date picker** instead of a number input.
-- 🐛 **`not-between` and fiscal period-and-year operators had no second value input.**
-- 🐛 **`link-entity` guessed `from="<entity>id"`**, which is wrong for activity entities
-  (`email`, `task`, `appointment` all use `activityid`). Now uses `PrimaryIdAttribute`.
-- 🐛 **Invalid OData output.** Untranslatable operators were emitted as a `/* comment */` in the filter
-  string; nested related-entity conditions were silently coerced to `eq`. Both are now omitted.
-- ✨ **Edit FetchXML** toolbar button — opens the current query as editable FetchXML to tweak or paste
-  over (`showEditFetchXmlButton`).
-- ✨ **Show/Hide OData and FetchXML** toolbar toggles (`showPreviewToggleButtons`).
-- ✨ `QueryBuilderApplyResult.odataUnsupported` reports conditions OData cannot express, surfaced as a
-  warning in the OData preview. New `isOperatorConvertibleToOData` helper.
-- ✨ Option metadata is fetched once per attribute type rather than once per field.
-- 💄 Softer, more rounded containers matching other Dynamics surfaces.
-- ⚠️ **Breaking:** `odataUnsupported` is a required field on `QueryBuilderApplyResult`. Consumers only
-  reading the result are unaffected; anyone constructing the type will need to add it.
-
-### 2026.8.30
-
-- ✨ Added multi-entity filter pattern with drill-down header ("← All" back button) in test harness
-- ✨ Added "Details Only (No Secondary Text)" example to test harness
-- ✨ Support for React elements in `secondaryText` and `details[].value` (Badges, icons, styled text)
-- ♻️ Improved `aria-selected`/`aria-disabled` attribute handling
-- 📝 Documentation overhaul with complete API reference and examples
-
-### 2026.6.12
-
-- ✨ Added React 19 support to peerDependencies
-- 📝 Updated README with cross-document support documentation
-
-### 2026.2.19
-
-- 🐛 Fixed cross-document dismiss in Dynamics 365 iframes using `ownerDocument`
-
-### 2026.2.17
-
-- 🐛 Removed `requestAnimationFrame` — handler registers immediately
-- 🐛 Switched to capture phase for dismiss handler to prevent D365 DOM interference
-
-### 2026.2.15
-
-- ✨ Added controlled `open` and `onOpenChange` props for programmatic dropdown control
-- 🐛 Removed `requestAnimationFrame` from dismiss handler
-
-### 2026.2.13
-
-- ♻️ Rebuilt popup from scratch using custom element (Fluent UI Popover had unexpected behavior)
-
-### 2026.2.11
-
-- 🐛 Added `onOpenChange` callback to sync internal state with Popover dismiss events (outside click, Escape, focus loss)
-
-### 2026.2.10
-
-- 🐛 Fixed Lookup not allowing space character in search input
-
-### 2026.2.8
-
-- ✨ **QueryBuilder**: Native API integration for field metadata
-- ✨ **QueryBuilder**: Lookup field support with related entity validation
-
-### 2026.2.7
-
-- ♻️ Removed `Xrm` global dependency — now uses native `/api/data/v9.2/` fetch calls
-
-### 2026.2.6
-
-- ♻️ **QueryBuilder**: Refactored to reuse shared components and styles
-
-### 2026.2.5
-
-- ✨ **QueryBuilder**: Initial release (beta) — Advanced Find-style query builder
-- ♻️ **Lookup**: Changed from options-only to popup-based rendering
-
-### 2026.2.3
-
-- ✨ Added `id` prop — auto-generated if not provided
-
-### 2026.2.2
-
-- 🐛 Fixed classic JSX transform for React 16 compatibility
-- ✨ Added React 16.8+ support
-
-### 2026.2.1
-
-- 🎉 Initial release
-- ✨ Lookup component with async search, expandable details, header/footer
 
 ## License
 

@@ -13,10 +13,51 @@ import {
 } from '@fluentui/react-components';
 import { MoreHorizontalRegular } from '@fluentui/react-icons';
 import { useCommandBarStyles } from './CommandBar.styles';
+import { planTooltip, shouldTooltipInOverflow } from './CommandBar.utils';
 import type { CommandBarItem, CommandBarProps } from './CommandBar.types';
 
 /** Width reserved for the overflow trigger when at least one command is collapsed. */
 const OVERFLOW_TRIGGER_WIDTH = 40;
+
+/**
+ * Wraps a trigger in a Fluent Tooltip when the command carries tooltip content, per the
+ * plan from `planTooltip`. Returns the trigger untouched when there is nothing to show,
+ * so commands without tooltips do not pay for a Tooltip wrapper.
+ */
+const useTooltipWrapper = (item: CommandBarItem, styles: ReturnType<typeof useCommandBarStyles>) => {
+  const plan = planTooltip(item);
+
+  return (trigger: React.ReactElement): React.ReactElement => {
+    if (!plan) return trigger;
+
+    const content =
+      plan.mode === 'custom' ? (
+        plan.element
+      ) : plan.mode === 'rich' ? (
+        <span className={styles.tooltipContent}>
+          {item.title && <span className={styles.tooltipTitle}>{item.title}</span>}
+          <span className={styles.tooltipDescription}>{item.description}</span>
+        </span>
+      ) : (
+        plan.text
+      );
+
+    // Rich and custom bodies cannot serve as an accessible name without dragging the
+    // whole description into it, so an icon-only command is named from `title` instead.
+    const named =
+      plan.mode !== 'plain' && plan.ariaLabel
+        ? React.cloneElement(trigger as React.ReactElement<{ 'aria-label'?: string }>, {
+            'aria-label': plan.ariaLabel,
+          })
+        : trigger;
+
+    return (
+      <Tooltip content={content} relationship={plan.relationship} withArrow>
+        {named}
+      </Tooltip>
+    );
+  };
+};
 
 /**
  * Renders one command as a button, a toggle, or a menu button when it has children.
@@ -26,38 +67,59 @@ const CommandButton: React.FC<{
   size: 'small' | 'medium' | 'large';
   className: string;
 }> = ({ item, size, className }) => {
+  const styles = useCommandBarStyles();
   const appearance = item.appearance ?? 'subtle';
+  const withTooltip = useTooltipWrapper(item, styles);
 
-  const button = item.subItems?.length ? (
-    <Menu>
-      <MenuTrigger disableButtonEnhancement>
-        <MenuButton size={size} appearance={appearance} icon={item.icon} disabled={item.disabled} className={className}>
-          {item.text}
-        </MenuButton>
-      </MenuTrigger>
-      <MenuPopover>
-        <MenuList>
-          {item.subItems.map((subItem) => (
-            <MenuItem key={subItem.key} icon={subItem.icon} disabled={subItem.disabled} onClick={subItem.onClick}>
-              {subItem.text}
-            </MenuItem>
-          ))}
-        </MenuList>
-      </MenuPopover>
-    </Menu>
-  ) : item.checked !== undefined ? (
-    <ToggleButton
-      size={size}
-      appearance={appearance}
-      icon={item.icon}
-      checked={item.checked}
-      disabled={item.disabled}
-      onClick={item.onClick}
-      className={className}
-    >
-      {item.text}
-    </ToggleButton>
-  ) : (
+  // The tooltip wraps the trigger button, not the Menu. Menu is not a DOM element, so
+  // the ref and hover handlers a Tooltip injects would land on a component that cannot
+  // use them and the tooltip would never open.
+  if (item.subItems?.length) {
+    return (
+      <Menu>
+        <MenuTrigger disableButtonEnhancement>
+          {withTooltip(
+            <MenuButton
+              size={size}
+              appearance={appearance}
+              icon={item.icon}
+              disabled={item.disabled}
+              className={className}
+            >
+              {item.text}
+            </MenuButton>,
+          )}
+        </MenuTrigger>
+        <MenuPopover>
+          <MenuList>
+            {item.subItems.map((subItem) => (
+              <MenuItem key={subItem.key} icon={subItem.icon} disabled={subItem.disabled} onClick={subItem.onClick}>
+                {subItem.text}
+              </MenuItem>
+            ))}
+          </MenuList>
+        </MenuPopover>
+      </Menu>
+    );
+  }
+
+  if (item.checked !== undefined) {
+    return withTooltip(
+      <ToggleButton
+        size={size}
+        appearance={appearance}
+        icon={item.icon}
+        checked={item.checked}
+        disabled={item.disabled}
+        onClick={item.onClick}
+        className={className}
+      >
+        {item.text}
+      </ToggleButton>,
+    );
+  }
+
+  return withTooltip(
     <Button
       size={size}
       appearance={appearance}
@@ -67,23 +129,15 @@ const CommandButton: React.FC<{
       className={className}
     >
       {item.text}
-    </Button>
+    </Button>,
   );
-
-  // Icon-only commands have no visible label, so the tooltip carries the accessible name
-  if (item.title && !item.text) {
-    return (
-      <Tooltip content={item.title} relationship="label" withArrow>
-        {button}
-      </Tooltip>
-    );
-  }
-
-  return button;
 };
 
 /** Renders an overflowed command inside the overflow menu, preserving any submenu. */
 const OverflowMenuItem: React.FC<{ item: CommandBarItem }> = ({ item }) => {
+  const styles = useCommandBarStyles();
+  const withTooltip = useTooltipWrapper(item, styles);
+
   if (item.subItems?.length) {
     return (
       <Menu>
@@ -105,11 +159,13 @@ const OverflowMenuItem: React.FC<{ item: CommandBarItem }> = ({ item }) => {
     );
   }
 
-  return (
+  const row = (
     <MenuItem icon={item.icon} disabled={item.disabled} onClick={item.onClick}>
       {item.text || item.title}
     </MenuItem>
   );
+
+  return shouldTooltipInOverflow(item) ? withTooltip(row) : row;
 };
 
 /**

@@ -82,4 +82,29 @@ export const useCommandBarStyles = makeStyles({
   overflowTrigger: {
     flexShrink: 0,
   },
+
+  /**
+   * Rich tooltip body. Capped so a long description wraps into a readable column
+   * instead of stretching to the width of the viewport.
+   */
+  tooltipContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXS,
+    maxWidth: '280px',
+  },
+
+  tooltipTitle: {
+    fontWeight: tokens.fontWeightSemibold,
+  },
+
+  /**
+   * Inherits the tooltip's foreground rather than setting `colorNeutralForeground2`:
+   * the tooltip surface flips to inverted colours in some themes, and a fixed
+   * neutral token would leave the description unreadable against it.
+   */
+  tooltipDescription: {
+    color: 'inherit',
+    opacity: 0.9,
+  },
 });

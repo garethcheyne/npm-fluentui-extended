@@ -13,8 +13,28 @@ export interface CommandBarItem {
    * because Fluent's icon slot does not accept the boolean arm of ReactNode.
    */
   icon?: React.ReactElement;
-  /** Tooltip / accessible name. Required in practice for icon-only commands. */
+  /**
+   * Tooltip heading, shown on hover and focus whether or not the command has a
+   * visible label. Doubles as the accessible name for icon-only commands, so it
+   * stays required in practice for those.
+   */
   title?: string;
+  /**
+   * Tooltip body, rendered under `title` as a Fluent 2 rich tooltip. Use it for the
+   * "what does this actually do" line that will not fit in a label.
+   *
+   * Accepts markup as well as a plain string, so a description can carry its own
+   * emphasis, a keyboard shortcut, or a short list. It renders inside the tooltip's
+   * body styling either way - pass `tooltip` instead to replace that styling too.
+   */
+  description?: React.ReactNode;
+  /**
+   * Custom tooltip content, for when text is not enough. Takes precedence over
+   * `title` and `description` as the tooltip body - `title` is still worth setting
+   * alongside it, because an icon-only command falls back to it for its
+   * accessible name rather than announcing the whole element.
+   */
+  tooltip?: React.ReactElement;
   onClick?: () => void;
   disabled?: boolean;
   appearance?: CommandBarItemAppearance;

@@ -103,6 +103,33 @@ export function CommandBarExamples({ onCommandLog }: CommandBarExamplesProps) {
         </p>
 
         <div style={{ marginTop: 16, padding: 12, background: '#faf9f8', borderRadius: 6 }}>
+          <strong>Tooltips — hover any command above:</strong>
+          <ul style={{ margin: '8px 0 0', paddingLeft: 20, fontSize: 13, color: '#444' }}>
+            <li>
+              <strong>Edit</strong> — <code>title</code> only, a plain single-line tooltip
+            </li>
+            <li>
+              <strong>New</strong> — <code>title</code> + <code>description</code>, the Fluent 2
+              rich tooltip
+            </li>
+            <li>
+              <strong>Delete</strong> — <code>description</code> as markup, so it can carry its own
+              emphasis
+            </li>
+            <li>
+              <strong>Flow</strong> — <code>tooltip</code> with a fully custom element
+            </li>
+            <li>
+              <strong>Filter</strong> (far right) — icon-only, where <code>title</code> is also the
+              accessible name
+            </li>
+            <li>
+              <strong>Export</strong> — a tooltip on a submenu command
+            </li>
+          </ul>
+        </div>
+
+        <div style={{ marginTop: 16, padding: 12, background: '#faf9f8', borderRadius: 6 }}>
           <strong>How overflow works:</strong>
           <ul style={{ margin: '8px 0 0', paddingLeft: 20, fontSize: 13, color: '#444' }}>
             <li>
