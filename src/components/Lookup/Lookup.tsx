@@ -48,6 +48,7 @@ export const Lookup: React.FC<LookupProps> = ({
   hoverCardTarget = 'both',
   hoverCardDelayMs = 400,
   hoverCardActions,
+  mountNode,
   multiSelect = false,
   maxSelection,
   selectedKeys: selectedKeysProp,
@@ -690,7 +691,7 @@ export const Lookup: React.FC<LookupProps> = ({
       </div>
 
       {showDropdown && (
-        <Portal>
+        <Portal mountNode={mountNode}>
           <div
             className={styles.dropdownPortal}
             style={{

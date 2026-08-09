@@ -1,7 +1,7 @@
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
-import React, { useEffect, useRef, useState, type ReactPortal } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { ParentPortalProps } from './ParentPortal.types';
+import type { ParentPortalProps, UseParentPortalMountOptions } from './ParentPortal.types';
 
 const DEFAULT_CONTAINER_ID = 'fluentui-extended-parent-portal-root';
 
@@ -81,43 +81,13 @@ function serializeSheet(sheet: CSSStyleSheet): string {
   }
 }
 
-/**
- * Renders children into the parent document (escaping an iframe) with full
- * Fluent UI styling. Wraps content in a FluentProvider so theme tokens and
- * Griffel styles are available in the parent DOM.
- *
- * Falls back to rendering children in-place if not inside an iframe.
- */
-export function ParentPortal({
-  children,
-  containerId = DEFAULT_CONTAINER_ID,
-  syncStyles = true,
-  syncTokens = true,
-  syncInterval = 300,
-  containerStyles,
-}: ParentPortalProps): ReactPortal | React.JSX.Element {
-  const [container, setContainer] = useState<HTMLElement | null>(null);
+function useSyncStyles(active: boolean, containerId: string, syncInterval: number) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const observerRef = useRef<MutationObserver | null>(null);
   const mirrorMapRef = useRef(new Map<HTMLStyleElement, HTMLStyleElement>());
 
-  // Create container in parent document
   useEffect(() => {
-    const parentDoc = getParentDocument();
-    if (!parentDoc) return;
-
-    const el = getOrCreateContainer(parentDoc, containerId, containerStyles);
-    if (syncTokens) copyFluentTokens(el);
-    setContainer(el);
-
-    return () => {
-      // Don't remove the container — other portals may share it
-    };
-  }, [containerId, containerStyles, syncTokens]);
-
-  // Sync Griffel styles to parent document
-  useEffect(() => {
-    if (!syncStyles || !container) return;
+    if (!active) return;
     const parentDoc = getParentDocument();
     if (!parentDoc) return;
 
@@ -164,9 +134,59 @@ export function ParentPortal({
       for (const mirror of mirrorMap.values()) mirror.remove();
       mirrorMap.clear();
     };
-  }, [syncStyles, syncInterval, container, containerId]);
+  }, [active, syncInterval, containerId]);
+}
 
-  // Fallback: render in-place if not in an iframe
+/**
+ * Hook that returns the parent-document mount node for use with Fluent's
+ * `mountNode` prop (e.g. on DialogSurface). Also handles style sync.
+ */
+export function useParentPortalMount(options?: UseParentPortalMountOptions): HTMLElement | undefined {
+  const {
+    containerId = DEFAULT_CONTAINER_ID,
+    syncStyles = true,
+    syncTokens = true,
+    syncInterval = 300,
+    containerStyles,
+  } = options ?? {};
+
+  const [container, setContainer] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const parentDoc = getParentDocument();
+    if (!parentDoc) return;
+
+    const el = getOrCreateContainer(parentDoc, containerId, containerStyles);
+    if (syncTokens) copyFluentTokens(el);
+    setContainer(el);
+  }, [containerId, containerStyles, syncTokens]);
+
+  useSyncStyles(syncStyles && container !== null, containerId, syncInterval);
+
+  return container ?? undefined;
+}
+
+/**
+ * Renders children into the parent document via createPortal.
+ * Use for non-portal Fluent components. For DialogSurface, use
+ * useParentPortalMount() with the mountNode prop instead.
+ */
+export function ParentPortal({
+  children,
+  containerId = DEFAULT_CONTAINER_ID,
+  syncStyles = true,
+  syncTokens = true,
+  syncInterval = 300,
+  containerStyles,
+}: ParentPortalProps) {
+  const container = useParentPortalMount({
+    containerId,
+    syncStyles,
+    syncTokens,
+    syncInterval,
+    containerStyles,
+  });
+
   if (!container) {
     return <>{children}</>;
   }

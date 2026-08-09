@@ -188,4 +188,10 @@ export interface LookupProps extends Omit<InputProps, 'onChange' | 'value'> {
   hoverCardDelayMs?: number;
   /** Content rendered at the bottom of the card, e.g. an "Open record" link */
   hoverCardActions?: React.ReactNode;
+  /**
+   * Mount node for the dropdown Portal. Use when the Lookup is inside a
+   * dialog rendered in a parent document (via mountNode) so the listbox
+   * appears in the same document as the dialog.
+   */
+  mountNode?: HTMLElement;
 }

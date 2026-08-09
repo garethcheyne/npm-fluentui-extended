@@ -3,8 +3,8 @@ export { DEFAULT_FIELD_APPEARANCE, toListboxAppearance, toTextareaAppearance } f
 export type { FieldAppearance, ListboxAppearance, TextareaAppearance } from './types/appearance';
 
 // Utilities
-export { ParentPortal } from './components/ParentPortal';
-export type { ParentPortalProps } from './components/ParentPortal';
+export { ParentPortal, useParentPortalMount } from './components/ParentPortal';
+export type { ParentPortalProps, UseParentPortalMountOptions } from './components/ParentPortal';
 
 // Components
 export { Lookup } from './components/Lookup';
