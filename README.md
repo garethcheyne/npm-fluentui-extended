@@ -123,6 +123,56 @@ selections render as the usual Lookup badges and multi-select comes for free.
 
 ![OwnerLookup users and teams](assets/screenshot-ownerlookup-open.png)
 
+### ParentPortal
+
+Renders Fluent UI content in the **parent document**, escaping an iframe boundary with full styling. Designed for Dynamics 365 web resources where dialogs must float above the entire D365 page rather than being trapped inside the iframe.
+
+**Problem:** Fluent UI v9 has no built-in cross-frame portal. `mountNode` targets a DOM node but Griffel injects styles into the iframe's `<head>`. D365's auto-height mechanism detects `scrollHeight` changes and adds scrollbars.
+
+**Solution:** `ParentPortal` creates a container in `window.parent.document`, syncs all Griffel CSSOM rules to the parent, and copies Fluent theme tokens — so components render fully styled in the parent page.
+
+```tsx
+import { Dialog, DialogSurface, DialogBody, DialogTitle, DialogContent } from '@fluentui/react-components';
+import { ParentPortal } from 'fluentui-extended';
+
+function MyDialog({ open, onClose }) {
+  return (
+    <Dialog open={open} onOpenChange={(_, d) => !d.open && onClose()}>
+      <ParentPortal>
+        <DialogSurface backdrop={{ appearance: 'dimmed' }}>
+          <DialogBody>
+            <DialogTitle>Escaped the iframe</DialogTitle>
+            <DialogContent>
+              This dialog renders in the parent D365 document with full
+              Fluent styling — no scrollbars, no forced iframe resize.
+            </DialogContent>
+          </DialogBody>
+        </DialogSurface>
+      </ParentPortal>
+    </Dialog>
+  );
+}
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `ReactNode` | — | Content to render in the parent document |
+| `containerId` | `string` | `'fluentui-extended-parent-portal-root'` | ID for the container element in the parent |
+| `syncStyles` | `boolean` | `true` | Sync Griffel stylesheets to the parent |
+| `syncTokens` | `boolean` | `true` | Copy Fluent CSS custom properties (theme tokens) |
+| `syncInterval` | `number` | `300` | Interval (ms) for CSSOM rule re-sync |
+| `containerStyles` | `string` | *(built-in)* | Custom CSS for the parent container |
+
+**How it works:**
+1. Creates a `position: fixed` container in `window.parent.document.body`
+2. Uses `React.createPortal` to render a `FluentProvider` + children into that container
+3. Serializes all `CSSStyleSheet.cssRules` from iframe `<style>` elements (Griffel uses `insertRule()`, so `textContent` is empty) and mirrors them to the parent `<head>`
+4. Copies CSS custom properties (`--colorNeutralBackground1`, etc.) from the iframe's `FluentProvider` to the parent container
+5. A `MutationObserver` + interval catches lazily-inserted Griffel rules
+6. Falls back to in-place rendering if not inside an iframe
+
+> **Requires same-origin:** The iframe and parent must be on the same domain (standard for D365 web resources).
+
 ## Quick Start
 
 ```tsx

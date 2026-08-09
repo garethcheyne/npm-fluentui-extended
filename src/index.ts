@@ -2,6 +2,10 @@
 export { DEFAULT_FIELD_APPEARANCE, toListboxAppearance, toTextareaAppearance } from './types/appearance';
 export type { FieldAppearance, ListboxAppearance, TextareaAppearance } from './types/appearance';
 
+// Utilities
+export { ParentPortal } from './components/ParentPortal';
+export type { ParentPortalProps } from './components/ParentPortal';
+
 // Components
 export { Lookup } from './components/Lookup';
 export type { LookupProps, LookupOption, LookupOptionDetail } from './components/Lookup';

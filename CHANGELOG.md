@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+- ✨ **[ParentPortal](README.md#parentportal)** — new component that renders Fluent UI content in the
+  parent document, escaping iframe boundaries with full Griffel styling and theme token sync. Designed
+  for Dynamics 365 web resources where dialogs must float above the D365 page without causing iframe
+  resize or scrollbars.
 - ✨ **[CommandBar tooltips](README.md#tooltips)** — commands take Fluent tooltips in three forms:
   `title` for a plain line, `title` + `description` for the Fluent 2 rich tooltip, and `tooltip` for
   a fully custom element. `description` accepts markup, so it can carry its own emphasis.
