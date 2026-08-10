@@ -21,6 +21,8 @@ export interface DateTimeFieldProps {
    * Dynamics default for new DateTime attributes.
    */
   behavior?: DateTimeBehavior;
+  /** Show the behavior hint text below the field. Defaults to false. */
+  showHint?: boolean;
   /**
    * Show a time picker alongside the date. Ignored when `behavior` is 'DateOnly',
    * which has no time component by definition.

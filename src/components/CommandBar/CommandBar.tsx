@@ -74,7 +74,7 @@ const CommandButton: React.FC<{
   // The tooltip wraps the trigger button, not the Menu. Menu is not a DOM element, so
   // the ref and hover handlers a Tooltip injects would land on a component that cannot
   // use them and the tooltip would never open.
-  if (item.subItems?.length) {
+  if (item.menuContent || item.subItems?.length) {
     return (
       <Menu>
         <MenuTrigger disableButtonEnhancement>
@@ -91,13 +91,15 @@ const CommandButton: React.FC<{
           )}
         </MenuTrigger>
         <MenuPopover>
-          <MenuList>
-            {item.subItems.map((subItem) => (
-              <MenuItem key={subItem.key} icon={subItem.icon} disabled={subItem.disabled} onClick={subItem.onClick}>
-                {subItem.text}
-              </MenuItem>
-            ))}
-          </MenuList>
+          {item.menuContent ?? (
+            <MenuList>
+              {item.subItems!.map((subItem) => (
+                <MenuItem key={subItem.key} icon={subItem.icon} disabled={subItem.disabled} onClick={subItem.onClick}>
+                  {subItem.text}
+                </MenuItem>
+              ))}
+            </MenuList>
+          )}
         </MenuPopover>
       </Menu>
     );
@@ -138,7 +140,7 @@ const OverflowMenuItem: React.FC<{ item: CommandBarItem }> = ({ item }) => {
   const styles = useCommandBarStyles();
   const withTooltip = useTooltipWrapper(item, styles);
 
-  if (item.subItems?.length) {
+  if (item.menuContent || item.subItems?.length) {
     return (
       <Menu>
         <MenuTrigger disableButtonEnhancement>
@@ -147,13 +149,15 @@ const OverflowMenuItem: React.FC<{ item: CommandBarItem }> = ({ item }) => {
           </MenuItem>
         </MenuTrigger>
         <MenuPopover>
-          <MenuList>
-            {item.subItems.map((subItem) => (
-              <MenuItem key={subItem.key} icon={subItem.icon} disabled={subItem.disabled} onClick={subItem.onClick}>
-                {subItem.text}
-              </MenuItem>
-            ))}
-          </MenuList>
+          {item.menuContent ?? (
+            <MenuList>
+              {item.subItems!.map((subItem) => (
+                <MenuItem key={subItem.key} icon={subItem.icon} disabled={subItem.disabled} onClick={subItem.onClick}>
+                  {subItem.text}
+                </MenuItem>
+              ))}
+            </MenuList>
+          )}
         </MenuPopover>
       </Menu>
     );

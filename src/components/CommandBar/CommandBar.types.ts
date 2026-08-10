@@ -43,6 +43,12 @@ export interface CommandBarItem {
   /** Nested commands - rendered as a menu button, and as a submenu when overflowed */
   subItems?: CommandBarItem[];
   /**
+   * Custom menu content rendered inside the MenuPopover. Use for complex menus
+   * that need MenuItemRadio, MenuItemCheckbox, MenuGroupHeader, etc.
+   * Takes precedence over subItems when both are provided.
+   */
+  menuContent?: React.ReactNode;
+  /**
    * Keep this command out of the overflow menu. Use sparingly: a pinned command
    * that does not fit will be clipped rather than moved.
    */

@@ -38,6 +38,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
   value,
   onChange,
   behavior: behaviorProp = 'UserLocal',
+  showHint = false,
   showTime = false,
   timeOnly = false,
   timeIntervalMinutes = 30,
@@ -509,7 +510,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
         </Portal>
       )}
 
-      {behavior !== 'UserLocal' && (
+      {showHint && behavior !== 'UserLocal' && (
         <Text className={styles.behaviorHint}>
           {behavior === 'DateOnly'
             ? 'Date only - stored without a time or timezone'
