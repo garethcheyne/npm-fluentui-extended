@@ -2,7 +2,46 @@
 
 > Version format: `YYYY.M.DD` (e.g., `2026.8.30` = August 30, 2026)
 
-## Unreleased
+## 2026.8.72
+
+- ✨ **[FluentShell](docs/FluentShell.md)** — the outermost element of a Dynamics 365 web resource,
+  sizing the app to whatever chrome hosts its iframe. The correct gutter is not a constant: it depends
+  on what the host already pads and on where the form's content column sits, and both move with the
+  window and the D365 release. The shell walks its own iframe's ancestors for the padding already
+  applied, lines its edges up with the form column, and adds only the difference. Ships a console API
+  (`__fluentShell`) for measuring and tuning a deployed web resource without a rebuild.
+- ✨ **[FluentContainer](docs/FluentContainer.md)** — a card matching the surface D365 draws on a
+  model-driven form, measured from a live form rather than approximated: `shadow4`, an 8px radius, and
+  a *transparent* hairline border. Clipping is opt-in via `scrolls`, because a shadow paints outside
+  the border box and any ancestor clipping at the card's own bounds erases it — a bug that reads as
+  "the card looks slightly flat" rather than as anything obviously wrong. In development the container
+  warns when its nearest clipping ancestor is too tight; the check compiles out of production.
+- ✨ **[D365TestHarness](docs/D365TestHarness.md)** — a local stand-in for the Dynamics 365 form that
+  hosts a web resource. On a bare dev server there is no chrome to measure, so `FluentShell` falls
+  back to its standalone behaviour and the layout being developed is not the one that ships. The
+  harness hosts the app in a genuine same-origin iframe and reproduces the geometry a live form
+  measures, so the same gutters resolve locally as in the org. Content is rendered into the frame
+  with Fluent's own cross-document support — a Griffel renderer bound to the frame's document —
+  rather than by copying stylesheets across. Inactive outside a local host, so the wrapper ships to
+  Dynamics as a no-op.
+- 🔧 **The test harness is now a simulated Dynamics form.** Every example renders inside a
+  `D365TestHarness`, so components are judged at the width and against the chrome they will really
+  have, and the component list is the sitemap rather than a tab strip. Each page opens with when to
+  reach for the component and when to reach for something else, and each example carries a "Show
+  code" panel.
+- 🔧 **`npm run gen:samples`** generates those snippets. Per-section samples are the library elements
+  lifted from the example files' own source, so the code shown is the code running; per-page samples
+  come from the README, whose blocks `verify:readme` compiles. The script also inserts the panels, so
+  a new example gets one by being written. Idempotent, and it fails loudly if a source heading moves.
+- 🔧 A **Documentation** tab gathers the guidance and every snippet into one reference, assembled
+  from the same sources the pages use — so it cannot fall out of step with them.
+- 🐛 The ParentPortal harness example imported `../../src/components/ParentPortal`, one level short,
+  so it failed to resolve and was never wired to a tab. `tsconfig.json` covers `src/**/*` only, so
+  `npm run typecheck` does not see the harness and could not catch it.
+- 📝 Component documentation moved to `docs/`, with the README carrying a short showcase and a
+  "read more" link. The README is close to the ~64KB cap npm applies to the package page, and two
+  components' full reference would have pushed it past — `docs/` is not in `files`, so it costs
+  nothing in the published tarball.
 
 - ✨ **[ParentPortal](README.md#parentportal)** — new component that renders Fluent UI content in the
   parent document, escaping iframe boundaries with full Griffel styling and theme token sync. Designed

@@ -13,6 +13,7 @@
  * `systemusers` queries when connected to Dynamics 365.
  */
 
+import { CodeExample } from '../shared/CodeExample';
 import React, { useState } from 'react';
 import { Link, Text } from '@fluentui/react-components';
 
@@ -154,6 +155,7 @@ export const PeopleExamples: React.FC<ExampleProps> = ({ dynamicsConnected, onCo
             <SystemUserPersona key={user.systemuserid} user={user} avatarOnly imageUrl={null} />
           ))}
         </div>
+        <CodeExample sampleId="people-systemuserpersona" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -200,6 +202,7 @@ export const PeopleExamples: React.FC<ExampleProps> = ({ dynamicsConnected, onCo
         <p style={{ marginTop: 12, fontSize: 14 }}>
           Selected: <strong>{multiOwners.map((o) => o.name).join(', ') || 'None'}</strong>
         </p>
+        <CodeExample sampleId="people-ownerlookup" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -237,6 +240,7 @@ export const PeopleExamples: React.FC<ExampleProps> = ({ dynamicsConnected, onCo
             <Text size={200}>Not connected.</Text>
           </div>
         )}
+        <CodeExample sampleId="people-live-owners" />
       </section>
     </>
   );

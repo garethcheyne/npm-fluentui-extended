@@ -6,6 +6,50 @@ export type { FieldAppearance, ListboxAppearance, TextareaAppearance } from './t
 export { ParentPortal, useParentPortalMount } from './components/ParentPortal';
 export type { ParentPortalProps, UseParentPortalMountOptions } from './components/ParentPortal';
 
+// Web resource layout - fits an app to whatever D365 chrome is hosting its iframe
+export {
+	FluentShell,
+	FLUENT_SHELL_VERSION,
+	SURFACE_RULES,
+	detectHostSurface,
+	useHostSurface,
+	useShellSurface,
+	useShellBleed,
+	measureAlignment,
+	readAlignmentAgainst,
+	collectHostChain,
+	collectShellDiagnostics,
+	logShellDiagnostics,
+	isShellDebugEnabled,
+} from './components/FluentShell';
+export type {
+	FluentShellProps,
+	HostSurface,
+	HostSurfaceInfo,
+	HostAncestor,
+	HostChain,
+	ChainStop,
+	ShellDensity,
+	ShellSpacing,
+	SpacingBasis,
+	SpacingStrategy,
+	AlignmentReading,
+	ShellDiagnostics,
+	ShellDebugApi,
+	EdgeComparison,
+	PaintedCard,
+} from './components/FluentShell';
+
+export { D365TestHarness, HARNESS_GEOMETRY } from './components/D365TestHarness';
+export type { D365TestHarnessProps, D365NavGroup, D365NavItem } from './components/D365TestHarness';
+
+export { FluentContainer, SHADOW_REACH } from './components/FluentContainer';
+export type {
+	FluentContainerProps,
+	FluentContainerScroll,
+	FluentContainerPadding,
+} from './components/FluentContainer';
+
 // Components
 export { Lookup } from './components/Lookup';
 export type { LookupProps, LookupOption, LookupOptionDetail } from './components/Lookup';

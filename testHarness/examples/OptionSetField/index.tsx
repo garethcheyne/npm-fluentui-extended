@@ -9,6 +9,7 @@
  * 4. **Live Mode** - Options loaded from Dynamics 365 metadata
  */
 
+import { CodeExample } from '../shared/CodeExample';
 import React, { useState } from 'react';
 import { OptionSetField, formatMultiSelectValue } from '../../../src';
 import type { ExampleProps } from '../shared/types';
@@ -162,6 +163,7 @@ export function OptionSetFieldExamples({ dynamicsConnected }: ExampleProps) {
             <li><strong>Multi-select:</strong> Set <code>multiselect</code> for checkbox-style selection</li>
           </ul>
         </div>
+        <CodeExample sampleId="optionsetfield-basic-usage" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -228,6 +230,7 @@ export function OptionSetFieldExamples({ dynamicsConnected }: ExampleProps) {
             />
           </div>
         </div>
+        <CodeExample sampleId="optionsetfield-field-states" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -325,6 +328,7 @@ export function OptionSetFieldExamples({ dynamicsConnected }: ExampleProps) {
             </pre>
           </div>
         </div>
+        <CodeExample sampleId="optionsetfield-badge-style" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -391,6 +395,7 @@ export function OptionSetFieldExamples({ dynamicsConnected }: ExampleProps) {
             />
           </div>
         </div>
+        <CodeExample sampleId="optionsetfield-appearance-variants" />
       </section>
     </>
   );

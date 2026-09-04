@@ -19,6 +19,7 @@
  * - Manages loading, error, and empty states
  */
 
+import { CodeExample } from '../shared/CodeExample';
 import React, { useState } from 'react';
 import { Badge } from '@fluentui/react-components';
 
@@ -138,6 +139,7 @@ export function EntityGridExamples({
           Connect to Dynamics 365 to load the grid.
         </div>
       )}
+      <CodeExample sampleId="entitygrid-entitygrid-example-1" />
     </section>
   );
 }

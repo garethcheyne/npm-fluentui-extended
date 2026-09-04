@@ -22,8 +22,8 @@ import {
   FluentProvider,
   webLightTheme,
   Button,
-  Tab,
-  TabList,
+  makeStyles,
+  tokens,
   type SelectTabData,
   type SelectTabEvent,
 } from '@fluentui/react-components';
@@ -33,6 +33,11 @@ import {
   PersonSearchRegular,
   FilterRegular,
   AppsListRegular,
+  BorderOutsideRegular,
+  SquareRegular,
+  WindowRegular,
+  LayerRegular,
+  BookRegular,
   TableRegular,
   CalendarLtrRegular,
   CheckboxCheckedRegular,
@@ -53,6 +58,17 @@ import { DateTimeFieldExamples } from './examples/DateTimeField';
 import { OptionSetFieldExamples } from './examples/OptionSetField';
 import { HoverCardExamples } from './examples/HoverCard';
 import { PeopleExamples } from './examples/People';
+import { FluentShellExamples } from './examples/FluentShell';
+import { FluentContainerExamples } from './examples/FluentContainer';
+import { ParentPortalExample } from './examples/ParentPortal';
+import { D365TestHarnessExamples } from './examples/D365TestHarness';
+import { DocsExamples } from './examples/Docs';
+import { D365TestHarness } from '../src/components/D365TestHarness';
+import { FluentShell } from '../src/components/FluentShell';
+import { FluentContainer } from '../src/components/FluentContainer';
+import { CodeExample } from './examples/shared/CodeExample';
+import { PAGE_LEVEL_SAMPLES } from './examples/shared/codeSamples';
+import { ComponentGuidanceBlock } from './examples/shared/ComponentGuidance';
 import { searchDynamicsRecords } from './examples/Lookup/dynamicsHelpers';
 
 // =============================================================================
@@ -60,18 +76,100 @@ import { searchDynamicsRecords } from './examples/Lookup/dynamicsHelpers';
 // =============================================================================
 
 /**
- * Tab definitions with icons for navigation.
+ * Normalises how example pages present.
+ *
+ * The example files were written over time with plain `<h2>`/`<h3>` elements,
+ * which render at browser defaults — oversized and with margins that fight the
+ * card they now sit in. Styling them from the page container fixes every page at
+ * once, and keeps the example files free of presentation concerns.
+ *
+ * Only typography is touched. Inline styles in those files (a `#666` paragraph,
+ * a 40px section gap) still win, and overriding them would need `!important`
+ * everywhere — not worth it for spacing that already reads well.
  */
-const tabs: Array<{ id: HarnessTab; label: string; icon: React.ReactElement }> = [
-  { id: 'lookup', label: 'Lookup', icon: <PersonSearchRegular /> },
-  { id: 'querybuilder', label: 'QueryBuilder', icon: <FilterRegular /> },
-  { id: 'commandbar', label: 'CommandBar', icon: <AppsListRegular /> },
-  { id: 'entitygrid', label: 'EntityGrid', icon: <TableRegular /> },
-  { id: 'datetimefield', label: 'DateTimeField', icon: <CalendarLtrRegular /> },
-  { id: 'optionsetfield', label: 'OptionSetField', icon: <CheckboxCheckedRegular /> },
-  { id: 'hovercard', label: 'HoverCard', icon: <ContactCardRegular /> },
-  { id: 'people', label: 'People', icon: <PeopleRegular /> },
+const usePageStyles = makeStyles({
+  page: {
+    '& h2': {
+      marginTop: '0px',
+      marginBottom: tokens.spacingVerticalXS,
+      fontSize: tokens.fontSizeBase500,
+      fontWeight: tokens.fontWeightSemibold,
+      lineHeight: tokens.lineHeightBase500,
+      color: tokens.colorNeutralForeground1,
+    },
+    '& h3': {
+      marginTop: tokens.spacingVerticalM,
+      marginBottom: tokens.spacingVerticalXS,
+      fontSize: tokens.fontSizeBase400,
+      fontWeight: tokens.fontWeightSemibold,
+      lineHeight: tokens.lineHeightBase400,
+      color: tokens.colorNeutralForeground1,
+    },
+    '& h4': {
+      marginTop: tokens.spacingVerticalS,
+      marginBottom: tokens.spacingVerticalXS,
+      fontSize: tokens.fontSizeBase300,
+      fontWeight: tokens.fontWeightSemibold,
+      color: tokens.colorNeutralForeground2,
+    },
+  },
+});
+
+interface HarnessEntry {
+  id: HarnessTab;
+  label: string;
+  icon: React.ReactElement;
+}
+
+/**
+ * The sitemap, grouped the way a model-driven app groups its own.
+ *
+ * Grouped by *what you are building* rather than alphabetically, because that is
+ * the question someone arrives with: a form field, a list of records, something
+ * about a person, or the frame the whole web resource sits in. Documentation
+ * leads, ungrouped, where a model-driven app puts Home.
+ */
+const NAV_GROUPS: Array<{ label?: string; items: HarnessEntry[] }> = [
+  {
+    items: [{ id: 'docs', label: 'Documentation', icon: <BookRegular /> }],
+  },
+  {
+    label: 'Form fields',
+    items: [
+      { id: 'lookup', label: 'Lookup', icon: <PersonSearchRegular /> },
+      { id: 'optionsetfield', label: 'OptionSetField', icon: <CheckboxCheckedRegular /> },
+      { id: 'datetimefield', label: 'DateTimeField', icon: <CalendarLtrRegular /> },
+    ],
+  },
+  {
+    label: 'Records & queries',
+    items: [
+      { id: 'entitygrid', label: 'EntityGrid', icon: <TableRegular /> },
+      { id: 'querybuilder', label: 'QueryBuilder', icon: <FilterRegular /> },
+      { id: 'hovercard', label: 'RecordHoverCard', icon: <ContactCardRegular /> },
+    ],
+  },
+  {
+    label: 'People',
+    items: [{ id: 'people', label: 'Personas & owners', icon: <PeopleRegular /> }],
+  },
+  {
+    label: 'Commands',
+    items: [{ id: 'commandbar', label: 'CommandBar', icon: <AppsListRegular /> }],
+  },
+  {
+    label: 'Web resource layout',
+    items: [
+      { id: 'fluentshell', label: 'FluentShell', icon: <BorderOutsideRegular /> },
+      { id: 'fluentcontainer', label: 'FluentContainer', icon: <SquareRegular /> },
+      { id: 'parentportal', label: 'ParentPortal', icon: <WindowRegular /> },
+      { id: 'harness', label: 'D365TestHarness', icon: <LayerRegular /> },
+    ],
+  },
 ];
+
+/** Flattened, for looking an entry up by id. */
+const tabs: HarnessEntry[] = NAV_GROUPS.flatMap((group) => group.items);
 
 // =============================================================================
 // SCREENSHOT MODE DETECTION
@@ -95,6 +193,8 @@ function getScreenshotComponent(): HarnessTab | null {
 // =============================================================================
 
 export function App() {
+  const pageStyles = usePageStyles();
+
   // ─────────────────────────────────────────────────────────────────────────────
   // SCREENSHOT MODE: Check if we're rendering a single component in isolation
   // ─────────────────────────────────────────────────────────────────────────────
@@ -188,6 +288,16 @@ export function App() {
             onCommandLog={setCommandLog}
           />
         );
+      case 'fluentshell':
+        return <FluentShellExamples />;
+      case 'fluentcontainer':
+        return <FluentContainerExamples />;
+      case 'parentportal':
+        return <ParentPortalExample />;
+      case 'harness':
+        return <D365TestHarnessExamples />;
+      case 'docs':
+        return <DocsExamples />;
       case 'commandbar':
         return <CommandBarExamples onCommandLog={setCommandLog} />;
       case 'entitygrid':
@@ -270,81 +380,90 @@ export function App() {
   // RENDER: Normal mode with full shell
   // ─────────────────────────────────────────────────────────────────────────────
 
+  // The harness is the page: every example renders inside the simulated form, at
+  // the width and against the furniture a real web resource gets. The example
+  // list becomes the sitemap, which is where a model-driven app puts navigation.
+  const activeMeta = tabs.find((tab) => tab.id === activeTab);
+
+  const navGroups = NAV_GROUPS.map((group) => ({
+    label: group.label,
+    items: group.items.map((entry) => ({
+      label: entry.label,
+      icon: entry.icon,
+      selected: entry.id === activeTab,
+      onClick: () => setActiveTab(entry.id),
+    })),
+  }));
+
+  const connection = configured ? (
+    connected ? (
+      <Button
+        appearance="subtle"
+        size="small"
+        icon={<PlugConnectedRegular />}
+        onClick={logout}
+        disabled={loading}
+      >
+        {user ?? 'Connected'}
+      </Button>
+    ) : (
+      <Button
+        appearance="primary"
+        size="small"
+        icon={<PlugDisconnectedRegular />}
+        onClick={login}
+        disabled={loading}
+      >
+        {loading ? 'Connecting...' : 'Connect to Dynamics'}
+      </Button>
+    )
+  ) : (
+    <span>Set VITE_DYNAMICS_* env vars to enable a live connection</span>
+  );
+
   return (
     <FluentProvider theme={webLightTheme}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px' }}>
-        {/* ═══════════════════════════════════════════════════════════════════════
-            HEADER: Title, connection status, and tab navigation
-            ═══════════════════════════════════════════════════════════════════════ */}
-        <header style={{ marginBottom: 24 }}>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: 16,
-            }}
-          >
-            <h1 style={{ margin: 0 }}>FluentUI Extended — Test Harness</h1>
-
-            {/* Connection button/status */}
-            {configured ? (
-              connected ? (
-                <Button
-                  appearance="subtle"
-                  icon={<PlugConnectedRegular />}
-                  onClick={logout}
-                  disabled={loading}
-                >
-                  {user ?? 'Connected'}
-                </Button>
-              ) : (
-                <Button
-                  appearance="primary"
-                  icon={<PlugDisconnectedRegular />}
-                  onClick={login}
-                  disabled={loading}
-                >
-                  {loading ? 'Connecting...' : 'Connect to Dynamics'}
-                </Button>
-              )
-            ) : (
-              <span style={{ color: '#888', fontSize: 13 }}>
-                Set VITE_DYNAMICS_* env vars to enable live connection
+      <D365TestHarness
+        active
+        orgName="FLUENTUI EXTENDED"
+        appName="Component Harness"
+        recordName={activeMeta?.label ?? 'Component'}
+        entityName="Component example"
+        saved={false}
+        tabs={['Examples']}
+        commands={[]}
+        status={[connected ? 'Connected' : 'Offline', 'Dynamics']}
+        navGroups={navGroups}
+        notification={
+          <>
+            {connection}
+            {commandLog && (
+              <span style={{ marginLeft: 'auto' }}>
+                Last action: <strong>{commandLog}</strong>
               </span>
             )}
-          </div>
-
-          {/* Tab navigation */}
-          <TabList selectedValue={activeTab} onTabSelect={handleTabSelect}>
-            {tabs.map((tab) => (
-              <Tab key={tab.id} value={tab.id} icon={tab.icon}>
-                {tab.label}
-              </Tab>
-            ))}
-          </TabList>
-        </header>
-
-        {/* Last command display */}
-        {commandLog && (
-          <div
-            style={{
-              marginBottom: 16,
-              padding: '8px 12px',
-              background: '#f3f2f1',
-              borderRadius: 6,
-              fontSize: 13,
-            }}
-          >
-            Last action: <strong>{commandLog}</strong>
-          </div>
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════════════════
-            TAB CONTENT: Render active example component
-            ═══════════════════════════════════════════════════════════════════════ */}
-        {renderTabContent(activeTab)}
-      </div>
+          </>
+        }
+      >
+        {/*
+          One card per page, the way a form section holds a control. The shell
+          owns the gutter and the scrolling; the container owns the surface. The
+          shell scrolls rather than the container so card shadows painted into
+          the gutter are not shaved by a scroll box sitting on their edge.
+        */}
+        <FluentShell overflow="scroll">
+          <FluentContainer as="section" className={pageStyles.page} style={{ gap: 12 }}>
+            {/* Which component to reach for comes before how to use it. */}
+            <ComponentGuidanceBlock componentId={activeTab} />
+            {renderTabContent(activeTab)}
+            {/*
+              Only for pages built as one block. Pages made of sections carry a
+              panel per section instead, inserted by `npm run gen:samples`.
+            */}
+            {PAGE_LEVEL_SAMPLES.includes(activeTab) && <CodeExample sampleId={activeTab} />}
+          </FluentContainer>
+        </FluentShell>
+      </D365TestHarness>
     </FluentProvider>
   );
 }

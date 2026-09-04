@@ -14,6 +14,7 @@
  * - Prevents network requests when dragging across rows
  */
 
+import { CodeExample } from '../shared/CodeExample';
 import React from 'react';
 import { Link, Text, Badge } from '@fluentui/react-components';
 import { BuildingRegular, PersonRegular } from '@fluentui/react-icons';
@@ -243,6 +244,7 @@ export function HoverCardExamples({
           </li>
         </ul>
       </div>
+      <CodeExample sampleId="hovercard-record-hover-card" />
     </section>
   );
 }

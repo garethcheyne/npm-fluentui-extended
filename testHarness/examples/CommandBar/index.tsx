@@ -16,6 +16,7 @@
  * - Respects pinned items (never overflow)
  */
 
+import { CodeExample } from '../shared/CodeExample';
 import React, { useState } from 'react';
 
 // Import from the library source (../../../src) — in a real app you'd use:
@@ -146,6 +147,7 @@ export function CommandBarExamples({ onCommandLog }: CommandBarExamplesProps) {
             </li>
           </ul>
         </div>
+        <CodeExample sampleId="commandbar-command-bar" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -197,6 +199,7 @@ export function CommandBarExamples({ onCommandLog }: CommandBarExamplesProps) {
             </li>
           </ul>
         </div>
+        <CodeExample sampleId="commandbar-commandbar-example-2" />
       </section>
     </>
   );

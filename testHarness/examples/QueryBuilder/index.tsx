@@ -13,6 +13,7 @@
  * - Visual condition/group editing
  */
 
+import { CodeExample } from '../shared/CodeExample';
 import React, { useState } from 'react';
 import { Button, Text } from '@fluentui/react-components';
 import { PlugDisconnectedRegular } from '@fluentui/react-icons';
@@ -144,6 +145,7 @@ export function QueryBuilderExamples({
           fields that don't exist in the provided schema. The component preserves these
           conditions but warns the user they need attention.
         </p>
+        <CodeExample sampleId="querybuilder-querybuilder-unknown-invalid-fields" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -285,6 +287,7 @@ export function QueryBuilderExamples({
           <strong>Serialized Output:</strong> Shows the generated FetchXML/OData query ready for
           use in API calls.
         </p>
+        <CodeExample sampleId="querybuilder-query-builder" />
       </section>
     </>
   );

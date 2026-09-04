@@ -18,6 +18,7 @@
  * - **Live mode**: Metadata fetched from entityName + attributeName
  */
 
+import { CodeExample } from '../shared/CodeExample';
 import React, { useState } from 'react';
 
 // Import from the library source (../../../src) — in a real app you'd use:
@@ -198,6 +199,7 @@ export function FieldsExamples({ dynamicsConnected }: ExampleProps) {
             </pre>
           </div>
         )}
+        <CodeExample sampleId="fields-datetimefield-datetimebehavior" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -387,6 +389,7 @@ export function FieldsExamples({ dynamicsConnected }: ExampleProps) {
             </li>
           </ul>
         </div>
+        <CodeExample sampleId="fields-datetimefield-advanced-props" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -503,6 +506,7 @@ export function FieldsExamples({ dynamicsConnected }: ExampleProps) {
             </li>
           </ul>
         </div>
+        <CodeExample sampleId="fields-optionsetfield" />
       </section>
     </>
   );

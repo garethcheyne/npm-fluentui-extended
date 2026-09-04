@@ -14,6 +14,7 @@
  * Each section includes inline comments explaining the props and patterns used.
  */
 
+import { CodeExample } from '../shared/CodeExample';
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   Badge,
@@ -319,6 +320,7 @@ export function LookupExamples({
         <p style={{ marginTop: 12, fontSize: 14 }}>
           Selected: <strong>{selectedKey1 ? staticOptions.find((o) => o.key === selectedKey1)?.text : 'None'}</strong>
         </p>
+        <CodeExample sampleId="lookup-basic-lookup-no-header-footer" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -359,6 +361,7 @@ export function LookupExamples({
               : 'None'}
           </strong>
         </p>
+        <CodeExample sampleId="lookup-multi-select-lookup" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -403,6 +406,7 @@ export function LookupExamples({
         <p style={{ marginTop: 12, fontSize: 14 }}>
           Selected: <strong>{selectedKey2 ? staticOptions.find((o) => o.key === selectedKey2)?.text : 'None'}</strong>
         </p>
+        <CodeExample sampleId="lookup-lookup-with-header-footer" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -491,6 +495,7 @@ export function LookupExamples({
         <p style={{ marginTop: 12, fontSize: 14 }}>
           Selected: <strong>{selectedKeyDetailsOnly ? detailsOnlyOptions.find((o) => o.key === selectedKeyDetailsOnly)?.text : 'None'}</strong>
         </p>
+        <CodeExample sampleId="lookup-lookup-with-details-only-no-secondary-text" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -559,6 +564,7 @@ export function LookupExamples({
             Try searching: "contoso", "acme", "fab", "north"
           </p>
         )}
+        <CodeExample sampleId="lookup-dynamic-search-async-api" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -638,6 +644,7 @@ export function LookupExamples({
           Active filter: <code>{multiEntityFilter}</code> — Click tabs in header to switch entity types.
           Expand contacts to see Badges in details.
         </p>
+        <CodeExample sampleId="lookup-multi-entity-lookup-with-react-elements" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -742,6 +749,7 @@ export function LookupExamples({
               </p>
             )}
           </div>
+          <CodeExample sampleId="lookup-dynamics-365-live-data" />
         </section>
       )}
 
@@ -811,6 +819,7 @@ export function LookupExamples({
             )}
           />
         </div>
+        <CodeExample sampleId="lookup-hover-cards" />
       </section>
     </>
   );

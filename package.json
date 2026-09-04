@@ -1,6 +1,6 @@
 {
   "name": "fluentui-extended",
-  "version": "2026.8.71",
+  "version": "2026.8.72",
   "description": "Extended Fluent UI v9 components styled after Dynamics 365 - Lookup with async search, expandable details, and more",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -36,6 +36,7 @@
     "prepublishOnly": "npm run build",
     "release": "node scripts/release.js",
     "shots": "node scripts/capture-shots.mjs",
+    "gen:samples": "node scripts/gen-code-samples.mjs",
     "verify:readme": "node scripts/verify-readme.mjs"
   },
   "keywords": [

@@ -19,7 +19,12 @@ export type HarnessTab =
   | 'datetimefield'
   | 'optionsetfield'
   | 'hovercard'
-  | 'people';
+  | 'people'
+  | 'fluentshell'
+  | 'fluentcontainer'
+  | 'parentportal'
+  | 'harness'
+  | 'docs';
 
 /**
  * Props passed to each example component.

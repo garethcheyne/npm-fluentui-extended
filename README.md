@@ -51,6 +51,26 @@ The two shadow variants are deprecated in Fluent and will be removed there. They
 existing callers keep working, but `Combobox` and `Dropdown` never supported them, so a component
 containing those narrows to the closest non-shadow fill rather than dropping the value.
 
+## New here? Run the harness
+
+The fastest way to understand this library is to see every component working, in a simulated
+Dynamics 365 form, with the code beside it:
+
+```bash
+git clone https://github.com/garethcheyne/npm-fluentui-extended.git
+cd npm-fluentui-extended
+npm install
+npm run harness
+```
+
+That opens a mock model-driven app — top bar, sitemap, record form — with each component on its own
+page: what it is for, when to reach for it, when to reach for something else, and a "Show code"
+panel on every example holding the exact source that is running. The **Documentation** entry in the
+sitemap gathers all of it in one page.
+
+No Dynamics connection is needed; the examples run on mock data. To point them at a real org, see
+[Local development](https://github.com/garethcheyne/npm-fluentui-extended/blob/main/docs/local-development.md).
+
 ## Components
 
 ### Lookup
@@ -172,6 +192,68 @@ function MyDialog({ open, onClose }) {
 6. Falls back to in-place rendering if not inside an iframe
 
 > **Requires same-origin:** The iframe and parent must be on the same domain (standard for D365 web resources).
+
+### FluentShell
+
+The outermost element of a Dynamics 365 web resource, fitting the app to whatever chrome hosts its iframe. The right gutter is not a constant - it depends on what the host already pads and where the form's content column sits, both of which move with the window and the D365 release - so `FluentShell` measures both and adds only the difference.
+
+```tsx
+import { FluentProvider, webLightTheme } from '@fluentui/react-components';
+import { FluentShell } from 'fluentui-extended';
+
+function Root() {
+  return (
+    <FluentProvider theme={webLightTheme} style={{ height: '100%' }}>
+      <FluentShell>
+        <div>app</div>
+      </FluentShell>
+    </FluentProvider>
+  );
+}
+```
+
+Nothing below it should set an outer margin - the two compound invisibly.
+**[Read more &rarr;](https://github.com/garethcheyne/npm-fluentui-extended/blob/main/docs/FluentShell.md)** - props, surface detection, and the console tooling for a deployed web resource.
+
+### FluentContainer
+
+A card matching the surface D365 draws on a model-driven form, measured from a live form: `shadow4`, an 8px radius, and a **transparent** hairline border on the neutral page ground.
+
+```tsx
+import { FluentContainer } from 'fluentui-extended';
+
+function Cards() {
+  return (
+    <FluentContainer fill scrolls="vertical" padding="none">
+      <div>grid</div>
+    </FluentContainer>
+  );
+}
+```
+
+**[Read more &rarr;](https://github.com/garethcheyne/npm-fluentui-extended/blob/main/docs/FluentContainer.md)** - props, and why clipping is opt-in.
+
+### D365TestHarness
+
+A local stand-in for the D365 form that will host a web resource. On a bare dev server there is no chrome to measure, so `FluentShell` falls back to standalone behaviour and the layout you develop is not the one that ships. The harness hosts your app in a genuine same-origin iframe and reproduces the geometry a live form measures, so the same gutters resolve locally as in the org.
+
+```tsx
+import { D365TestHarness, FluentShell } from 'fluentui-extended';
+
+function Root() {
+  return (
+    <D365TestHarness recordName="Boomer iMAC" entityName="Price List">
+      <FluentShell>
+        <div>app</div>
+      </FluentShell>
+    </D365TestHarness>
+  );
+}
+```
+
+It is inactive outside a local host, so the same tree ships to Dynamics unwrapped.
+**[Read more &rarr;](https://github.com/garethcheyne/npm-fluentui-extended/blob/main/docs/D365TestHarness.md)**
+Setting this up in your own project also needs a dev-server proxy to reach Dataverse from `localhost`: see **[Local development](https://github.com/garethcheyne/npm-fluentui-extended/blob/main/docs/local-development.md)**.
 
 ## Quick Start
 

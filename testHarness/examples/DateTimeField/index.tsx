@@ -16,6 +16,7 @@
  *    - displayFormat: Custom format patterns
  */
 
+import { CodeExample } from '../shared/CodeExample';
 import React, { useState } from 'react';
 import { DateTimeField, DateTimeRangeField } from '../../../src';
 import type { ExampleProps } from '../shared/types';
@@ -177,6 +178,7 @@ export function DateTimeFieldExamples({ dynamicsConnected }: ExampleProps) {
             </pre>
           </div>
         )}
+        <CodeExample sampleId="datetimefield-datetimebehavior" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -319,6 +321,7 @@ export function DateTimeFieldExamples({ dynamicsConnected }: ExampleProps) {
             <li><code>timeOnly</code> — Hide the calendar, show only time picker</li>
           </ul>
         </div>
+        <CodeExample sampleId="datetimefield-advanced-props" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -366,6 +369,7 @@ export function DateTimeFieldExamples({ dynamicsConnected }: ExampleProps) {
             )}
           </pre>
         </div>
+        <CodeExample sampleId="datetimefield-date-time-between" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -518,6 +522,7 @@ export function DateTimeFieldExamples({ dynamicsConnected }: ExampleProps) {
             </div>
           </div>
         </div>
+        <CodeExample sampleId="datetimefield-custom-display-format" />
       </section>
     </>
   );

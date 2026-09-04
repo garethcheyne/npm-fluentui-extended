@@ -9,7 +9,7 @@ import {
   Text,
 } from '@fluentui/react-components';
 import { useState } from 'react';
-import { ParentPortal } from '../../src/components/ParentPortal';
+import { ParentPortal } from '../../../src/components/ParentPortal';
 
 /**
  * Demonstrates ParentPortal escaping an iframe.
