@@ -2,6 +2,13 @@
 
 > Version format: `YYYY.M.DD` (e.g., `2026.8.30` = August 30, 2026)
 
+## 2026.9.5
+
+- 🐛 Widened the `@fluentui/react-calendar-compat` peer range to `^0.3.0 || ^0.4.0`. It was pinned
+  to `^0.3.0`, so any consumer already on 0.4.x — which current Fluent installs pull in — hit an
+  `ERESOLVE` failure and could not install this package at all. Only `Calendar` is imported from it
+  and that export is unchanged; the library typechecks, tests and builds against 0.4.6.
+
 ## 2026.9.4
 
 > Published first as `2026.8.72`, which carried the wrong month. Same contents; use this one.

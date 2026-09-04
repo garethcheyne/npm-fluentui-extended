@@ -1,6 +1,6 @@
 {
   "name": "fluentui-extended",
-  "version": "2026.9.4",
+  "version": "2026.9.5",
   "description": "Extended Fluent UI v9 components styled after Dynamics 365 - Lookup with async search, expandable details, and more",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -54,7 +54,7 @@
   "author": "err403.com",
   "license": "MIT",
   "peerDependencies": {
-    "@fluentui/react-calendar-compat": "^0.3.0",
+    "@fluentui/react-calendar-compat": "^0.3.0 || ^0.4.0",
     "@fluentui/react-components": "^9.0.0",
     "@fluentui/react-datepicker-compat": "^0.6.0",
     "@fluentui/react-icons": "^2.0.0",
@@ -63,7 +63,7 @@
   },
   "devDependencies": {
     "@azure/msal-browser": "^5.2.0",
-    "@fluentui/react-calendar-compat": "^0.3.21",
+    "@fluentui/react-calendar-compat": "^0.4.6",
     "@fluentui/react-components": "^9.56.0",
     "@fluentui/react-datepicker-compat": "^0.6.23",
     "@fluentui/react-icons": "^2.0.258",
