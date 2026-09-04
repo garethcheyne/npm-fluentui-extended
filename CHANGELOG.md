@@ -2,6 +2,13 @@
 
 > Version format: `YYYY.M.DD` (e.g., `2026.8.30` = August 30, 2026)
 
+## 2026.9.6
+
+- ✨ **`size` on [OptionSetField](README.md#optionsetfield)**, forwarded to the underlying Combobox.
+  Without it the control could not be used in a dense grid: a default-height control inside a
+  virtualised row makes every row taller, so callers had to keep a hand-rolled Dropdown just to
+  pass `size="small"`.
+
 ## 2026.9.5
 
 - 🐛 Widened the `@fluentui/react-calendar-compat` peer range to `^0.3.0 || ^0.4.0`. It was pinned

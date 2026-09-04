@@ -53,6 +53,12 @@ export interface OptionSetFieldProps {
    * expanded control has to be rendered without driving a real pointer.
    */
   open?: boolean;
+  /**
+   * Control height, passed through to the underlying Combobox. `small` is what a
+   * dense grid needs: a default-height control inside a virtualised row makes
+   * every row taller, which is the opposite of what density is for.
+   */
+  size?: 'small' | 'medium' | 'large';
   /** Label rendered above the control */
   label?: string | React.ReactElement;
   /** Validation message rendered below the control */

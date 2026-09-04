@@ -59,6 +59,7 @@ export const OptionSetField: React.FC<OptionSetFieldProps> = ({
   asBadge = false,
   placeholder = '---',
   disabled,
+  size,
   appearance = DEFAULT_FIELD_APPEARANCE,
   clearable = true,
   open,
@@ -175,6 +176,7 @@ export const OptionSetField: React.FC<OptionSetFieldProps> = ({
           multiselect={multiselect}
           placeholder={loading ? 'Loading...' : placeholder}
           disabled={disabled || loading}
+          size={size}
           value={displayValue}
           selectedOptions={selectedValues.map(String)}
           onOptionSelect={handleOptionSelect}
