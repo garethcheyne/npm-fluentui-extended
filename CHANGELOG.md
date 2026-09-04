@@ -2,7 +2,9 @@
 
 > Version format: `YYYY.M.DD` (e.g., `2026.8.30` = August 30, 2026)
 
-## 2026.8.72
+## 2026.9.4
+
+> Published first as `2026.8.72`, which carried the wrong month. Same contents; use this one.
 
 - ✨ **[FluentShell](docs/FluentShell.md)** — the outermost element of a Dynamics 365 web resource,
   sizing the app to whatever chrome hosts its iframe. The correct gutter is not a constant: it depends
