@@ -1,6 +1,6 @@
 {
   "name": "fluentui-extended",
-  "version": "2026.9.6",
+  "version": "2026.10.16",
   "description": "Extended Fluent UI v9 components styled after Dynamics 365 - Lookup with async search, expandable details, and more",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -18,6 +18,18 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
+    },
+    "./address-lookup": {
+      "types": "./dist/address-lookup.d.ts",
+      "import": "./dist/address-lookup.mjs",
+      "require": "./dist/address-lookup.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "address-lookup": [
+        "dist/address-lookup.d.ts"
+      ]
     }
   },
   "files": [
@@ -30,6 +42,7 @@
     "harness": "vite --config testHarness/vite.config.ts",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
+    "typecheck:harness": "tsc --noEmit -p tsconfig.harness.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -54,19 +67,45 @@
   "author": "err403.com",
   "license": "MIT",
   "peerDependencies": {
+    "@dnd-kit/core": "^6.0.0",
+    "@dnd-kit/sortable": "^8.0.0 || ^9.0.0 || ^10.0.0",
+    "@dnd-kit/utilities": "^3.2.0",
     "@fluentui/react-calendar-compat": "^0.3.0 || ^0.4.0",
     "@fluentui/react-components": "^9.0.0",
     "@fluentui/react-datepicker-compat": "^0.6.0",
     "@fluentui/react-icons": "^2.0.0",
+    "@tanstack/react-table": "^8.20.0",
+    "@tanstack/react-virtual": "^3.10.0",
     "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0",
     "react-dom": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0"
   },
+  "peerDependenciesMeta": {
+    "@dnd-kit/core": {
+      "optional": true
+    },
+    "@dnd-kit/sortable": {
+      "optional": true
+    },
+    "@dnd-kit/utilities": {
+      "optional": true
+    },
+    "@tanstack/react-table": {
+      "optional": true
+    },
+    "@tanstack/react-virtual": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@azure/msal-browser": "^5.2.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@fluentui/react-calendar-compat": "^0.4.6",
     "@fluentui/react-components": "^9.56.0",
     "@fluentui/react-datepicker-compat": "^0.6.23",
     "@fluentui/react-icons": "^2.0.258",
+    "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.14.9",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

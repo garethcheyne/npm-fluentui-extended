@@ -11,6 +11,7 @@ import {
 import { getSystemUser, initialsOf, systemUserImageUrl } from '../../api/systemUser';
 import type { SystemUserRecord } from '../../api/systemUser';
 import { SystemUserCard } from './SystemUserCard';
+import { useHoverDelay } from '../../hooks/useHoverDelay';
 import { useSystemUserPersonaStyles } from './SystemUserPersona.styles';
 import type { SystemUserPersonaProps, SystemUserPersonaSize } from './SystemUserPersona.types';
 
@@ -41,6 +42,7 @@ export const SystemUserPersona: React.FC<SystemUserPersonaProps> = ({
   avatarOnly = false,
   showSecondaryText = true,
   showHoverCard = true,
+  hoverCardDelayMs = 500,
   additionalContact,
   cardActions,
   onClick,
@@ -51,7 +53,8 @@ export const SystemUserPersona: React.FC<SystemUserPersonaProps> = ({
   const [user, setUser] = React.useState<SystemUserRecord | null>(providedUser ?? null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [open, setOpen] = React.useState(false);
+  const hover = useHoverDelay(hoverCardDelayMs);
+  const open = hover.open;
 
   const loadedRef = React.useRef(false);
   const disposedRef = React.useRef(false);
@@ -93,6 +96,13 @@ export const SystemUserPersona: React.FC<SystemUserPersonaProps> = ({
       if (!disposedRef.current) setLoading(false);
     }
   }, [providedUser, userId, onLoadError]);
+
+  // The card is opened by the hover timer as well as by Fluent, and Fluent's
+  // `onOpenChange` does not fire for a state change we make ourselves. Watching
+  // the resulting state catches both routes.
+  React.useEffect(() => {
+    if (open) void loadUser();
+  }, [open, loadUser]);
 
   const displayName = name ?? user?.fullname ?? '';
   const displaySecondary = secondaryText ?? user?.jobtitle ?? undefined;
@@ -149,15 +159,15 @@ export const SystemUserPersona: React.FC<SystemUserPersonaProps> = ({
     <Popover
       open={open}
       onOpenChange={(_, data) => {
-        setOpen(data.open);
+        hover.setOpen(data.open);
         if (data.open) void loadUser();
       }}
-      openOnHover
-      mouseLeaveDelay={250}
       withArrow
       positioning="below-start"
     >
-      <PopoverTrigger disableButtonEnhancement>{anchor}</PopoverTrigger>
+      <PopoverTrigger disableButtonEnhancement>
+        <span {...hover.triggerProps}>{anchor}</span>
+      </PopoverTrigger>
       <PopoverSurface className={styles.cardSurface}>
         <SystemUserCard
           user={user}

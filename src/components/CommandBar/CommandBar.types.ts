@@ -38,6 +38,8 @@ export interface CommandBarItem {
   onClick?: () => void;
   disabled?: boolean;
   appearance?: CommandBarItemAppearance;
+  /** Inline styles applied to the visible command button. */
+  buttonStyle?: React.CSSProperties;
   /** Renders a checked toggle state */
   checked?: boolean;
   /** Nested commands - rendered as a menu button, and as a submenu when overflowed */
@@ -55,6 +57,35 @@ export interface CommandBarItem {
   pinned?: boolean;
   /** Draw a divider before this item */
   dividerBefore?: boolean;
+  /**
+   * Content rendered in place of the command's button — a lookup, a filter, a
+   * read-out: anything the bar should carry that is not a button.
+   *
+   * Takes precedence over every other rendering field, and gets no tooltip
+   * wrapper, since it is not the single focusable element one attaches to.
+   * Pair it with `pinned`: the overflow menu has only menu rows to offer, which
+   * is not what this is, and an unpinned control would vanish into it.
+   */
+  content?: React.ReactNode;
+  /**
+   * Where this command sits among the others, low to high.
+   *
+   * Leave it unset and the command keeps the place it was written in, so a bar
+   * that orders nothing renders exactly the list it was given. Set it on the few
+   * that matter and the rest flow around them: an unordered command follows
+   * whichever one precedes it.
+   *
+   * Ordering runs within a section, not across both, so a right-aligned command
+   * only has to out-number the other right-aligned ones.
+   */
+  order?: number;
+  /**
+   * Which end of the bar this command belongs to. Defaults to `left`.
+   *
+   * `right` puts it in the far group, against the trailing edge — where a grid
+   * puts its search box.
+   */
+  align?: 'left' | 'right';
 }
 
 export interface CommandBarProps {

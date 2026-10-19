@@ -13,9 +13,11 @@ import type { LookupOption } from '../../../src';
  */
 export type HarnessTab =
   | 'lookup'
+  | 'addresslookup'
   | 'querybuilder'
   | 'commandbar'
   | 'entitygrid'
+  | 'datagrid'
   | 'datetimefield'
   | 'optionsetfield'
   | 'hovercard'

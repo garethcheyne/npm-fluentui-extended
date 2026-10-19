@@ -61,6 +61,48 @@ export function planTooltip(item: CommandBarItem): CommandBarTooltipPlan | undef
 }
 
 /**
+ * Puts a section's commands in their running order.
+ *
+ * An explicit `order` wins. Anything without one takes the place after whatever
+ * precedes it, which is what lets a consumer number only the commands it cares
+ * about — and what makes a bar that numbers nothing render the list unchanged.
+ *
+ * Numbers are compared, not ranked, so leave gaps: with the grid's built-ins at
+ * 10, 20, 30 there is somewhere to put a command between two of them without
+ * renumbering anything.
+ */
+export function orderCommandBarItems(items: readonly CommandBarItem[]): CommandBarItem[] {
+  let previous = 0;
+  const placed = items.map((item, index) => {
+    const order = item.order ?? previous + 1;
+    previous = order;
+    return { item, order, index };
+  });
+
+  // The written index breaks ties, so two commands sharing an order keep the
+  // sequence they were passed in rather than swapping on a re-render.
+  placed.sort((a, b) => a.order - b.order || a.index - b.index);
+  return placed.map((entry) => entry.item);
+}
+
+/**
+ * Splits a bar's commands into its two sections, each already ordered.
+ *
+ * Ordering deliberately runs within a section rather than across both: a
+ * right-aligned command at 101 need only follow the one at 100 beside it, not
+ * out-number every command on the left.
+ */
+export function splitCommandBarItems(items: readonly CommandBarItem[]): {
+  left: CommandBarItem[];
+  right: CommandBarItem[];
+} {
+  return {
+    left: orderCommandBarItems(items.filter((item) => item.align !== 'right')),
+    right: orderCommandBarItems(items.filter((item) => item.align === 'right')),
+  };
+}
+
+/**
  * Whether an overflowed command should still carry a tooltip.
  *
  * A menu row always renders its text, so a title-only tooltip would just repeat the

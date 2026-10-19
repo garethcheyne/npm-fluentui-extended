@@ -103,6 +103,36 @@ sorting, and lookups rendered as names rather than GUIDs.
 
 ![EntityGrid](assets/screenshot-entitygrid.png)
 
+### DataGrid
+
+A virtualised, editable grid on TanStack Table and TanStack Virtual, for the spreadsheet-style
+screens a subgrid cannot carry: thousands of rows, inline editors, column drag and resize,
+grouping with subtotals, and a column layout that survives a reload.
+
+Bring your own rows — fetching and saving stay yours. The grid libraries are **optional** peer
+dependencies, so nothing ships them unless you use this component.
+
+```bash
+npm install @tanstack/react-table @tanstack/react-virtual \
+            @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities
+```
+
+```tsx
+<DataGrid
+  data={rows}
+  columns={columns}
+  getRowId={(row) => row.id}
+  getCellValue={(row, key, rowId) => pending[rowId]?.[key] ?? row[key]}
+  onCellChange={stageEdit}
+  getRowState={(_, rowId) => (pending[rowId] ? 'dirty' : null)}
+  selectable
+  groupBy="category"
+  persist={{ scope: 'quote-lines' }}
+/>
+```
+
+**[Read more &rarr;](https://github.com/garethcheyne/npm-fluentui-extended/blob/main/docs/DataGrid.md)** - columns, unsaved-edit layering, persistence, and the headless `useDataGrid` hook.
+
 ### DateTimeField
 
 A date/time field that respects the attribute's Dynamics `DateTimeBehavior`, so `DateOnly` values
@@ -142,6 +172,76 @@ selections render as the usual Lookup badges and multi-select comes for free.
 ![OwnerLookup resolved](assets/screenshot-ownerlookup-rest.png)
 
 ![OwnerLookup users and teams](assets/screenshot-ownerlookup-open.png)
+
+### AddressLookup
+
+A preconfigured `Lookup` for Google Places. Type an address, hover a suggestion to see it on a
+map, and the selection arrives flattened into the columns an address is stored in.
+
+Google bills per request, so the work is split the way the API prices it: typing buys
+Autocomplete predictions only, and a place is resolved once - when its card opens, or when the
+row is chosen, whichever happens first. The result is cached, so hovering then clicking the same
+suggestion costs a single Place Details call.
+
+Each suggestion is iconed by what it actually is - a street address, a building, a suburb, a
+region, an airport, a shop - rather than every row carrying the same pin, so a list of mixed
+results can be read at a glance.
+
+```tsx
+import { AddressLookup } from 'fluentui-extended';
+import type { PlaceAddress } from 'fluentui-extended';
+
+const [address, setAddress] = useState<PlaceAddress | null>(null);
+
+<AddressLookup
+  apiKey={googleMapsKey}
+  label="Address"
+  value={address}
+  onSelect={(picked) => setAddress(picked)}
+  countries={['nz', 'au']}
+  stateShortName
+  countryShortName
+/>
+```
+
+`onSelect` receives the flattened address and the place it came from:
+
+```ts
+{
+  placeId: 'ChIJ...',
+  formattedAddress: '1 Queen Street, Auckland CBD, Auckland 1010, New Zealand',
+  building: '', street: '1 Queen Street', suburb: 'Auckland CBD',
+  city: 'Auckland', state: 'AUK', postcode: '1010', country: 'NZ',
+  latitude: -36.8442, longitude: 174.7676,
+}
+```
+
+The key needs the **Maps JavaScript API** and the **Places API** enabled, and the host's origin
+allowed under its HTTP referrer restrictions. The Maps script is loaded once per page and shared,
+so several AddressLookups on one form cost one script tag between them.
+
+#### AddressLookup Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `apiKey` | `string` | - | Google Maps API key (required) |
+| `value` / `onSelect` | `PlaceAddress \| null` | - | Selection (controlled). `onSelect` also receives the full `PlaceDetail` |
+| `countries` | `string \| string[]` | - | Restrict to ISO country codes, e.g. `['nz','au']`. Google allows five |
+| `searchTypes` | `string[]` | `['address']` | Use `['establishment']` for businesses, `['geocode']` for anything mappable |
+| `stateShortName` | `boolean` | `false` | Return `NSW` rather than `New South Wales` |
+| `countryShortName` | `boolean` | `false` | Return `AU` rather than `Australia` |
+| `showMapCard` | `boolean` | `true` | Map card on hover |
+| `mapCardTarget` | `'list' \| 'rest' \| 'both'` | `'both'` | Where the card is offered |
+| `mapCardDelayMs` | `number` | `400` | Pointer settle delay before the place is resolved |
+| `mapZoom` | `number` | `15` | Map zoom on the card |
+| `showCoordinates` / `showRatings` | `boolean` | `true` | Card detail toggles |
+| `cardActions` | `ReactNode` | - | Content at the bottom of the card |
+| `minSearchLength` | `number` | `3` | Short input never leaves the browser |
+| `onError` | `(error) => void` | - | Search or place lookup failures |
+
+The Places client is exported on its own for geocoding outside a form:
+`loadGoogleMaps`, `searchPlacePredictions`, `getPlaceDetails`, `parsePlaceAddress`,
+`placeMapUrl`, `isGoogleMapsReady`, `clearPlacesCache`.
 
 ### ParentPortal
 

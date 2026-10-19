@@ -13,7 +13,12 @@ import {
 } from '@fluentui/react-components';
 import { MoreHorizontalRegular } from '@fluentui/react-icons';
 import { useCommandBarStyles } from './CommandBar.styles';
-import { planTooltip, shouldTooltipInOverflow } from './CommandBar.utils';
+import {
+  orderCommandBarItems,
+  planTooltip,
+  shouldTooltipInOverflow,
+  splitCommandBarItems,
+} from './CommandBar.utils';
 import type { CommandBarItem, CommandBarProps } from './CommandBar.types';
 
 /** Width reserved for the overflow trigger when at least one command is collapsed. */
@@ -71,6 +76,10 @@ const CommandButton: React.FC<{
   const appearance = item.appearance ?? 'subtle';
   const withTooltip = useTooltipWrapper(item, styles);
 
+  // Content owns its own rendering entirely: no button around it, and no
+  // tooltip wrapper, which would need a single focusable element to attach to.
+  if (item.content) return <>{item.content}</>;
+
   // The tooltip wraps the trigger button, not the Menu. Menu is not a DOM element, so
   // the ref and hover handlers a Tooltip injects would land on a component that cannot
   // use them and the tooltip would never open.
@@ -85,6 +94,7 @@ const CommandButton: React.FC<{
               icon={item.icon}
               disabled={item.disabled}
               className={className}
+              style={item.buttonStyle}
             >
               {item.text}
             </MenuButton>,
@@ -115,6 +125,7 @@ const CommandButton: React.FC<{
         disabled={item.disabled}
         onClick={item.onClick}
         className={className}
+        style={item.buttonStyle}
       >
         {item.text}
       </ToggleButton>,
@@ -129,6 +140,7 @@ const CommandButton: React.FC<{
       disabled={item.disabled}
       onClick={item.onClick}
       className={className}
+      style={item.buttonStyle}
     >
       {item.text}
     </Button>,
@@ -139,6 +151,10 @@ const CommandButton: React.FC<{
 const OverflowMenuItem: React.FC<{ item: CommandBarItem }> = ({ item }) => {
   const styles = useCommandBarStyles();
   const withTooltip = useTooltipWrapper(item, styles);
+
+  // A menu row cannot show a control. Such an item should carry `pinned` so it
+  // never collapses in the first place; this is the backstop for one that does.
+  if (item.content) return null;
 
   if (item.menuContent || item.subItems?.length) {
     return (
@@ -180,7 +196,7 @@ const OverflowMenuItem: React.FC<{ item: CommandBarItem }> = ({ item }) => {
  * a "More commands" menu instead of being clipped or pushed onto a second row.
  */
 export const CommandBar: React.FC<CommandBarProps> = ({
-  items,
+  items: itemsProp,
   farItems,
   size = 'small',
   overflowAriaLabel = 'More commands',
@@ -188,6 +204,24 @@ export const CommandBar: React.FC<CommandBarProps> = ({
   className,
 }) => {
   const styles = useCommandBarStyles();
+
+  /**
+   * The bar's two sections.
+   *
+   * `items` from here on is the leading group — the measured, overflowing one —
+   * so everything below reads as it did before sections existed. Right-aligned
+   * commands join `farItems` in the far group, which never collapses: it is
+   * where a bar puts the handful of things that must stay reachable.
+   */
+  const { left: items, right } = React.useMemo(
+    () => splitCommandBarItems(itemsProp),
+    [itemsProp],
+  );
+  const farGroup = React.useMemo(
+    () => [...right, ...orderCommandBarItems(farItems ?? [])],
+    [right, farItems],
+  );
+
   const regionRef = React.useRef<HTMLDivElement>(null);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
   const itemRefs = React.useRef(new Map<string, HTMLDivElement>());
@@ -322,9 +356,9 @@ export const CommandBar: React.FC<CommandBarProps> = ({
         </Menu>
       )}
 
-      {farItems && farItems.length > 0 && (
+      {farGroup.length > 0 && (
         <div className={styles.farRegion}>
-          {farItems.map((item) => (
+          {farGroup.map((item) => (
             <CommandButton key={item.key} item={item} size={size} className={styles.command} />
           ))}
         </div>

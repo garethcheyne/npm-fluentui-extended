@@ -3,6 +3,7 @@ import { Avatar, Badge, Link, PresenceBadgeStatus, Spinner, Text } from '@fluent
 import {
   BuildingRegular,
   CallRegular,
+  ChatRegular,
   ChevronRightRegular,
   MailRegular,
   PhoneRegular,
@@ -148,7 +149,36 @@ export const SystemUserCard: React.FC<SystemUserCardProps> = ({
         </div>
       )}
 
-      {actions && <div className={styles.cardFooter}>{actions}</div>}
+      {actions ?? <DefaultActions email={user.internalemailaddress} />}
     </>
   );
 };
+
+/**
+ * Email and Teams chat, from the address the record already carries.
+ *
+ * Both are plain links rather than API calls: `mailto:` hands off to whatever
+ * the user's mail client is, and the Teams deep link opens the desktop app or
+ * falls back to the web one. Neither needs a token or a permission grant, which
+ * is what makes them safe to offer by default.
+ */
+function DefaultActions({ email }: { email?: string | null }) {
+  const styles = useSystemUserPersonaStyles();
+  if (!email) return null;
+
+  return (
+    <div className={styles.cardFooter}>
+      <Link href={`mailto:${email}`} className={styles.footerLink}>
+        <MailRegular fontSize={16} /> Send email
+      </Link>
+      <Link
+        href={`https://teams.microsoft.com/l/chat/0/0?users=${encodeURIComponent(email)}`}
+        target="_blank"
+        rel="noreferrer"
+        className={styles.footerLink}
+      >
+        <ChatRegular fontSize={16} /> Teams message
+      </Link>
+    </div>
+  );
+}

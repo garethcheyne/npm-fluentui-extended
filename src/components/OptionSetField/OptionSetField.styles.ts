@@ -39,7 +39,10 @@ export const useOptionSetFieldStyles = makeStyles({
 
   badgeValueOverlay: {
     position: 'absolute',
-    left: '12px',
+    // 12px lines the badge up with a form field's own input padding. A dense
+    // host — a grid cell, where the text beside it starts at 2px — sets the
+    // variable instead of living with a badge indented past its neighbours.
+    left: 'var(--fue-optionset-badge-inset, 12px)',
     right: '32px',
     top: '50%',
     transform: 'translateY(-50%)',

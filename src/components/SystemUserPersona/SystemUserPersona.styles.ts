@@ -59,7 +59,9 @@ export const useSystemUserPersonaStyles = makeStyles({
 
   cardHeader: {
     display: 'flex',
-    alignItems: 'flex-start',
+    // Centred against the coin rather than top-aligned: with one or two short
+    // lines the text otherwise hangs off the top of a 72px avatar.
+    alignItems: 'center',
     gap: tokens.spacingHorizontalM,
     padding: tokens.spacingHorizontalL,
     paddingBottom: tokens.spacingVerticalM,
@@ -133,6 +135,15 @@ export const useSystemUserPersonaStyles = makeStyles({
     minWidth: 0,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+
+  /** An action with an icon beside it, which a plain link does not lay out. */
+  footerLink: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    fontSize: tokens.fontSizeBase200,
     whiteSpace: 'nowrap',
   },
 

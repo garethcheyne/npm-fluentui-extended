@@ -24,6 +24,8 @@ export const Lookup: React.FC<LookupProps> = ({
   loading = false,
   noResultsMessage = 'No results found',
   clearable = true,
+  readOnly = false,
+  searchIcon = 'always',
   minSearchLength = 0,
   searchDebounceMs = 300,
   matchInputWidth = true,
@@ -33,6 +35,7 @@ export const Lookup: React.FC<LookupProps> = ({
   open: controlledOpen,
   onOpenChange,
   disableClientFilter = false,
+  editSelectionOnBackspace = false,
   // Dynamics 365 renders fields filled rather than outlined, so that is the default here
   appearance = DEFAULT_FIELD_APPEARANCE,
   entityIcon,
@@ -54,6 +57,7 @@ export const Lookup: React.FC<LookupProps> = ({
   selectedKeys: selectedKeysProp,
   selectedOptions: selectedOptionsProp,
   onOptionsSelect,
+  className,
   ...inputProps
 }) => {
   const styles = useLookupStyles();
@@ -82,6 +86,8 @@ export const Lookup: React.FC<LookupProps> = ({
   );
   const [searchText, setSearchText] = React.useState('');
   const [highlightedIndex, setHighlightedIndex] = React.useState(-1);
+  // The selected value is in the search box being edited, so its badge is hidden
+  const [editingSelection, setEditingSelection] = React.useState(false);
   const [expandedKeys, setExpandedKeys] = React.useState<Set<string>>(new Set());
   const [internalSelectedOption, setInternalSelectedOption] = React.useState<LookupOption | null>(null);
   // Multi-select internal state
@@ -92,7 +98,19 @@ export const Lookup: React.FC<LookupProps> = ({
   const dropdownRef = React.useRef<HTMLDivElement>(null);
   const debounceRef = React.useRef<ReturnType<typeof setTimeout>>();
   const justSelectedRef = React.useRef(false);
-  const [dropdownPosition, setDropdownPosition] = React.useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
+  /**
+   * The list's rendered height, so a flipped dropdown can be placed by its
+   * bottom edge. Measured after it opens; the first frame uses the cap, which
+   * is why the portal stays hidden until a position has been calculated.
+   */
+  const dropdownHeightRef = React.useRef(0);
+  const [dropdownPosition, setDropdownPosition] = React.useState<{
+    top: number;
+    left: number;
+    width: number;
+    /** Room the list has to fill, once it knows which way it opened. */
+    maxHeight: number;
+  }>({ top: 0, left: 0, width: 0, maxHeight: 0 });
   // Track whether position has been calculated to prevent flash at 0,0
   const [dropdownPositionReady, setDropdownPositionReady] = React.useState(false);
 
@@ -197,6 +215,8 @@ export const Lookup: React.FC<LookupProps> = ({
     setIsOpen(false);
     setSearchText('');
     setHighlightedIndex(-1);
+    // An edit abandoned without a new choice leaves the original selection
+    setEditingSelection(false);
   }, []);
 
   // Handle search text change with debounce
@@ -260,6 +280,7 @@ export const Lookup: React.FC<LookupProps> = ({
         setInternalSelectedOption(option);
         onOptionSelect?.(option);
         setSearchText('');
+        setEditingSelection(false);
         setIsOpen(false);
         setHighlightedIndex(-1);
         inputRef.current?.focus();
@@ -309,9 +330,42 @@ export const Lookup: React.FC<LookupProps> = ({
         case 'Tab':
           closeDropdown();
           break;
+
+        case 'Backspace':
+          if (
+            editSelectionOnBackspace &&
+            !multiSelect &&
+            !readOnly &&
+            selectedOption &&
+            !editingSelection &&
+            searchText === ''
+          ) {
+            // The whole value comes back to edit; the browser deleting a
+            // character as well would make the first press lose one
+            e.preventDefault();
+            setEditingSelection(true);
+            handleSearchChange(selectedOption.text);
+            openDropdown();
+          }
+          break;
       }
     },
-    [disabled, isOpen, highlightedIndex, filteredOptions, handleSelectOption, openDropdown, closeDropdown]
+    [
+      disabled,
+      isOpen,
+      highlightedIndex,
+      filteredOptions,
+      handleSelectOption,
+      openDropdown,
+      closeDropdown,
+      editSelectionOnBackspace,
+      multiSelect,
+      readOnly,
+      selectedOption,
+      editingSelection,
+      searchText,
+      handleSearchChange,
+    ]
   );
 
   // Handle input focus — open the dropdown
@@ -334,11 +388,11 @@ export const Lookup: React.FC<LookupProps> = ({
   // Handle click on the wrapper — also opens (in case focus doesn't fire
   // because the input is already focused, e.g. clicking the chevron area)
   const handleWrapperClick = React.useCallback(() => {
-    if (!disabled && !isOpen) {
+    if (!disabled && !readOnly && !isOpen) {
       openDropdown();
       inputRef.current?.focus();
     }
-  }, [disabled, isOpen, openDropdown]);
+  }, [disabled, readOnly, isOpen, openDropdown]);
 
   // Cleanup debounce on unmount
   React.useEffect(() => {
@@ -369,45 +423,90 @@ export const Lookup: React.FC<LookupProps> = ({
 
     const updatePosition = () => {
       const rect = inputWrapperRef.current?.getBoundingClientRect();
-      if (rect) {
-        // Use ownerDocument's window for scroll offsets (cross-document safe)
-        const ownerWin = inputWrapperRef.current?.ownerDocument?.defaultView ?? window;
-        setDropdownPosition({
-          top: rect.bottom + 4 + ownerWin.scrollY,
-          left: rect.left + ownerWin.scrollX,
-          width: matchInputWidth ? rect.width : 0,
-        });
-        // Mark position as ready after first calculation
-        setDropdownPositionReady(true);
-      }
+      if (!rect) return;
+
+      const ownerWin = inputWrapperRef.current?.ownerDocument?.defaultView ?? window;
+
+      /**
+       * Which way the list opens.
+       *
+       * Below the field is the natural place, and where it stays whenever
+       * there is room. Near the foot of the viewport — the last row of a
+       * grid, a field low in a dialog — there is not, and a list that opens
+       * downward anyway runs off the bottom of the screen with its options
+       * unreachable. So it flips above the field, and either way it is told
+       * how much room it actually has rather than assuming.
+       */
+      const GAP = 4;
+      // Keeps the list clear of the very edge of the window.
+      const MARGIN = 8;
+      const spaceBelow = ownerWin.innerHeight - rect.bottom - GAP - MARGIN;
+      const spaceAbove = rect.top - GAP - MARGIN;
+      // Only give up on opening downward when above is genuinely roomier;
+      // a flip that gains nothing just moves the problem.
+      const openUp = spaceBelow < 200 && spaceAbove > spaceBelow;
+      const available = Math.max(openUp ? spaceAbove : spaceBelow, 120);
+
+      /**
+       * The field's own viewport rect, used as-is.
+       *
+       * That is the whole calculation: the portal is `position: fixed`, so it
+       * is measured from the same viewport `getBoundingClientRect` reports in.
+       * No scroll offsets, no container origin, no frame translation — every
+       * one of those was compensating for a list positioned somewhere other
+       * than the field it belongs to.
+       */
+      const top = openUp
+        ? rect.top - GAP - Math.min(dropdownHeightRef.current, available)
+        : rect.bottom + GAP;
+      const left = rect.left;
+      const width = matchInputWidth ? rect.width : 0;
+
+      // Unmoved means unchanged: this runs every frame while the list is open,
+      // and handing back a new object each time would re-render it sixty times
+      // a second for a field sitting perfectly still.
+      setDropdownPosition((prev) =>
+        prev.top === top &&
+        prev.left === left &&
+        prev.width === width &&
+        prev.maxHeight === available
+          ? prev
+          : { top, left, width, maxHeight: available },
+      );
+      // Mark position as ready after first calculation
+      setDropdownPositionReady(true);
     };
 
     updatePosition();
 
-    // Track input resize (e.g. flex/grid layout changes)
-    let resizeObserver: ResizeObserver | undefined;
-    if (typeof ResizeObserver !== 'undefined' && inputWrapperRef.current) {
-      resizeObserver = new ResizeObserver(() => updatePosition());
-      resizeObserver.observe(inputWrapperRef.current);
-    }
+    /**
+     * Follow the field for as long as the list is open.
+     *
+     * Measuring once is measuring too early. The field is routinely still on
+     * its way somewhere when the list opens — a dialog playing its entrance
+     * animation is the ordinary case, since opening one focuses the first field
+     * and that opens this — and a single reading leaves the list where the
+     * field *was*. That is why it used to snap into place the moment anything
+     * was scrolled: the scroll handler took a second reading.
+     *
+     * Re-reading each frame makes it self-correcting, and subsumes the window
+     * listeners and the resize observer this used to need — scrolling, resizing
+     * and animating are all just the field having moved. A rect read per frame
+     * is cheap, and `updatePosition` returns the same state object when nothing
+     * has changed, so a stationary field causes no renders at all.
+     *
+     * The height is captured on the way past: a list that opens upward is
+     * placed by its bottom edge, so it cannot be positioned until it has
+     * rendered and can be measured.
+     */
+    let frame = requestAnimationFrame(function track() {
+      const height = dropdownRef.current?.offsetHeight ?? 0;
+      if (height > 0) dropdownHeightRef.current = height;
+      updatePosition();
+      frame = requestAnimationFrame(track);
+    });
 
-    // Use the ownerDocument's window for event listeners.
-    // In cross-document scenarios (e.g., D365 iframes where React mounts
-    // into the top window's document), the global `window` refers to the
-    // iframe window, but events fire on the top window where the DOM lives.
-    const ownerWin = inputWrapperRef.current?.ownerDocument?.defaultView ?? window;
-
-    // Track window resize
-    ownerWin.addEventListener('resize', updatePosition);
-
-    // Track any scroll so the portal follows the input
-    ownerWin.addEventListener('scroll', updatePosition, true);
-
-    return () => {
-      resizeObserver?.disconnect();
-      ownerWin.removeEventListener('resize', updatePosition);
-      ownerWin.removeEventListener('scroll', updatePosition, true);
-    };
+    return () => cancelAnimationFrame(frame);
   }, [isOpen, matchInputWidth]);
 
   // ─── Close when clicking outside ───────────────────────────────
@@ -441,14 +540,14 @@ export const Lookup: React.FC<LookupProps> = ({
     };
   }, [isOpen, closeDropdown]);
 
-  const showDropdown = isOpen && !disabled;
+  const showDropdown = isOpen && !disabled && !readOnly;
 
   // Determine which items to show as badges (both single and multi-select)
   // When maxSelection is set, show only up to maxSelection badges and indicate overflow
   const visibleBadgeCount = maxSelection && maxSelection > 0 ? Math.min(maxSelection, 3) : undefined;
   const allBadgeItems: LookupOption[] = multiSelect
     ? selectedOptions
-    : selectedOption
+    : selectedOption && !editingSelection
     ? [selectedOption]
     : [];
   const badgeItems = visibleBadgeCount !== undefined && allBadgeItems.length > visibleBadgeCount
@@ -457,8 +556,9 @@ export const Lookup: React.FC<LookupProps> = ({
   const overflowCount = allBadgeItems.length - badgeItems.length;
 
   // Should we show the input field? In single-select at-rest, we might hide the text input
-  // In multi-select or when searching, always show
-  const showTextInput = multiSelect || isOpen || !selectedOption;
+  // In multi-select or when searching, always show. Read-only never shows one:
+  // a caret in a field that cannot take a value is an invitation to type into it.
+  const showTextInput = !readOnly && (multiSelect || isOpen || !selectedOption);
   const isSingleSelectAtRest = !multiSelect && !showTextInput;
   const canAutoNavigateRecord = React.useCallback(
     (option: LookupOption) => Boolean(option.entityName && (option.recordId ?? option.key)),
@@ -527,7 +627,7 @@ export const Lookup: React.FC<LookupProps> = ({
   );
 
   return (
-    <div className={styles.root}>
+    <div className={mergeClasses(styles.root, className)}>
       <div
         className={mergeClasses(
           styles.tagInputWrapper,
@@ -656,7 +756,7 @@ export const Lookup: React.FC<LookupProps> = ({
           )}
 
           {/* Text input for searching */}
-          {(showTextInput || badgeItems.length === 0) && (
+          {(showTextInput || (badgeItems.length === 0 && !readOnly)) && (
             <input
               id={lookupId}
               ref={inputRef}
@@ -678,16 +778,19 @@ export const Lookup: React.FC<LookupProps> = ({
           )}
         </div>
 
-        {/* Icons on the right */}
-        <span className={styles.tagInputIcons}>
-          {loading ? (
-            <Spinner size="tiny" />
-          ) : (
-            <span className={styles.chevronIcon}>
-              <SearchRegular />
-            </span>
-          )}
-        </span>
+        {/* Icons on the right. Suppressed when read-only: a search glyph beside a
+            value nobody can change reads as a control that is simply broken. */}
+        {!readOnly && (loading || searchIcon === 'always' || isOpen || badgeItems.length === 0) && (
+          <span className={styles.tagInputIcons}>
+            {loading ? (
+              <Spinner size="tiny" />
+            ) : (
+              <span className={styles.chevronIcon}>
+                <SearchRegular />
+              </span>
+            )}
+          </span>
+        )}
       </div>
 
       {showDropdown && (
@@ -699,6 +802,9 @@ export const Lookup: React.FC<LookupProps> = ({
               left: dropdownPosition.left,
               // Hide until position is calculated to prevent flash at 0,0
               visibility: dropdownPositionReady ? 'visible' : 'hidden',
+              // Whatever room the chosen side actually had. Without it the list
+              // keeps its own height and simply overflows the window.
+              maxHeight: dropdownPosition.maxHeight || undefined,
               ...(matchInputWidth && dropdownPosition.width > 0
                 ? { width: dropdownPosition.width }
                 : { minWidth: 220 }),

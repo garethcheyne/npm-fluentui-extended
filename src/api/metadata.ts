@@ -6,11 +6,12 @@
  * resolved value - two components mounting in the same tick share one round trip.
  */
 
-import { webApiGet, WebApiError } from './webApi';
+import { webApiGet, WebApiError, getWebApiBaseUrl } from './webApi';
 import type { AttributeMetadata, EntityDefinition } from './metadata.types';
 import type { WebApiCollection } from './webApi';
 
-const ENTITY_SELECT = 'LogicalName,EntitySetName,PrimaryNameAttribute,PrimaryIdAttribute,ObjectTypeCode,DisplayName';
+const ENTITY_SELECT =
+  'LogicalName,EntitySetName,PrimaryNameAttribute,PrimaryIdAttribute,PrimaryImageAttribute,ObjectTypeCode,DisplayName';
 
 /**
  * Properties available on the base AttributeMetadata type.
@@ -21,7 +22,7 @@ const ENTITY_SELECT = 'LogicalName,EntitySetName,PrimaryNameAttribute,PrimaryIdA
  * 'Microsoft.Dynamics.CRM.AttributeMetadata'". They are merged in via a cast below.
  */
 const ATTRIBUTE_SELECT =
-  'LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName,IsValidForAdvancedFind,IsValidForRead,RequiredLevel';
+  'LogicalName,SchemaName,DisplayName,Description,AttributeType,AttributeTypeName,IsValidForAdvancedFind,IsValidForRead,IsValidForUpdate,IsValidForCreate,RequiredLevel';
 
 const entityCache = new Map<string, Promise<EntityDefinition>>();
 const attributeCache = new Map<string, Promise<AttributeMetadata[]>>();
@@ -32,6 +33,7 @@ export const clearMetadataCache = (): void => {
   entityCache.clear();
   attributeCache.clear();
   optionSetCache.clear();
+  navigationCache.clear();
 };
 
 /**
@@ -104,6 +106,24 @@ export const getEntityAttributes = (entityLogicalName: string): Promise<Attribut
           if (source.Format) target.Format = source.Format;
         },
       ),
+      // MaxLength and Precision drive a grid's editors: the character cap on a
+      // text cell, and the decimal places a money cell reads to.
+      enrich('Microsoft.Dynamics.CRM.StringAttributeMetadata', 'LogicalName,MaxLength,Format', (target, source) => {
+        if (source.MaxLength != null) target.MaxLength = source.MaxLength;
+        if (source.Format) target.Format = source.Format;
+      }),
+      enrich('Microsoft.Dynamics.CRM.MemoAttributeMetadata', 'LogicalName,MaxLength', (target, source) => {
+        if (source.MaxLength != null) target.MaxLength = source.MaxLength;
+      }),
+      enrich('Microsoft.Dynamics.CRM.MoneyAttributeMetadata', 'LogicalName,Precision', (target, source) => {
+        if (source.Precision != null) target.Precision = source.Precision;
+      }),
+      enrich('Microsoft.Dynamics.CRM.DecimalAttributeMetadata', 'LogicalName,Precision', (target, source) => {
+        if (source.Precision != null) target.Precision = source.Precision;
+      }),
+      enrich('Microsoft.Dynamics.CRM.DoubleAttributeMetadata', 'LogicalName,Precision', (target, source) => {
+        if (source.Precision != null) target.Precision = source.Precision;
+      }),
     ]);
 
     return attributes;
@@ -164,4 +184,86 @@ export const getAttributeOptions = async (
 ): Promise<AttributeMetadata | undefined> => {
   const all = await getEntityOptionSets(entityLogicalName);
   return all.find((attribute) => attribute.LogicalName === attributeLogicalName);
+};
+
+/** How a lookup attribute is expanded and what it points at. */
+export interface LookupNavigation {
+  /** Attribute logical name, e.g. "productid". */
+  attribute: string;
+  /** Navigation property for `$expand`, e.g. "productid" or "createdby". */
+  navigationProperty: string;
+  /** Entity the lookup points at, e.g. "product". */
+  targetEntity: string;
+}
+
+/**
+ * URL for a record's image.
+ *
+ * Image columns are addressed by URL rather than selected. Selecting one returns
+ * the whole picture as base64 inline, which turns a page of fifty rows into
+ * several megabytes of JSON — the same reason `systemUserImageUrl` exists.
+ *
+ * Returns null where the table has no image column enabled, which is what
+ * `PrimaryImageAttribute` being absent means.
+ */
+export const entityImageUrl = (
+  entity: EntityDefinition,
+  recordId: string,
+  size: 'thumbnail' | 'full' = 'full',
+): string | null => {
+  if (!entity.PrimaryImageAttribute) return null;
+  const id = recordId.replace(/[{}]/g, '');
+  if (!id) return null;
+  const base = `${getWebApiBaseUrl()}/${entity.EntitySetName}(${id})/${entity.PrimaryImageAttribute}/$value`;
+  // The thumbnail Dataverse generates is a fraction of the size and is what a
+  // grid row should ask for.
+  return size === 'thumbnail' ? `${base}?size=thumbnail` : base;
+};
+
+const navigationCache = new Map<string, Promise<Map<string, LookupNavigation>>>();
+
+/**
+ * Fetch the navigation property behind each of an entity's lookups.
+ *
+ * A lookup's `$expand` term is not its attribute name and cannot be derived from
+ * it - `ReferencingEntityNavigationPropertyName` is the only reliable source,
+ * and it differs from the logical name often enough that guessing produces a
+ * query Dataverse rejects outright.
+ *
+ * Keyed by attribute logical name.
+ */
+export const getEntityLookupNavigation = (
+  entityLogicalName: string,
+): Promise<Map<string, LookupNavigation>> => {
+  const cached = navigationCache.get(entityLogicalName);
+  if (cached) return cached;
+
+  const request = (async () => {
+    const response = await webApiGet<
+      WebApiCollection<{
+        ReferencingAttribute: string;
+        ReferencingEntityNavigationPropertyName: string;
+        ReferencedEntity: string;
+      }>
+    >(
+      `EntityDefinitions(LogicalName='${entityLogicalName}')/ManyToOneRelationships` +
+        '?$select=ReferencingAttribute,ReferencingEntityNavigationPropertyName,ReferencedEntity',
+    );
+
+    const map = new Map<string, LookupNavigation>();
+    for (const relationship of response.value || []) {
+      map.set(relationship.ReferencingAttribute, {
+        attribute: relationship.ReferencingAttribute,
+        navigationProperty: relationship.ReferencingEntityNavigationPropertyName,
+        targetEntity: relationship.ReferencedEntity,
+      });
+    }
+    return map;
+  })().catch((err) => {
+    navigationCache.delete(entityLogicalName);
+    throw err;
+  });
+
+  navigationCache.set(entityLogicalName, request);
+  return request;
 };

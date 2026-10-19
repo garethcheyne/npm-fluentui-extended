@@ -26,6 +26,11 @@ export interface EntityDefinition {
   PrimaryNameAttribute: string;
   /** Attribute holding the record's GUID, e.g. "accountid" */
   PrimaryIdAttribute: string;
+  /**
+   * Attribute holding the record's image, usually "entityimage". Absent on
+   * tables that have no image enabled, which is how you tell the two apart.
+   */
+  PrimaryImageAttribute?: string | null;
   DisplayName?: LocalizedLabel;
   /** Numeric type code, used to build record URLs in some Dynamics surfaces */
   ObjectTypeCode?: number;
@@ -43,6 +48,7 @@ export interface AttributeMetadata {
   LogicalName: string;
   SchemaName?: string;
   DisplayName?: LocalizedLabel;
+  Description?: LocalizedLabel;
   /** Coarse type, e.g. "String", "Picklist", "DateTime" */
   AttributeType?: string;
   /**
@@ -52,6 +58,9 @@ export interface AttributeMetadata {
   AttributeTypeName?: { Value: string };
   IsValidForAdvancedFind?: { Value: boolean };
   IsValidForRead?: { Value: boolean };
+  /** False for calculated, rollup and system-owned columns. Dataverse rejects writes to them. */
+  IsValidForUpdate?: { Value: boolean };
+  IsValidForCreate?: { Value: boolean };
   RequiredLevel?: { Value: string };
 
   // The properties below are declared on DERIVED metadata types, not on
@@ -66,6 +75,12 @@ export interface AttributeMetadata {
   DateTimeBehavior?: { Value: DateTimeBehavior };
   /** DateTimeAttributeMetadata / StringAttributeMetadata / IntegerAttributeMetadata */
   Format?: string;
+  /** String/Memo attributes - characters accepted */
+  MaxLength?: number;
+  /** Money/Decimal/Double attributes - decimal places */
+  Precision?: number;
+  MinValue?: number;
+  MaxValue?: number;
   /** Picklist/MultiSelectPicklist/Boolean attributes only */
   OptionSet?: {
     Options?: OptionSetValue[];

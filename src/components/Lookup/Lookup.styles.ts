@@ -72,6 +72,18 @@ export const useLookupStyles = makeStyles({
     minHeight: '24px',
     paddingLeft: '6px',
     paddingRight: '2px',
+
+    /**
+     * In a dense control the search box gives way to the value.
+     *
+     * The input's 60px floor is right on a form, where there is room for both.
+     * In a grid cell it takes that width off the resolved badge first, so a long
+     * record name is squeezed to nothing instead of truncating with an ellipsis.
+     */
+    '& input': {
+      flexBasis: 0,
+      minWidth: 0,
+    },
   },
 
   tagInputWrapperDisabled: {
@@ -258,7 +270,18 @@ export const useLookupStyles = makeStyles({
   },
 
   dropdownPortal: {
-    position: 'absolute',
+    /**
+     * Fixed, not absolute.
+     *
+     * The list is portalled, so an absolute position is resolved against
+     * whichever ancestor the portal happened to land inside — the document when
+     * it mounts on `body`, a viewport-anchored host when it mounts into a
+     * dialog's. The same coordinates then mean two different places, which is
+     * what kept detaching the list from its field. Fixed is measured from the
+     * viewport wherever it mounts, which is exactly what a field's rect already
+     * gives us.
+     */
+    position: 'fixed',
     padding: 0,
     minWidth: '220px',
     zIndex: 1000000,
@@ -271,7 +294,9 @@ export const useLookupStyles = makeStyles({
   },
 
   dropdownContent: {
-    maxHeight: '350px',
+    // The portal carries the real cap, worked out from the room on the side it
+    // opened. This is the ceiling for the common case where there is plenty.
+    maxHeight: 'inherit',
     display: 'flex',
     flexDirection: 'column',
     // Scrolling belongs to `optionsContainer` below, so the header and footer stay
@@ -479,7 +504,29 @@ export const useLookupStyles = makeStyles({
     gap: '8px',
   },
 
+  /**
+   * The scrolling part of the list.
+   *
+   * `flex: 1` with a zero basis rather than a fixed cap, so the header and
+   * footer keep their height and the options take whatever the portal's
+   * computed `max-height` leaves — which is what stops a dropdown near the
+   * bottom of the window running off it.
+   */
   optionsContainer: {
+    /**
+     * Sized by its content, then capped — not stretched to a share of the box.
+     *
+     * `flex-basis: 0` asks for a share of the container's height, and the
+     * container has no definite height of its own: only a maximum. The share
+     * resolves to nothing, and the list collapses to zero while the header
+     * above it still draws — a dropdown that looks empty whatever it holds.
+     * `auto` lets the options size themselves, `maxHeight` is what stops a long
+     * list, and the scrollbar takes over from there.
+     */
+    flexGrow: 0,
+    flexShrink: 1,
+    flexBasis: 'auto',
+    minHeight: 0,
     maxHeight: '250px',
     overflowY: 'auto',
     overflowX: 'hidden',

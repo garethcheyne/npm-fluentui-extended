@@ -2,6 +2,88 @@
 
 > Version format: `YYYY.M.DD` (e.g., `2026.8.30` = August 30, 2026)
 
+## 2026.10.17
+
+- 🐛 **AddressLookup finds addresses typed with a unit or level.** Google Autocomplete rarely
+  matches "Level 5/135 Coronation Dr", so a leading unit ("Level 5/", "Unit 3B,", "Suite 2",
+  "5/135") is taken off before the search and put back on the chosen address.
+- ✨ **`unitPlacement`** (`'building'` | `'street'`, default `'building'`) — where that unit goes:
+  the building column, or the street line as "Level 5/135 Coronation Drive".
+- 🐛 **"Use as typed" is always offered, and first.** It only appeared when Google found nothing,
+  so a list of near misses hid it; below five suggestions it also scrolled out of sight.
+- 🐛 **The map card shows a typed address as typed.** An address with no place id or coordinates
+  is no longer geocoded — "125 John Street" landed in Toronto, or failed with `ZERO_RESULTS`. The
+  card shows the stored address with no map, and falls back to it whenever a lookup fails.
+- ✨ **Lookup `editSelectionOnBackspace`** — Backspace in the empty search box hands a single
+  selected value back as text to edit. Closing the list without a new choice restores it.
+  AddressLookup turns it on.
+
+- 🐛 **DataGrid: keys typed in the filter row no longer move the active cell.** The key handler ran
+  for anything inside the scroll container, so an arrow, Enter or Tab pressed while filtering
+  jumped the selection into the body and took the focus with it.
+- 🐛 **A collapsed group no longer changes the footer totals or the row count**, and **select-all no
+  longer skips the rows inside one.** All three read the rendered list, which holds only what is on
+  screen; they now read the filtered rows. Shift-ranges and the fill handle still work down the
+  screen, where visual order is the point.
+- 🐛 **Arrow keys work as soon as the grid has focus.** The active cell was only set on mousedown,
+  so a grid reached by Tab ignored the keyboard until it was clicked.
+- ✨ **`groupSubtotalLevels`** (`'all'` | `'innermost'`, default `'all'`) — a nested grid put a
+  subtotal under every level, repeating the same figures at each depth. `'innermost'` puts one only
+  under the bands that hold rows.
+- ✨ **`isSameCellValue`** — the test for whether an edit actually changes a cell. `null`,
+  `undefined` and `''` all mean blank, so clearing an empty cell is not a change while clearing a
+  filled one is. Consumers were reaching for `Object.is`, which stages a phantom edit, or for
+  `String(a) === String(b)`, which throws a clear away and leaves a clear button that does nothing.
+- 🐛 **A choice badge lines up with the text beside it in a grid.** `OptionSetField` positions its
+  badge overlay at a form field's input padding; that offset is now the `--fue-optionset-badge-inset`
+  variable, and DataGrid sets it to 2px for cells. Forms are unchanged.
+- 🐛 **A resolved lookup truncates with an ellipsis in a narrow cell.** The search input inside a
+  `small` Lookup held a 60px floor, taking that width off the value first, so a long record name was
+  squeezed away instead of truncating.
+
+- ✨ **[DataGrid](docs/DataGrid.md)** — a virtualised, editable grid on TanStack Table and TanStack
+  Virtual. Two production apps had each grown their own copy of the same machinery — row
+  virtualisation, column drag and resize, grouping with subtotals, a filter row, density, inline
+  editors and layout persistence — and the copies had begun to drift. This is that machinery,
+  extracted: fetching, saving and the toolbar stay with the consumer.
+
+  Notable behaviour: `getCellValue` layers unsaved edits over the stored record, and sorting,
+  filtering, grouping and the footer totals all read through it — so the grid orders by what is on
+  screen rather than by what the server last returned. Column layout restores during the first
+  render rather than in an effect, so the grid paints its saved layout instead of reflowing a frame
+  later, and the storage key includes the origin so dev, test and production orgs in one browser do
+  not share one layout. Sorting ascends first whatever the data type, unlike TanStack's default.
+
+  Also exports `useDataGrid`, the headless state machine, plus the chrome components and style hook,
+  so a bespoke render does not have to fork the component.
+
+  Hooks added so the grid can replace the two hand-built project grids (tracked in
+  `enhancements/DataGrid-replace-project-grids.md`):
+  - **States:** custom and restyled cell and row states (`cellStates`, `rowStates`), layered row
+    states from `getRowState`, and built-in `deleted` and `placeholder` states.
+  - **Cells:** `getCellTooltip`.
+  - **Groups:** banner hooks (`renderGroupHeader`, `groupContextMenu`, `onGroupDoubleClick`,
+    `groupSelection`), and row drops that report `toGroup`.
+  - **Keyboard:** spreadsheet keys — Tab, F2, type-over, and caret-aware arrows.
+  - **Totals:** function summaries, `includeInSummary` and `groupSubtotalsMinGroups`.
+  - **Visibility and views:** controlled visibility, `forceHiddenColumns`, `columnGroup`, and
+    `getLayout` / `applyLayout`.
+  - **Row chrome and toolbar:** `renderRowIndicator`, `showEditableHints`, `highlightRow`, and
+    `renderToolbarSearch`.
+
+  Fixes in the same pass:
+  - Changing `persist.scope` while mounted now loads that scope's layout. It used to overwrite it
+    with the current one.
+  - Nested group subtotals and counts now come from leaf rows rather than inner banners.
+  - Hiding a column while grouped no longer saves the grouped column as hidden.
+  - Keys pressed inside a cell's popup no longer move the active cell.
+
+  `cellStateClass` is replaced by `cellStateProps`.
+
+- 📦 `@tanstack/react-table`, `@tanstack/react-virtual` and the three `@dnd-kit` packages are
+  **optional** peer dependencies. Nothing outside `DataGrid` imports them, so consumers using only
+  the field components ship none of it.
+
 ## 2026.9.6
 
 - ✨ **`size` on [OptionSetField](README.md#optionsetfield)**, forwarded to the underlying Combobox.

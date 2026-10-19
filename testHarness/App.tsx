@@ -31,6 +31,7 @@ import {
   PlugConnectedRegular,
   PlugDisconnectedRegular,
   PersonSearchRegular,
+  LocationRegular,
   FilterRegular,
   AppsListRegular,
   BorderOutsideRegular,
@@ -51,9 +52,11 @@ import { useDynamicsConnection } from './examples/shared/useDynamicsConnection';
 
 // Example components
 import { LookupExamples } from './examples/Lookup';
+import { AddressLookupExamples } from './examples/AddressLookup';
 import { QueryBuilderExamples } from './examples/QueryBuilder';
 import { CommandBarExamples } from './examples/CommandBar';
 import { EntityGridExamples } from './examples/EntityGrid';
+import { DataGridExamples } from './examples/DataGrid';
 import { DateTimeFieldExamples } from './examples/DateTimeField';
 import { OptionSetFieldExamples } from './examples/OptionSetField';
 import { HoverCardExamples } from './examples/HoverCard';
@@ -137,6 +140,7 @@ const NAV_GROUPS: Array<{ label?: string; items: HarnessEntry[] }> = [
     label: 'Form fields',
     items: [
       { id: 'lookup', label: 'Lookup', icon: <PersonSearchRegular /> },
+      { id: 'addresslookup', label: 'AddressLookup', icon: <LocationRegular /> },
       { id: 'optionsetfield', label: 'OptionSetField', icon: <CheckboxCheckedRegular /> },
       { id: 'datetimefield', label: 'DateTimeField', icon: <CalendarLtrRegular /> },
     ],
@@ -145,6 +149,7 @@ const NAV_GROUPS: Array<{ label?: string; items: HarnessEntry[] }> = [
     label: 'Records & queries',
     items: [
       { id: 'entitygrid', label: 'EntityGrid', icon: <TableRegular /> },
+      { id: 'datagrid', label: 'DataGrid', icon: <TableRegular /> },
       { id: 'querybuilder', label: 'QueryBuilder', icon: <FilterRegular /> },
       { id: 'hovercard', label: 'RecordHoverCard', icon: <ContactCardRegular /> },
     ],
@@ -278,6 +283,16 @@ export function App() {
             onLiveAccountOptionsChange={setLiveAccountOptions}
           />
         );
+      case 'addresslookup':
+        return (
+          <AddressLookupExamples
+            dynamicsConnected={connected}
+            dynamicsLoading={loading}
+            dynamicsConfigured={configured}
+            onLogin={login}
+            onCommandLog={setCommandLog}
+          />
+        );
       case 'querybuilder':
         return (
           <QueryBuilderExamples
@@ -310,6 +325,8 @@ export function App() {
             onCommandLog={setCommandLog}
           />
         );
+      case 'datagrid':
+        return <DataGridExamples connected={connected} />;
       case 'datetimefield':
         return (
           <DateTimeFieldExamples

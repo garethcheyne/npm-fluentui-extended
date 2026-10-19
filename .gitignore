@@ -29,5 +29,13 @@ coverage/
 .env.local
 .env.*.local
 
+# Points npm at the token in .env. Ignored so a token can never be committed,
+# even if someone replaces the variable with the value itself.
+.npmrc
+
 # Misc
 *.tgz
+
+# Scratch output from Playwright MCP and the README example check
+.playwright-mcp/
+.readme-check/

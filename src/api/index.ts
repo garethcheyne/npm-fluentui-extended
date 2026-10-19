@@ -12,9 +12,12 @@ export {
   getEntityDefinition,
   getEntityAttributes,
   getEntityOptionSets,
+  getEntityLookupNavigation,
   getAttributeOptions,
+  entityImageUrl,
   clearMetadataCache,
 } from './metadata';
+export type { LookupNavigation } from './metadata';
 export {
   getSystemUser,
   searchSystemUsers,
@@ -26,6 +29,29 @@ export type { SystemUserRecord, SearchSystemUsersOptions } from './systemUser';
 
 export { searchOwners, searchTeams, getOwner, ownerFromUser } from './owner';
 export type { OwnerRecord, OwnerType, SearchOwnersOptions } from './owner';
+
+export {
+  loadGoogleMaps,
+  isGoogleMapsReady,
+  searchPlacePredictions,
+  getPlaceDetails,
+  parsePlaceAddress,
+  placeMapUrl,
+  clearPlacesCache,
+  formatPlaceAddress,
+  geocodeAddress,
+  reverseGeocode,
+  placeFromAddress,
+  resolvePlace,
+} from './googlePlaces';
+export type {
+  PlaceAddress,
+  PlaceAddressComponent,
+  PlaceAddressOptions,
+  PlaceDetail,
+  PlacePrediction,
+  PlaceSearchOptions,
+} from './googlePlaces.types';
 
 export { labelOf } from './metadata.types';
 export type {

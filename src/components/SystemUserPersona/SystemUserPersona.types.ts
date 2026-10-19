@@ -52,6 +52,14 @@ export interface SystemUserPersonaProps {
    * Defaults to true.
    */
   showHoverCard?: boolean;
+  /**
+   * How long the pointer must rest before the card opens. Defaults to 500ms.
+   *
+   * The delay matters in a scrolling list: the wheel brings a row to a
+   * stationary cursor, and a card that opens on contact appears over whatever
+   * the user was reading.
+   */
+  hoverCardDelayMs?: number;
   /** Extra rows appended to the card's Contact section */
   additionalContact?: SystemUserContactItem[];
   /** Content rendered at the bottom of the card, e.g. an "Open record" link */

@@ -65,6 +65,95 @@ export type {
 	EntityGridSortDirection,
 } from './components/EntityGrid';
 
+// Virtualised spreadsheet-style grid. Bring your own rows - the grid handles
+// virtualisation, column layout, grouping, editing and persistence.
+export {
+	DataGrid,
+	useDataGrid,
+	useRowSelection,
+	useFillHandle,
+	isFillable,
+	useDataGridStyles,
+	DataGridCell,
+	DataGridHeaderCell,
+	DataGridBodyRow,
+	DataGridGroupRow,
+	DataGridSubtotalRow,
+	DataGridColumnMenu,
+	DataGridColumnPicker,
+	DataGridContextMenu,
+	DataGridToolbar,
+	cellStateProps,
+	RESERVED_COLUMN_IDS,
+	DENSITY_METRICS,
+	SELECT_COLUMN_ID,
+	DRAG_COLUMN_ID,
+	ROW_STYLE_TOKENS,
+	CELL_STYLE_TOKENS,
+	BUILTIN_ROW_STATES,
+	BUILTIN_CELL_STATES,
+	resolveRowStateStyle,
+	resolveCellStateStyle,
+	groupPaths,
+	readPath,
+	readColumnValue,
+	columnAlign,
+	formatCellValue,
+	parseEditorValue,
+	isSameCellValue,
+	toImageSrc,
+	aggregate,
+	layoutStorageKey,
+	mergeColumnOrder,
+	useEntityColumns,
+	columnFromAttribute,
+	attributeToDataType,
+	attributeChoices,
+	attributeValueKey,
+	isSystemAttribute,
+	dataverseCellValue,
+	dataverseFormattedValue,
+	SYSTEM_ATTRIBUTES,
+	FORMATTED_VALUE,
+	LOOKUP_LOGICAL_NAME,
+	INCLUDE_ANNOTATIONS,
+} from './components/DataGrid';
+export type {
+	DataGridProps,
+	DataGridColumn,
+	DataGridRow,
+	DataGridDataType,
+	DataGridAlign,
+	DataGridSummary,
+	DataGridSummaryFn,
+	DataGridSummaryContext,
+	DataGridDensity,
+	DataGridDensityMetrics,
+	DataGridChoice,
+	DataGridRowState,
+	DataGridRowStateStyle,
+	DataGridCellState,
+	DataGridCellStateStyle,
+	DataGridGroupContext,
+	DataGridLayout,
+	DataGridCellContext,
+	DataGridComputed,
+	DataGridComputeContext,
+	DataGridPersistence,
+	DataGridRowMove,
+	DataGridHandle,
+	DataGridAffix,
+	DataGridLookupValue,
+	DataGridLookupOption,
+	DataGridSelectModifiers,
+	DataGridCellRef,
+	DataGridFill,
+	UseDataGridOptions,
+	UseDataGridResult,
+	UseEntityColumnsOptions,
+	UseEntityColumnsResult,
+} from './components/DataGrid';
+
 export { DateTimeField } from './components/DateTimeField';
 export { DateTimeRangeField } from './components/DateTimeField';
 export type { DateTimeFieldProps, DateTimeRangeFieldProps, DateTimeRangeFieldChange, DateTimeRangeValue, DateTimeBehavior } from './components/DateTimeField';
@@ -85,6 +174,10 @@ export type {
 export { OwnerLookup } from './components/OwnerLookup';
 export type { OwnerLookupProps } from './components/OwnerLookup';
 
+// Google Places address picker - a preconfigured Lookup with a map on its hover card
+export { AddressLookup, AddressMapCard, placeKind, placeKindLabel, placeTypeIcon } from './components/AddressLookup';
+export type { AddressLookupProps, AddressMapCardProps, PlaceKind } from './components/AddressLookup';
+
 export { RecordHoverCard } from './components/RecordHoverCard';
 export type {
 	RecordHoverCardProps,
@@ -102,7 +195,9 @@ export {
 	getEntityDefinition,
 	getEntityAttributes,
 	getEntityOptionSets,
+	getEntityLookupNavigation,
 	getAttributeOptions,
+	entityImageUrl,
 	clearMetadataCache,
 	getSystemUser,
 	searchSystemUsers,
@@ -118,11 +213,36 @@ export type {
 	EntityDefinition,
 	OptionSetValue,
 	WebApiCollection,
+	LookupNavigation,
 	SystemUserRecord,
 	SearchSystemUsersOptions,
 	OwnerRecord,
 	OwnerType,
 	SearchOwnersOptions,
+} from './api';
+
+// Google Places client behind AddressLookup - usable on its own for geocoding
+export {
+	loadGoogleMaps,
+	isGoogleMapsReady,
+	searchPlacePredictions,
+	getPlaceDetails,
+	parsePlaceAddress,
+	placeMapUrl,
+	clearPlacesCache,
+	formatPlaceAddress,
+	geocodeAddress,
+	reverseGeocode,
+	placeFromAddress,
+	resolvePlace,
+} from './api';
+export type {
+	PlaceAddress,
+	PlaceAddressComponent,
+	PlaceAddressOptions,
+	PlaceDetail,
+	PlacePrediction,
+	PlaceSearchOptions,
 } from './api';
 export {
 	QueryBuilder,
@@ -145,3 +265,5 @@ export type {
 	QueryBuilderRelatedEntity,
 	QueryBuilderDataType,
 } from './components/QueryBuilder';
+export { useHoverDelay } from './hooks/useHoverDelay';
+export type { UseHoverDelayResult } from './hooks/useHoverDelay';

@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // The harness is never emitted, so it does not share the library's rootDir.
+    "rootDir": ".",
+    "declaration": false,
+    "declarationMap": false,
+    "types": ["vite/client"]
+  },
+  "include": ["testHarness/**/*", "src/**/*"]
+}

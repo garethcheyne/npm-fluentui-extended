@@ -66,6 +66,23 @@ export interface LookupProps extends Omit<InputProps, 'onChange' | 'value'> {
   noResultsMessage?: string;
   /** Whether to allow clearing the selection */
   clearable?: boolean;
+  /**
+   * Show the value but offer no way to change it.
+   *
+   * Distinct from `disabled`: the reference stays live — clickable through to
+   * the record, and still offering its hover card — but the search icon, the
+   * text input and the dropdown all go, because each of them says "you can
+   * change this" about a value the user cannot change. A greyed-out control says
+   * something different again, and is wrong for a field that is simply owned
+   * elsewhere.
+   */
+  readOnly?: boolean;
+  /**
+   * When the search icon shows. `'always'` (the default) matches a Dynamics
+   * lookup; `'whenEmpty'` drops it once a value is chosen, for fields where the
+   * value reads as plain text - it comes back while the dropdown is open.
+   */
+  searchIcon?: 'always' | 'whenEmpty';
   /** Minimum characters before triggering search */
   minSearchLength?: number;
   /** Debounce delay for search in milliseconds */
@@ -92,6 +109,13 @@ export interface LookupProps extends Omit<InputProps, 'onChange' | 'value'> {
    * already filtered. Defaults to `false` (client-side filtering enabled).
    */
   disableClientFilter?: boolean;
+  /**
+   * Single-select only. Backspace in the empty search box turns the selected
+   * value back into text to edit and search on, instead of leaving it as a
+   * badge that can only be removed whole. The selection stands until another
+   * option is chosen - closing the list puts it back. Defaults to `false`.
+   */
+  editSelectionOnBackspace?: boolean;
   /**
    * Icon shown before the selected value at rest, representing the table.
    * Falls back to the selected option's own `icon`.

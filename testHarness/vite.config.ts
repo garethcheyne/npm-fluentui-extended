@@ -107,16 +107,27 @@ function dynamicsAuthPlugin(): Plugin {
               'Authorization': `Bearer ${token}`,
               'OData-MaxVersion': '4.0',
               'OData-Version': '4.0',
-              'Accept': 'application/json',
+              // Forwarded rather than forced: an entity image is fetched with
+              // `Accept: image/*`, and demanding JSON makes Dataverse refuse it.
+              'Accept': req.headers?.accept || 'application/json',
               'Content-Type': 'application/json',
+              ...(req.headers?.prefer ? { Prefer: req.headers.prefer } : {}),
             },
           });
 
-          const data = await response.text();
+          const contentType = response.headers.get('content-type') || 'application/json';
 
           res.statusCode = response.status;
-          res.setHeader('Content-Type', response.headers.get('content-type') || 'application/json');
-          res.end(data);
+          res.setHeader('Content-Type', contentType);
+
+          // Reading a binary body as text decodes it as UTF-8 and destroys it,
+          // which is why entity images arrived corrupt and personas fell back
+          // to initials.
+          if (/^(image|audio|video|application\/octet-stream)/.test(contentType)) {
+            res.end(Buffer.from(await response.arrayBuffer()));
+          } else {
+            res.end(await response.text());
+          }
         } catch (error) {
           console.error('[Dynamics Proxy] Error:', error);
           res.statusCode = 500;

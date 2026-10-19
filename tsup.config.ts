@@ -1,7 +1,9 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/index.ts'],
+  // address-lookup is self-contained (splitting is off) so it never pulls in the
+  // root bundle's other peers - see src/address-lookup.ts
+  entry: { index: 'src/index.ts', 'address-lookup': 'src/address-lookup.ts' },
   format: ['cjs', 'esm'],
   dts: true,
   splitting: false,
@@ -17,6 +19,11 @@ export default defineConfig({
     '@fluentui/react-icons',
     '@fluentui/react-datepicker-compat',
     '@fluentui/react-calendar-compat',
+    '@tanstack/react-table',
+    '@tanstack/react-virtual',
+    '@dnd-kit/core',
+    '@dnd-kit/sortable',
+    '@dnd-kit/utilities',
   ],
   treeshake: true,
   esbuildOptions(options) {
