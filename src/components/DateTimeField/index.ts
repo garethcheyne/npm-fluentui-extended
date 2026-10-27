@@ -8,4 +8,6 @@ export {
   formatLocalTime,
   withTime,
   buildTimeOptions,
+  parseFreeFormDateTime,
+  isDayFirst,
 } from './DateTimeField.utils';

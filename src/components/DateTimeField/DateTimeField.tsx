@@ -15,6 +15,7 @@ import {
   parseTimeOnlyValue,
   formatTime12h,
   parseFreeFormDateTime,
+  isDayFirst,
   parseStoredValue,
   timeToMinutes,
   withTime,
@@ -318,7 +319,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
       return;
     }
 
-    const { date, time } = parseFreeFormDateTime(inputText, behavior);
+    const { date, time } = parseFreeFormDateTime(inputText, behavior, isDayFirst(displayFormat));
     
     if (date) {
       let finalDate = date;

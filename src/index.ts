@@ -157,7 +157,7 @@ export type {
 export { DateTimeField } from './components/DateTimeField';
 export { DateTimeRangeField } from './components/DateTimeField';
 export type { DateTimeFieldProps, DateTimeRangeFieldProps, DateTimeRangeFieldChange, DateTimeRangeValue, DateTimeBehavior } from './components/DateTimeField';
-export { parseStoredValue, formatStoredValue } from './components/DateTimeField';
+export { parseStoredValue, formatStoredValue, parseFreeFormDateTime, isDayFirst } from './components/DateTimeField';
 
 export { OptionSetField } from './components/OptionSetField';
 export type { OptionSetFieldProps, OptionSetOption } from './components/OptionSetField';

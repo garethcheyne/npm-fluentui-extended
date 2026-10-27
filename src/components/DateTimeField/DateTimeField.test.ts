@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+  parseFreeFormDateTime,
+  isDayFirst,
   anchorTimeOnlyDate,
   buildTimeOptions,
   formatLocalDate,
@@ -146,5 +148,50 @@ describe('timeOnly helpers', () => {
   it('serializes time-only values as HH:mm', () => {
     expect(formatTimeOnlyValue(new Date(1970, 0, 1, 8, 45, 12))).toBe('08:45');
     expect(formatTimeOnlyValue(null)).toBeNull();
+  });
+});
+
+describe('parseFreeFormDateTime', () => {
+  const ymd = (d: Date | null) => (d ? `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}` : null);
+
+  it('reads numeric dates day first for day-first locales', () => {
+    expect(ymd(parseFreeFormDateTime('6/8/2026', 'DateOnly', true).date)).toBe('2026-8-6');
+    expect(ymd(parseFreeFormDateTime('06.08.26', 'DateOnly', true).date)).toBe('2026-8-6');
+    expect(ymd(parseFreeFormDateTime('6-8-2026', 'DateOnly', true).date)).toBe('2026-8-6');
+  });
+
+  it('reads numeric dates month first for month-first locales', () => {
+    expect(ymd(parseFreeFormDateTime('6/8/2026', 'DateOnly', false).date)).toBe('2026-6-8');
+  });
+
+  it('reads ISO dates the same way everywhere', () => {
+    expect(ymd(parseFreeFormDateTime('2026-08-06', 'DateOnly', true).date)).toBe('2026-8-6');
+    expect(ymd(parseFreeFormDateTime('2026-08-06', 'DateOnly', false).date)).toBe('2026-8-6');
+  });
+
+  it('refuses dates that do not exist rather than rolling them over', () => {
+    expect(parseFreeFormDateTime('31/02/2026', 'DateOnly', true).date).toBeNull();
+    expect(parseFreeFormDateTime('13/13/2026', 'DateOnly', true).date).toBeNull();
+    expect(parseFreeFormDateTime('2026-02-30', 'DateOnly', true).date).toBeNull();
+  });
+
+  it('round-trips what toLocaleDateString shows', () => {
+    const date = new Date(2026, 7, 6);
+    for (const locale of ['en-AU', 'en-GB', 'en-US', 'de-DE']) {
+      const shown = date.toLocaleDateString(locale);
+      expect(ymd(parseFreeFormDateTime(shown, 'DateOnly', isDayFirst(undefined, locale)).date)).toBe('2026-8-6');
+    }
+  });
+});
+
+describe('isDayFirst', () => {
+  it('follows the locale', () => {
+    expect(isDayFirst(undefined, 'en-AU')).toBe(true);
+    expect(isDayFirst(undefined, 'en-US')).toBe(false);
+  });
+
+  it('follows the display pattern over the locale', () => {
+    expect(isDayFirst('MM/dd/yyyy', 'en-AU')).toBe(false);
+    expect(isDayFirst('dd MMM yyyy', 'en-US')).toBe(true);
   });
 });

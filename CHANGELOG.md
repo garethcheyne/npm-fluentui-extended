@@ -2,6 +2,18 @@
 
 > Version format: `YYYY.M.DD` (e.g., `2026.8.30` = August 30, 2026)
 
+## 2026.10.28
+
+- 🐛 **DateTimeField reads typed dates in the user's day/month order.** With `allowFreeType`,
+  numeric dates were always read month first, so in en-AU or en-GB "6/8/2026" became June 8, and
+  a date the field displayed itself (via `toLocaleDateString`) swapped day and month when the field
+  lost focus. The order now comes from `displayFormat` when set, otherwise from the user's locale.
+  `.` and `-` work as separators too ("06.08.26").
+- 🐛 **Dates that don't exist are refused** ("31/02/2026" used to roll over to 3 March); the field
+  reverts to its value, as for any text it can't read.
+- ✨ **`isDayFirst(displayFormat?, locale?)`** is exported, and `parseFreeFormDateTime` takes an
+  optional `dayFirst` argument.
+
 ## 2026.10.27
 
 - ✨ **QueryBuilder `title`** — the heading is no longer fixed. "Query Builder: {entityDisplayName}"

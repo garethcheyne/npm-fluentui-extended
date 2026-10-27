@@ -222,15 +222,39 @@ export const parseTime12h = (time: string): string | null => {
 };
 
 /**
+ * Whether dates are written day before month (en-AU, en-GB: 6/8/2026 is 6 August). Taken from the
+ * display pattern when there is one, otherwise from the locale (the user's, by default), so that what
+ * the field shows parses back to the same date.
+ */
+export const isDayFirst = (displayFormat?: string, locale?: string): boolean => {
+  if (displayFormat) {
+    const day = displayFormat.search(/d/);
+    const month = displayFormat.search(/M/);
+    if (day >= 0 && month >= 0) return day < month;
+  }
+  const parts = new Intl.DateTimeFormat(locale).formatToParts(new Date(2026, 7, 6));
+  return parts.findIndex((p) => p.type === 'day') < parts.findIndex((p) => p.type === 'month');
+};
+
+/** A local date, or null when the parts don't make one (31/02 would otherwise roll over into March). */
+const makeDate = (year: number, month: number, day: number): Date | null => {
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? date : null;
+};
+
+/**
  * Parse a free-form date/time string into a Date.
- * Supports various formats like "8/6/2026", "2026-08-06", "Aug 6, 2026",
- * and optional time like "8/6/2026 2:30pm", "2026-08-06 14:30", etc.
+ * Supports various formats like "8/6/2026", "8.6.2026", "2026-08-06", "Aug 6, 2026",
+ * and optional time like "8/6/2026 2:30pm", "2026-08-06 14:30", etc. Numeric dates are read in the
+ * order given by `dayFirst` (the user's locale by default): "6/8/2026" is 6 August in en-AU and
+ * June 8 in en-US.
  */
 export const parseFreeFormDateTime = (
   input: string,
   // Kept for signature stability: free-form parsing reads whatever the user typed and
   // leaves behaviour-specific normalisation to formatStoredValue.
   _behavior: DateTimeBehavior,
+  dayFirst: boolean = isDayFirst(),
 ): { date: Date | null; time: string | null } => {
   if (!input.trim()) return { date: null, time: null };
 
@@ -244,11 +268,11 @@ export const parseFreeFormDateTime = (
 
   // Match date part: various formats
   // ISO: 2026-08-06
-  // US: 8/6/2026 or 08/06/2026 or 8/6 (no year)
-  // EU: 6/8/2026 or 06/08/2026 (less common, we'll use US format)
+  // Numeric, in the locale's order: 8/6/2026, 08.06.2026, 8-6-26, or 8/6 (no year)
   const isoDateRegex = /(\d{4})-(\d{1,2})-(\d{1,2})/;
-  const slashDateRegex = /(\d{1,2})\/(\d{1,2})\/(\d{2,4})/;
-  const slashDateNoYearRegex = /^(\d{1,2})\/(\d{1,2})$/;
+  const slashDateRegex = /(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})/;
+  const slashDateNoYearRegex = /^(\d{1,2})[/.-](\d{1,2})$/;
+  const dayMonth = (a: string, b: string) => (dayFirst ? { day: Number(a), month: Number(b) } : { day: Number(b), month: Number(a) });
 
   // Match time part: 14:30, 2:30pm, 2:30 PM
   const timeRegex = /(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM|am|pm)?/;
@@ -276,20 +300,21 @@ export const parseFreeFormDateTime = (
   // Try ISO format first
   dateMatch = isoDateRegex.exec(dateOnly);
   if (dateMatch) {
-    parsedDate = new Date(Number(dateMatch[1]), Number(dateMatch[2]) - 1, Number(dateMatch[3]));
+    parsedDate = makeDate(Number(dateMatch[1]), Number(dateMatch[2]), Number(dateMatch[3]));
   } else {
-    // Try slash format with year (US: MM/DD/YYYY)
+    // Numeric with year, in the locale's day/month order
     dateMatch = slashDateRegex.exec(dateOnly);
     if (dateMatch) {
       let year = Number(dateMatch[3]);
       if (year < 100) year += 2000; // 26 -> 2026
-      parsedDate = new Date(year, Number(dateMatch[1]) - 1, Number(dateMatch[2]));
+      const { day, month } = dayMonth(dateMatch[1], dateMatch[2]);
+      parsedDate = makeDate(year, month, day);
     } else {
-      // Try slash format without year (US: MM/DD) - default to current year
+      // Numeric without year - default to current year
       dateMatch = slashDateNoYearRegex.exec(dateOnly);
       if (dateMatch) {
-        const currentYear = new Date().getFullYear();
-        parsedDate = new Date(currentYear, Number(dateMatch[1]) - 1, Number(dateMatch[2]));
+        const { day, month } = dayMonth(dateMatch[1], dateMatch[2]);
+        parsedDate = makeDate(new Date().getFullYear(), month, day);
       } else {
         // Fall back to native Date parsing for formats like "Aug 6, 2026" or "Aug 6"
         let nativeDate = new Date(dateOnly);
