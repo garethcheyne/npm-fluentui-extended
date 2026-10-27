@@ -1108,7 +1108,8 @@ parsed from `initialFetchXml` are preserved rather than dropped on the next seri
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `entityName` | `string` | - | Logical name of the entity (required) |
-| `entityDisplayName` | `string` | - | Display name shown in header |
+| `entityDisplayName` | `string` | - | Entity name used in the default heading ("Query Builder: {entityDisplayName}") |
+| `title` | `ReactNode \| false` | `"Query Builder: {entityDisplayName}"` | Heading above the toolbar. Pass text or an element to replace it, or `false` to hide it |
 | `fields` | `QueryBuilderField[]` | - | Fields for filtering (auto-loaded via Web API if omitted) |
 | `initialFetchXml` | `string` | - | FetchXML to pre-populate the query builder |
 | `initialState` | `QueryBuilderState` | - | Initial query state object |

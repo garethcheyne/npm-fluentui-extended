@@ -2,6 +2,12 @@
 
 > Version format: `YYYY.M.DD` (e.g., `2026.8.30` = August 30, 2026)
 
+## 2026.10.27
+
+- ✨ **QueryBuilder `title`** — the heading is no longer fixed. "Query Builder: {entityDisplayName}"
+  is now only the default: pass any text or element to replace it, or `false` to leave it out when
+  the builder sits in a panel or dialog that already has its own heading.
+
 ## 2026.10.17
 
 - 🐛 **AddressLookup finds addresses typed with a unit or level.** Google Autocomplete rarely

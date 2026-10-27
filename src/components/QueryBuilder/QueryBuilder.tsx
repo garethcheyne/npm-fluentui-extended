@@ -1201,11 +1201,13 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
 
     return (
         <div className={styles.container}>
-            <div className={styles.headerRow}>
-                <Text weight="semibold" className={styles.headerTitle}>
-                    Query Builder: {props.entityDisplayName || props.entityName}
-                </Text>
-            </div>
+            {props.title !== false && (
+                <div className={styles.headerRow}>
+                    <Text weight="semibold" className={styles.headerTitle}>
+                        {props.title ?? `Query Builder: ${props.entityDisplayName || props.entityName}`}
+                    </Text>
+                </div>
+            )}
 
             {/* Commands. CommandBar collapses anything that will not fit into a
                 "More commands" menu, rather than clipping it as the previous

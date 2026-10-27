@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { FieldAppearance } from '../../types/appearance';
 
 export type QueryBuilderDataType = 'string' | 'number' | 'datetime' | 'boolean' | 'optionset' | 'lookup';
@@ -265,6 +266,12 @@ export interface QueryBuilderProps {
   /** Entity set name for OData queries (e.g., "accounts"). If not provided, will be fetched from the Web API. */
   entitySetName?: string;
   entityDisplayName?: string;
+  /**
+   * Heading above the toolbar. Defaults to "Query Builder: {entityDisplayName}" (or the
+   * entity name). Pass any text or element to replace it, or `false` to leave the heading
+   * out, e.g. when the builder sits in a panel or dialog that already has its own title.
+   */
+  title?: ReactNode | false;
   fields?: QueryBuilderField[];
   /** Related entities for filtering. If not provided, will be auto-detected from lookup fields. */
   relatedEntities?: QueryBuilderRelatedEntity[];
