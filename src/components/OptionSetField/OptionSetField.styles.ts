@@ -1,6 +1,33 @@
 import { makeStyles, tokens } from '@fluentui/react-components';
 
 export const useOptionSetFieldStyles = makeStyles({
+  /**
+   * `inline`: the value (or its badge) without the combobox's fill and
+   * underline, in every state. Only the chevron comes back on hover and focus,
+   * which is all the cue an editable value needs.
+   *
+   * Named on the combobox's hover and focus states too: Fluent inserts those
+   * after plain rules, so a resting-state override alone loses to them.
+   */
+  inline: {
+    '& .fui-Combobox, & .fui-Combobox:hover, & .fui-Combobox:focus-within': {
+      backgroundColor: 'transparent',
+      borderTopColor: 'transparent',
+      borderRightColor: 'transparent',
+      borderBottomColor: 'transparent',
+      borderLeftColor: 'transparent',
+    },
+    '& .fui-Combobox::after, & .fui-Combobox:focus-within::after': {
+      borderTopColor: 'transparent',
+      borderRightColor: 'transparent',
+      borderBottomColor: 'transparent',
+      borderLeftColor: 'transparent',
+    },
+    '& .fui-Combobox__expandIcon': { opacity: 0 },
+    ':hover': { '& .fui-Combobox__expandIcon': { opacity: 1 } },
+    ':focus-within': { '& .fui-Combobox__expandIcon': { opacity: 1 } },
+  },
+
   root: {
     display: 'flex',
     flexDirection: 'column',
@@ -67,6 +94,21 @@ export const useOptionSetFieldStyles = makeStyles({
     height: '10px',
     borderRadius: tokens.borderRadiusCircular,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+
+  /** An ancestor shown only to place a search match */
+  optionContext: {
+    color: tokens.colorNeutralForeground3,
+  },
+
+  /**
+   * A parent that heads its children but cannot be chosen. Disabled underneath,
+   * so it takes no selection, but drawn as a heading rather than greyed out.
+   */
+  optionGroup: {
+    color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightSemibold,
+    cursor: 'default',
   },
 
   optionLabel: {

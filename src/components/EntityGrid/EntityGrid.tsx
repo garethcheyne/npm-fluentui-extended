@@ -25,7 +25,7 @@ import { getEntityAttributes, getEntityDefinition } from '../../api/metadata';
 import { webApiGet } from '../../api/webApi';
 import type { WebApiCollection } from '../../api/webApi';
 import { useEntityGridStyles } from './EntityGrid.styles';
-import { applyMetadataLabels, buildPageQuery, buildSelect, formattedValue, nextSort } from './EntityGrid.utils';
+import { applyMetadataLabels, buildPageQuery, buildSelect, columnValueKeys, formattedValue, nextSort } from './EntityGrid.utils';
 import type {
   ColumnState,
   EntityGridColumn,
@@ -82,6 +82,8 @@ export const EntityGrid: React.FC<EntityGridProps> = ({
     defaultColumnState ?? [],
   );
   const [primaryId, setPrimaryId] = React.useState<string>('');
+  // Column name -> the property its value arrives on (`_x_value` for a lookup)
+  const [valueKeys, setValueKeys] = React.useState<Map<string, string>>(new Map());
   const [records, setRecords] = React.useState<Record<string, unknown>[]>([]);
   const [sort, setSort] = React.useState<EntityGridSort | undefined>(defaultSort);
   const [loading, setLoading] = React.useState(false);
@@ -237,21 +239,26 @@ export const EntityGrid: React.FC<EntityGridProps> = ({
 
         setPrimaryId(definition.PrimaryIdAttribute);
 
-        if (effectiveColumns.some((column) => !column.label)) {
-          const attributes = await getEntityAttributes(entityName);
-          setColumns(applyMetadataLabels(effectiveColumns, attributes));
-        } else {
-          setColumns(effectiveColumns);
-        }
+        // Always read: lookups have to be requested and read as `_x_value`, labels or not.
+        // The metadata client caches it, so this is one request per table, not per page.
+        const attributes = await getEntityAttributes(entityName).catch(() => []);
+        const keys = columnValueKeys(effectiveColumns, attributes);
+        setValueKeys(keys);
+        setColumns(
+          effectiveColumns.some((column) => !column.label)
+            ? applyMetadataLabels(effectiveColumns, attributes)
+            : effectiveColumns,
+        );
+        const sortBy = sort ?? { column: definition.PrimaryNameAttribute, direction: 'asc' as const };
 
         const replayUrl = pageHistory[targetIndex];
         const url =
           replayUrl ??
           buildPageQuery({
             entitySetName: definition.EntitySetName,
-            select: buildSelect(effectiveColumns, definition.PrimaryIdAttribute, definition.PrimaryNameAttribute),
+            select: buildSelect(effectiveColumns, definition.PrimaryIdAttribute, definition.PrimaryNameAttribute, keys),
             filter,
-            sort: sort ?? { column: definition.PrimaryNameAttribute, direction: 'asc' },
+            sort: { ...sortBy, column: keys.get(sortBy.column) ?? sortBy.column },
             pageSize,
             includeCount: targetIndex === 0,
           });
@@ -431,7 +438,7 @@ export const EntityGrid: React.FC<EntityGridProps> = ({
             </TableCell>
           )}
           {sortedColumns.map((column) => {
-            const formatted = formattedValue(record, column.name);
+            const formatted = formattedValue(record, valueKeys.get(column.name) ?? column.name);
             const isPinned = enableColumnPinning && isColumnPinned(column.name);
             const colWidth = getColumnWidth(column);
             return (
@@ -450,6 +457,7 @@ export const EntityGrid: React.FC<EntityGridProps> = ({
     },
     [
       rowId,
+      valueKeys,
       selectedIds,
       sortedColumns,
       styles,

@@ -58,7 +58,7 @@ interface DataGridColumn<T> {
   key: string;              // column id, and the row property read
   label?: string;
   dataType?: 'string' | 'multiline' | 'integer' | 'decimal' | 'money' | 'percent'
-           | 'boolean' | 'date' | 'datetime' | 'choice' | 'lookup';
+           | 'boolean' | 'date' | 'datetime' | 'choice' | 'lookup' | 'image';
   width?: number;           // default 140
   align?: 'left' | 'center' | 'right';
   editable?: boolean;
@@ -270,7 +270,7 @@ const { table, metrics, columnMap, selectedRowIds, setGroupBy } = useDataGrid({
 | `data` | `T[]` | — | Rows. Must be referentially stable |
 | `columns` | `DataGridColumn<T>[]` | — | Column config. Must be referentially stable |
 | `getRowId` | `(row, index) => string` | array index | Stable row id |
-| `getCellValue` | `(row, key, rowId) => unknown` | reads the column | Effective value, for unsaved-edit layering |
+| `getCellValue` | `(row, key, rowId, baseValue) => unknown` | reads the column | Effective value, for unsaved-edit layering. `baseValue` is what the column reads without it |
 | `onCellChange` | `(row, key, value, rowId) => void` | — | Commit an inline edit. Omit for a read-only grid |
 | `readOnly` | `boolean` | `false` | Read-only whatever `editable` says |
 | `getRowState` | `(row, rowId) => state \| state[]` | — | Row tint, layered when a list |
@@ -284,8 +284,8 @@ const { table, metrics, columnMap, selectedRowIds, setGroupBy } = useDataGrid({
 | `defaultSorting` / `onSortingChange` | `SortingState` | `[]` | Sorting |
 | `showFilters` / `defaultShowFilters` / `onShowFiltersChange` | `boolean` | `false` | Per-column filter row |
 | `globalFilter` | `string` | — | Free-text search across visible columns |
-| `groupBy` / `defaultGroupBy` / `onGroupByChange` | `string \| null` | `null` | Group-by column key |
-| `renderGroupLabel` | `(value, rows) => ReactNode` | raw value | Group banner label |
+| `groupBy` / `defaultGroupBy` / `onGroupByChange` | `string \| string[] \| null` | `null` | Group-by column key; an array nests groups in that order |
+| `renderGroupLabel` | `(value, rows, depth) => ReactNode` | raw value | Group banner label; `depth` is 0 for the outermost group |
 | `renderGroupHeader` / `groupContextMenu` / `onGroupDoubleClick` | `(ctx) => …` | — | Group banner hooks |
 | `groupSelection` | `boolean` | `false` | Select-all checkbox per group |
 | `groupSubtotals` | `boolean \| string[]` | `false` | Aggregate row under each group |

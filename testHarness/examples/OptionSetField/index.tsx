@@ -48,6 +48,19 @@ const demoTagOptions = [
   { value: 5, label: 'Documentation', color: '#ffaa44' },
 ];
 
+/** Product categories, each child naming its parent by `parentValue`. */
+const demoCategoryOptions = [
+  { value: 100, label: 'Appliances' },
+  { value: 110, label: 'Kitchen', parentValue: 100 },
+  { value: 111, label: 'Fridges', parentValue: 110 },
+  { value: 112, label: 'Dishwashers', parentValue: 110 },
+  { value: 120, label: 'Laundry', parentValue: 100 },
+  { value: 121, label: 'Washing machines', parentValue: 120 },
+  { value: 200, label: 'Electrical' },
+  { value: 210, label: 'Lighting', parentValue: 200 },
+  { value: 220, label: 'Heating', parentValue: 200 },
+];
+
 // =============================================================================
 // OPTIONSETFIELD EXAMPLES COMPONENT
 // =============================================================================
@@ -62,6 +75,8 @@ export function OptionSetFieldExamples({ dynamicsConnected }: ExampleProps) {
   const [priorityValue, setPriorityValue] = useState<number | null>(null);
   const [readOnlyValue] = useState<number | null>(1);
   const [tagValues, setTagValues] = useState<number[]>([1, 2]);
+  const [categoryValue, setCategoryValue] = useState<number | null>(111);
+  const [leafCategoryValues, setLeafCategoryValues] = useState<number[]>([]);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -329,6 +344,63 @@ export function OptionSetFieldExamples({ dynamicsConnected }: ExampleProps) {
           </div>
         </div>
         <CodeExample sampleId="optionsetfield-badge-style" />
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          SECTION: Hierarchy
+          ═══════════════════════════════════════════════════════════════════════ */}
+      <section style={{ marginBottom: 40 }}>
+        <h2>Hierarchy</h2>
+        <p style={{ color: '#666', marginBottom: 12 }}>
+          <code>hierarchical</code> — options indented under their <code>parentValue</code>. Dataverse choices
+          carry no hierarchy, so it comes from the caller; type to search and each match keeps its ancestors.
+        </p>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: 16,
+          }}
+        >
+          <div style={{ border: '1px solid #e1dfdd', borderRadius: 8, padding: 16, background: '#fff' }}>
+            <h4 style={{ margin: '0 0 8px' }}>Any Level</h4>
+            <p style={{ fontSize: 12, color: '#666', marginBottom: 12 }}>
+              <code>showPath</code> — the chosen value reads with its ancestors.
+            </p>
+            <OptionSetField
+              label="Category"
+              options={demoCategoryOptions}
+              hierarchical
+              showPath
+              value={categoryValue}
+              onChange={(value) => setCategoryValue(value as number | null)}
+            />
+            <pre style={{ margin: '12px 0 0', fontSize: 12, color: '#666' }}>
+              {categoryValue ?? '(empty)'}
+            </pre>
+          </div>
+
+          <div style={{ border: '1px solid #e1dfdd', borderRadius: 8, padding: 16, background: '#fff' }}>
+            <h4 style={{ margin: '0 0 8px' }}>Bottom Level Only</h4>
+            <p style={{ fontSize: 12, color: '#666', marginBottom: 12 }}>
+              <code>{'selectableParents={false}'}</code> — parents become headings.
+            </p>
+            <OptionSetField
+              label="Categories"
+              options={demoCategoryOptions}
+              hierarchical
+              selectableParents={false}
+              multiselect
+              value={leafCategoryValues}
+              onChange={(value) => setLeafCategoryValues((value as number[]) ?? [])}
+            />
+            <pre style={{ margin: '12px 0 0', fontSize: 12, color: '#666' }}>
+              {formatMultiSelectValue(leafCategoryValues) || '(empty)'}
+            </pre>
+          </div>
+        </div>
+        <CodeExample sampleId="optionsetfield-hierarchy" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════

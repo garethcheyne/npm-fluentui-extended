@@ -65,6 +65,19 @@ const DEFAULT_HEADERS: Record<string, string> = {
   Accept: 'application/json',
 };
 
+/** A path relative to the API root, or an absolute URL, as the URL to request. */
+const resolveUrl = (path: string): string =>
+  /^https?:\/\//i.test(path) ? path : `${apiBaseUrl}/${path.replace(/^\/+/, '')}`;
+
+/**
+ * Send a request through the configured base URL and transport, and hand back
+ * the raw response. For callers with their own status handling; everything else
+ * should use `webApiGet`. Without it a component calling `fetch` itself ignores
+ * `setWebApiBaseUrl` and `setWebApiFetch`, and only works inside Dynamics.
+ */
+export const webApiRequest = (path: string, init: RequestInit = {}): Promise<Response> =>
+  webApiFetch(resolveUrl(path), init);
+
 /**
  * GET a Web API resource.
  *
@@ -73,7 +86,7 @@ const DEFAULT_HEADERS: Record<string, string> = {
  * as-is, so both forms are accepted.
  */
 export const webApiGet = async <T>(path: string, options: WebApiRequestOptions = {}): Promise<T> => {
-  const url = /^https?:\/\//i.test(path) ? path : `${apiBaseUrl}/${path.replace(/^\/+/, '')}`;
+  const url = resolveUrl(path);
 
   let response: Response;
   try {

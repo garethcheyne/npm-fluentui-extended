@@ -1,7 +1,7 @@
 /**
  * Typecheck the README's code examples.
  *
- *   npm run verify:readme
+ *   pnpm run verify:readme
  *
  * Documentation drifts silently: a renamed prop or a removed export keeps rendering
  * fine in Markdown. This extracts every ```tsx / ```ts block, compiles it against the
@@ -53,6 +53,7 @@ const IMPORTS = [
   '  setWebApiBaseUrl, setWebApiFetch, getEntityDefinition, clearMetadataCache,',
   '  parseStoredValue, formatStoredValue, formatMultiSelectValue, parseSelectedValues,',
   '  serializeQueryBuilderState, parseFetchXmlToState, validateQueryBuilderState,',
+  '  useHierarchyLookup, useParentPortalMount, DataGrid, AddressLookup,',
   '} = Lib;',
   'void [React, FluentProvider, webLightTheme, Link, Text, Badge, Button, ToggleButton,',
   '  Dialog, DialogSurface, DialogBody, DialogTitle, DialogContent,',
@@ -62,7 +63,8 @@ const IMPORTS = [
   '  ParentPortal, FluentShell, FluentContainer, D365TestHarness,',
   '  setWebApiBaseUrl, setWebApiFetch, getEntityDefinition, clearMetadataCache,',
   '  parseStoredValue, formatStoredValue, formatMultiSelectValue, parseSelectedValues,',
-  '  serializeQueryBuilderState, parseFetchXmlToState, validateQueryBuilderState];',
+  '  serializeQueryBuilderState, parseFetchXmlToState, validateQueryBuilderState,',
+  '  useHierarchyLookup, useParentPortalMount, DataGrid, AddressLookup];',
 ].join('\n');
 
 /**
@@ -79,6 +81,12 @@ const AMBIENT = {
   SystemUserRecord: 'type SystemUserRecord = Lib.SystemUserRecord;',
   ReactNode: 'type ReactNode = React.ReactNode;',
   options: 'declare const options: any[];',
+  PlaceAddress: 'type PlaceAddress = Lib.PlaceAddress;',
+  googleMapsKey: 'declare const googleMapsKey: string;',
+  rows: 'declare const rows: { id: string; category: string; [key: string]: unknown }[];',
+  columns: 'declare const columns: Lib.DataGridColumn<{ id: string; category: string; [key: string]: unknown }>[];',
+  pending: 'declare const pending: Record<string, Record<string, unknown>>;',
+  stageEdit: 'declare const stageEdit: (...a: any[]) => void;',
   fields: 'declare const fields: Lib.QueryBuilderField[];',
   state: 'declare const state: Lib.QueryBuilderState;',
   value: 'declare const value: any;',
@@ -171,9 +179,9 @@ if (fragments.length) console.log(`  fragments at README lines: ${fragments.join
 
 try {
   await run(
-    'npx',
+    'pnpm',
     [
-      'tsc', '--noEmit', '--jsx', 'react-jsx', '--esModuleInterop', '--skipLibCheck',
+      'exec', 'tsc', '--noEmit', '--jsx', 'react-jsx', '--esModuleInterop', '--skipLibCheck',
       '--target', 'es2020', '--module', 'esnext', '--moduleResolution', 'bundler',
       ...files,
     ],

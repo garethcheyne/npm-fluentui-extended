@@ -51,13 +51,42 @@ export const buildPageQuery = (options: {
   return `${options.entitySetName}?${params.join('&')}`;
 };
 
+/** Attribute types the Web API returns as `_<name>_value` rather than by name. */
+const LOOKUP_TYPES = new Set(['Lookup', 'Customer', 'Owner']);
+
+/**
+ * The property each column's value arrives on, by column name.
+ *
+ * A lookup is the exception in a Web API payload: `primarycontactid` comes back as
+ * `_primarycontactid_value`, and `$select=primarycontactid` is rejected outright. A
+ * column may be given by either name; one already in `_x_value` form is left alone.
+ */
+export const columnValueKeys = (
+  columns: EntityGridColumn[],
+  attributes: AttributeMetadata[],
+): Map<string, string> => {
+  const byName = new Map(attributes.map((attribute) => [attribute.LogicalName, attribute]));
+  return new Map(
+    columns.map((column) => {
+      const attribute = byName.get(column.name);
+      const isLookup = attribute !== undefined && LOOKUP_TYPES.has(String(attribute.AttributeType));
+      return [column.name, isLookup ? `_${column.name}_value` : column.name];
+    }),
+  );
+};
+
 /**
  * Columns to request. The primary id is always included so rows have a stable key
  * and can be opened, even when the caller did not ask for it.
  */
-export const buildSelect = (columns: EntityGridColumn[], primaryIdAttribute: string, primaryNameAttribute: string): string[] => {
+export const buildSelect = (
+  columns: EntityGridColumn[],
+  primaryIdAttribute: string,
+  primaryNameAttribute: string,
+  valueKeys?: Map<string, string>,
+): string[] => {
   const names = new Set<string>([primaryIdAttribute, primaryNameAttribute]);
-  columns.forEach((column) => names.add(column.name));
+  columns.forEach((column) => names.add(valueKeys?.get(column.name) ?? column.name));
   return Array.from(names);
 };
 

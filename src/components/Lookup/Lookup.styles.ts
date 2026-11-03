@@ -1,6 +1,37 @@
 import { makeStyles, tokens } from '@fluentui/react-components';
 
+/**
+ * Stable class names on the Lookup's parts, for a host that has to restyle
+ * them. Griffel's own classes are hashed, so they cannot be targeted.
+ */
+export const lookupClassNames = {
+  /** The box that looks like an input: fill, border and badges. */
+  field: 'fue-Lookup__field',
+} as const;
+
+const field = `.${lookupClassNames.field}`;
+
 export const useLookupStyles = makeStyles({
+  /**
+   * `inline`: the value without the field box, in every state.
+   *
+   * Named on the field's hover and focus states as well as its rest: those
+   * rules of the field's own are inserted after plain ones, so an override of
+   * the resting state alone loses to them the moment the control is used.
+   */
+  inline: {
+    [`& ${field}, & ${field}:hover, & ${field}:focus-within`]: {
+      backgroundColor: 'transparent',
+      borderTopColor: 'transparent',
+      borderRightColor: 'transparent',
+      borderBottomColor: 'transparent',
+      borderLeftColor: 'transparent',
+      // Focus thickens the underline to 2px; kept at 1 the text does not shift
+      borderBottomWidth: '1px',
+      paddingLeft: '0',
+    },
+  },
+
   root: {
     position: 'relative',
     display: 'inline-flex',
@@ -391,6 +422,36 @@ export const useLookupStyles = makeStyles({
     transform: 'rotate(180deg)',
   },
 
+  /** Chevron and indent of a hierarchical row; the indent itself is an inline margin. */
+  treeToggle: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '20px',
+    height: '20px',
+    flexShrink: 0,
+    color: tokens.colorNeutralForeground3,
+    borderRadius: tokens.borderRadiusSmall,
+    transition: 'transform 0.15s ease',
+
+    '&:hover': {
+      color: tokens.colorNeutralForeground1,
+    },
+  },
+
+  treeToggleWithSecondary: {
+    marginTop: '8px', // Centered between text + secondaryText rows
+  },
+
+  treeToggleExpanded: {
+    transform: 'rotate(90deg)',
+  },
+
+  /** Opened to show search matches, so it does not fold */
+  treeToggleFixed: {
+    cursor: 'default',
+  },
+
   optionHighlighted: {
     backgroundColor: tokens.colorNeutralBackground1Hover,
   },
@@ -415,6 +476,17 @@ export const useLookupStyles = makeStyles({
     fontWeight: tokens.fontWeightSemibold,
     color: tokens.colorNeutralForeground1,
     lineHeight: tokens.lineHeightBase300,
+  },
+
+  /** An ancestor shown only to place a search match */
+  optionTextContext: {
+    fontWeight: tokens.fontWeightRegular,
+    color: tokens.colorNeutralForeground3,
+  },
+
+  /** A parent that opens and closes but cannot be chosen */
+  optionTextGroup: {
+    color: tokens.colorNeutralForeground2,
   },
 
   optionSecondaryText: {

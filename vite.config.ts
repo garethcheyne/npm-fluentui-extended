@@ -52,7 +52,8 @@ function dynamicsProxyPlugin(): Plugin {
       const env = loadEnv('', cwd, '');
       dynamicsUrl = env.VITE_DYNAMICS_URL?.replace(/\/$/, '') || '';
       clientId = env.VITE_AZURE_CLIENT_ID || '';
-      clientSecret = env.VITE_AZURE_CLIENT_SECRET || '';
+      // Unprefixed: a VITE_ variable is handed to the browser. The old name still works.
+      clientSecret = env.AZURE_CLIENT_SECRET || env.VITE_AZURE_CLIENT_SECRET || '';
       tenantId = env.VITE_AZURE_TENANT_ID || '';
 
       const isConfigured = !!(

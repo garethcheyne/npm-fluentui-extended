@@ -8,6 +8,12 @@ export interface OptionSetOption {
   /** Hex colour configured on the option in metadata, e.g. "#0078d4" */
   color?: string | null;
   disabled?: boolean;
+  /**
+   * Value of this option's parent, for a `hierarchical` field. Dataverse choices
+   * carry no hierarchy of their own, so this comes from the caller - directly,
+   * or through `getParentValue` for options loaded from metadata.
+   */
+  parentValue?: number | null;
 }
 
 export interface OptionSetFieldProps {
@@ -59,11 +65,39 @@ export interface OptionSetFieldProps {
    * every row taller, which is the opposite of what density is for.
    */
   size?: 'small' | 'medium' | 'large';
+  /**
+   * Show the options as a tree, indented by level, from each option's
+   * `parentValue`. Every level is open; searching keeps each match's ancestors,
+   * dimmed, so the match is seen in its place.
+   */
+  hierarchical?: boolean;
+  /**
+   * Work out an option's parent, for options loaded from metadata - which
+   * cannot carry one. Return `null` for a top-level option. Takes precedence
+   * over `parentValue`.
+   */
+  getParentValue?: (option: OptionSetOption, options: OptionSetOption[]) => number | null | undefined;
+  /**
+   * Whether an option with children can be chosen. Defaults to `true`. Off, a
+   * parent is a heading for the options under it.
+   */
+  selectableParents?: boolean;
+  /** Show the chosen value with its ancestors, e.g. "Electrical › Lighting". */
+  showPath?: boolean;
+  /** Separator between the levels of `showPath`. Defaults to `' › '`. */
+  pathSeparator?: string;
   /** Label rendered above the control */
   label?: string | React.ReactElement;
   /** Validation message rendered below the control */
   validationMessage?: string | React.ReactElement;
   required?: boolean;
+  /**
+   * Draw the control as its value, with no field box: no fill, border or
+   * underline in any state. For a host that is itself the control and draws the
+   * focus ring - a grid cell, a list row - where the field's own chrome would be
+   * a box inside a box. Off by default; a form field keeps the Dynamics look.
+   */
+  inline?: boolean;
   className?: string;
   /** Called when metadata auto-load fails */
   onLoadError?: (error: Error) => void;

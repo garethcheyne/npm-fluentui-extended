@@ -40,6 +40,17 @@ export interface LookupOption {
   entityName?: string;
   /** Record GUID. Defaults to `key`, which is usually already the id. */
   recordId?: string;
+  /**
+   * Key of this option's parent, for a `hierarchical` Lookup. The level is
+   * worked out from the chain of parents, so it is not passed. A parent that is
+   * not among the options leaves this one at the top level.
+   */
+  parentKey?: string | null;
+  /**
+   * Has children that are not in `options` yet. Draws the expand chevron, and
+   * expanding it calls `onLoadChildren`.
+   */
+  hasChildren?: boolean;
 }
 
 /** Where a Lookup's hover card is offered. */
@@ -77,6 +88,13 @@ export interface LookupProps extends Omit<InputProps, 'onChange' | 'value'> {
    * elsewhere.
    */
   readOnly?: boolean;
+  /**
+   * Draw the control as its value, with no field box: no fill, border or
+   * underline in any state. For a host that is itself the control and draws the
+   * focus ring - a grid cell, a list row - where the field's own chrome would be
+   * a box inside a box. Off by default; a form field keeps the Dynamics look.
+   */
+  inline?: boolean;
   /**
    * When the search icon shows. `'always'` (the default) matches a Dynamics
    * lookup; `'whenEmpty'` drops it once a value is chosen, for fields where the
@@ -177,6 +195,43 @@ export interface LookupProps extends Omit<InputProps, 'onChange' | 'value'> {
    * - 'medium': 32px height (default, matches standard form fields)
    */
   size?: LookupSize;
+
+  // ── Hierarchy ───────────────────────────────────────────────────────────────
+
+  /**
+   * Show the options as a tree, built from each option's `parentKey` and
+   * indented by level. Off by default, and while off `parentKey` is ignored.
+   *
+   * Searching narrows the tree to the matches and their ancestors, opened up
+   * and with the ancestors dimmed, so each match is seen in its place.
+   */
+  hierarchical?: boolean;
+  /**
+   * Which levels start open: `'all'` (the default), `'none'`, or a number of
+   * levels - `1` opens the top level only. Nodes whose children are still to
+   * load always start closed.
+   */
+  defaultExpanded?: 'all' | 'none' | number;
+  /**
+   * Load a node's children the first time it is expanded, for a tree too large
+   * to fetch whole. Called for options with `hasChildren` set and no children
+   * yet. Return the children (their `parentKey` defaults to the node's key), or
+   * return nothing and add them to `options` yourself.
+   */
+  onLoadChildren?: (option: LookupOption) => Promise<LookupOption[] | void> | LookupOption[] | void;
+  /**
+   * Whether an option with children can be chosen. Defaults to `true`. Off, a
+   * parent only opens and closes - for a category tree where only the bottom
+   * level is a real value.
+   */
+  selectableParents?: boolean;
+  /**
+   * Show the chosen value with its ancestors, e.g. "Electrical › Lighting".
+   * Off by default.
+   */
+  showPath?: boolean;
+  /** Separator between the levels of `showPath`. Defaults to `' › '`. */
+  pathSeparator?: string;
 
   // ── Hover card ──────────────────────────────────────────────────────────────
 

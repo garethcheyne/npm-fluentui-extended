@@ -5,6 +5,7 @@ import {
   Popover,
   PopoverSurface,
   PopoverTrigger,
+  Text,
   Textarea,
   Tooltip,
   mergeClasses,
@@ -27,6 +28,7 @@ import { useHoverDelay } from '../../hooks/useHoverDelay';
 import { useDataGridStyles } from './DataGrid.styles';
 import { BUILTIN_CELL_STATES } from './DataGrid.tokens';
 import {
+  editorText,
   formatCellValue,
   parseEditorValue,
   resolveCellStateStyle,
@@ -42,6 +44,7 @@ import type {
   DataGridCellStateStyle,
   DataGridColumn,
   DataGridLookupOption,
+  DataGridLookupSearch,
   DataGridRow,
 } from './DataGrid.types';
 
@@ -320,6 +323,7 @@ function BooleanCell<T extends DataGridRow>({
   const checkbox = (
     <span className={styles.editorCheckboxWrap}>
       <Checkbox
+        className={styles.editorCheckbox}
         checked={on}
         disabled={!editable}
         aria-label={column.label ?? column.key}
@@ -375,6 +379,7 @@ function ChoiceCell<T extends DataGridRow>({
         styles.choiceAtRest,
         dirty && styles.editorDirty,
       )}
+      inline
       options={options}
       value={value == null || String(value) === '' ? null : String(value)}
       onChange={(next) => onCommit(next)}
@@ -389,6 +394,30 @@ function ChoiceCell<T extends DataGridRow>({
 }
 
 // ─── Lookups ─────────────────────────────────────────────────────────────────
+
+/** Characters typed before a lookup cell searches. */
+const LOOKUP_MIN_SEARCH = 2;
+
+/** A header or footer as the column gave it: a node, a function of the cell, `null` for none, or the default. */
+function lookupSlot<T extends DataGridRow>(
+  slot: DataGridColumn<T>['lookupHeader'],
+  ctx: DataGridCellContext<T>,
+  search: DataGridLookupSearch,
+  fallback: () => React.ReactNode,
+): React.ReactNode {
+  if (slot === undefined) return fallback();
+  return typeof slot === 'function' ? slot(ctx, search) : slot;
+}
+
+/** What a lookup's footer says by default: what to do next, or what was found. */
+export function defaultLookupFooter(search: DataGridLookupSearch): string {
+  const typed = search.text.trim().length;
+  if (typed < search.minLength) return `Type at least ${search.minLength} characters to search`;
+  if (search.searching) return 'Searching…';
+  const count = search.results.length;
+  return count === 0 ? 'No matching records' : `${count} record${count === 1 ? '' : 's'}`;
+}
+
 
 /**
  * A reference.
@@ -419,8 +448,11 @@ function LookupCell<T extends DataGridRow>({
   const [searching, setSearching] = React.useState(false);
 
   const searchLookup = column.searchLookup;
+  // Read through a ref so a re-render of the row does not re-run the search.
+  const ctxRef = React.useRef(ctx);
+  ctxRef.current = ctx;
   React.useEffect(() => {
-    if (!searchLookup || search.trim().length < 2) {
+    if (!searchLookup || search.trim().length < LOOKUP_MIN_SEARCH) {
       setResults([]);
       return;
     }
@@ -428,7 +460,7 @@ function LookupCell<T extends DataGridRow>({
     // replacing good results with stale ones.
     let live = true;
     setSearching(true);
-    void searchLookup(search)
+    void searchLookup(search, ctxRef.current)
       .then((found) => {
         if (live) setResults(found);
       })
@@ -443,8 +475,17 @@ function LookupCell<T extends DataGridRow>({
     };
   }, [searchLookup, search]);
 
-  const className = mergeClasses(styles.editorControl, styles.lookupAtRest, dirty && styles.editorDirty);
+  const className = mergeClasses(styles.editorControl, dirty && styles.editorDirty);
   const canPick = editable && Boolean(searchLookup);
+
+  // The dropdown's header and footer, as a Dynamics lookup has them.
+  const searchState: DataGridLookupSearch = { text: search, minLength: LOOKUP_MIN_SEARCH, searching, results };
+  const header = lookupSlot(column.lookupHeader, ctx, searchState, () => (
+    <Text size={200} weight="semibold">{column.label ?? column.key}</Text>
+  ));
+  const footer = lookupSlot(column.lookupFooter, ctx, searchState, () => (
+    <Text size={200}>{defaultLookupFooter(searchState)}</Text>
+  ));
 
   if (resolved) {
     /**
@@ -493,6 +534,7 @@ function LookupCell<T extends DataGridRow>({
     return (
       <Lookup
         className={className}
+        inline
         options={canPick ? toLookupOptions(results, column) : [option]}
         selectedOption={option}
         onSearchChange={canPick ? setSearch : undefined}
@@ -518,7 +560,9 @@ function LookupCell<T extends DataGridRow>({
           column.renderHoverCard ? () => column.renderHoverCard?.(resolved, ctx) : undefined
         }
         hoverCardTarget="rest"
-        minSearchLength={2}
+        minSearchLength={LOOKUP_MIN_SEARCH}
+        header={canPick ? header : undefined}
+        footer={canPick ? footer : undefined}
         searchDebounceMs={300}
       />
     );
@@ -529,6 +573,7 @@ function LookupCell<T extends DataGridRow>({
   return (
     <Lookup
       className={className}
+      inline
       options={toLookupOptions(results, column)}
       selectedOption={null}
       onSearchChange={setSearch}
@@ -539,7 +584,9 @@ function LookupCell<T extends DataGridRow>({
       appearance="filled-darker"
       clearable={false}
       disableClientFilter
-      minSearchLength={2}
+      minSearchLength={LOOKUP_MIN_SEARCH}
+      header={canPick ? header : undefined}
+      footer={canPick ? footer : undefined}
       searchDebounceMs={300}
       noResultsMessage="No matches"
     />
@@ -602,6 +649,7 @@ function DateCell<T extends DataGridRow>({
   return (
     <DateTimeField
       className={mergeClasses(styles.editorControl, dirty && styles.editorDirty)}
+      inline
       value={toDate(value)}
       behavior={withTime ? 'UserLocal' : 'DateOnly'}
       showTime={withTime}
@@ -903,7 +951,10 @@ function TextEditor<T extends DataGridRow>({
     column.dataType === 'integer';
 
   const [focused, setFocused] = React.useState(false);
-  const raw = value == null ? '' : String(value);
+  // Numbers edit at the decimal places they are shown at. Compared against this,
+  // opening a cell and leaving it untouched writes nothing back - a computed
+  // 13.043478 is not rounded to 13.04 just by being looked at.
+  const raw = editorText(value, column);
   const [draft, setDraft] = React.useState(raw);
 
   /**

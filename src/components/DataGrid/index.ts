@@ -92,6 +92,7 @@ export type {
   DataGridAffix,
   DataGridLookupValue,
   DataGridLookupOption,
+  DataGridLookupSearch,
   DataGridSelectModifiers,
   DataGridCellRef,
   DataGridFill,

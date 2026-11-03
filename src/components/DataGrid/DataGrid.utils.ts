@@ -63,9 +63,8 @@ function defaultPrecision(dataType: DataGridDataType | undefined): number {
   switch (dataType) {
     case 'money':
     case 'decimal':
-      return 2;
     case 'percent':
-      return 1;
+      return 2;
     default:
       return 0;
   }
@@ -74,6 +73,26 @@ function defaultPrecision(dataType: DataGridDataType | undefined): number {
 /** Decimal places a column's values carry, whether shown or written. */
 export function columnPrecision<T extends DataGridRow>(column: DataGridColumn<T>): number {
   return column.precision ?? defaultPrecision(column.dataType);
+}
+
+/**
+ * A number as the cell's editor shows it: the column's decimal places, as the
+ * cell showed it at rest, but without grouping so it parses back. Opening a
+ * cell to find `13.043478` where it said `13.04` reads as a different value.
+ * Anything else is its plain string.
+ */
+export function editorText<T extends DataGridRow>(value: unknown, column: DataGridColumn<T>): string {
+  if (value == null || value === '') return '';
+  if (
+    column.dataType === 'integer' ||
+    column.dataType === 'decimal' ||
+    column.dataType === 'money' ||
+    column.dataType === 'percent'
+  ) {
+    const num = toNumber(value);
+    if (num != null) return num.toFixed(columnPrecision(column));
+  }
+  return String(value);
 }
 
 /**
@@ -271,7 +290,9 @@ export function formatCellValue<T extends DataGridRow>(
       if (num == null) return String(value);
       const digits = column.precision ?? defaultPrecision(column.dataType);
       const text = numberFormatFor(digits).format(num);
-      return column.dataType === 'percent' ? `${text}%` : text;
+      // A column with a suffix shows its unit there; signing the number as well
+      // read "2.5% %"
+      return column.dataType === 'percent' && column.suffix == null ? `${text}%` : text;
     }
 
     case 'date': {

@@ -7,21 +7,35 @@ import {
   useId,
   Checkbox,
 } from '@fluentui/react-components';
-import { DismissRegular, ChevronDownRegular, SearchRegular } from '@fluentui/react-icons';
-import { useLookupStyles } from './Lookup.styles';
+import { DismissRegular, ChevronDownRegular, ChevronRightRegular, SearchRegular } from '@fluentui/react-icons';
+import { lookupClassNames, useLookupStyles } from './Lookup.styles';
 import { DEFAULT_FIELD_APPEARANCE } from '../../types/appearance';
 import { LookupHoverCard } from './Lookup.HoverCard';
+import { buildHierarchy, expandedByDefault, flattenHierarchy } from './Lookup.hierarchy';
+import type { HierarchyRow } from './Lookup.hierarchy';
 import type { LookupProps, LookupOption } from './Lookup.types';
 
-/**
- * Stable class names on the Lookup's parts, for a host that has to restyle
- * them — the grid strips the field's fill at rest, as it does a choice's.
- * Griffel's own classes are hashed, so they cannot be targeted.
- */
-export const lookupClassNames = {
-  /** The box that looks like an input: fill, border and badges. */
-  field: 'fue-Lookup__field',
-} as const;
+/** Indent per level of a hierarchical list, in px. */
+const TREE_INDENT = 16;
+
+/** Whether an option matches typed search text, already lower-cased. */
+const matchesSearch = (opt: LookupOption, lowerSearch: string): boolean => {
+  // Check primary text
+  if (opt.text.toLowerCase().includes(lowerSearch)) {
+    return true;
+  }
+  // Check searchFields (hidden searchable content)
+  if (opt.searchFields && opt.searchFields.toLowerCase().includes(lowerSearch)) {
+    return true;
+  }
+  // Check secondaryText only if it's a string
+  if (typeof opt.secondaryText === 'string') {
+    return opt.secondaryText.toLowerCase().includes(lowerSearch);
+  }
+  return false;
+};
+
+export { lookupClassNames };
 
 export const Lookup: React.FC<LookupProps> = ({
   id,
@@ -35,6 +49,7 @@ export const Lookup: React.FC<LookupProps> = ({
   noResultsMessage = 'No results found',
   clearable = true,
   readOnly = false,
+  inline = false,
   searchIcon = 'always',
   minSearchLength = 0,
   searchDebounceMs = 300,
@@ -67,6 +82,12 @@ export const Lookup: React.FC<LookupProps> = ({
   selectedKeys: selectedKeysProp,
   selectedOptions: selectedOptionsProp,
   onOptionsSelect,
+  hierarchical = false,
+  defaultExpanded = 'all',
+  onLoadChildren,
+  selectableParents = true,
+  showPath = false,
+  pathSeparator = ' › ',
   className,
   ...inputProps
 }) => {
@@ -102,6 +123,13 @@ export const Lookup: React.FC<LookupProps> = ({
   const [internalSelectedOption, setInternalSelectedOption] = React.useState<LookupOption | null>(null);
   // Multi-select internal state
   const [internalSelectedOptions, setInternalSelectedOptions] = React.useState<LookupOption[]>([]);
+  // Hierarchy: nodes opened or closed by hand, over the `defaultExpanded` setting
+  const [treeToggles, setTreeToggles] = React.useState<Map<string, boolean>>(new Map());
+  // Children fetched through onLoadChildren, kept beside the options handed in
+  const [loadedChildren, setLoadedChildren] = React.useState<LookupOption[]>([]);
+  const [loadingKeys, setLoadingKeys] = React.useState<Set<string>>(new Set());
+  // Nodes whose load has finished, so a node that came back empty loses its chevron
+  const [exhaustedKeys, setExhaustedKeys] = React.useState<Set<string>>(new Set());
 
   const inputRef = React.useRef<HTMLInputElement>(null);
   const inputWrapperRef = React.useRef<HTMLDivElement>(null);
@@ -124,20 +152,43 @@ export const Lookup: React.FC<LookupProps> = ({
   // Track whether position has been calculated to prevent flash at 0,0
   const [dropdownPositionReady, setDropdownPositionReady] = React.useState(false);
 
+  // The options handed in, plus any children loaded on expand that are not among them
+  const allOptions = React.useMemo(() => {
+    if (!hierarchical || loadedChildren.length === 0) return options;
+    const given = new Set(options.map((opt) => opt.key));
+    return [...options, ...loadedChildren.filter((opt) => !given.has(opt.key))];
+  }, [hierarchical, options, loadedChildren]);
+
+  const tree = React.useMemo(
+    () => (hierarchical ? buildHierarchy(allOptions, (opt) => opt.key, (opt) => opt.parentKey) : null),
+    [hierarchical, allOptions],
+  );
+
+  /**
+   * Every option this Lookup has been shown, by key, for the path of a chosen
+   * value. A server-side search replaces the options with each keystroke, and
+   * the chosen value's ancestors go with them - a path read only from the
+   * current options would shrink back to the bare name.
+   */
+  const knownOptionsRef = React.useRef(new Map<string, LookupOption>());
+  if (hierarchical && showPath) {
+    for (const opt of allOptions) knownOptionsRef.current.set(opt.key, opt);
+  }
+
   // Find the selected option - prefer props, fallback to internal state
   const selectedOption = React.useMemo(
-    () => selectedOptionProp ?? options.find((opt) => opt.key === selectedKey) ?? internalSelectedOption,
-    [selectedOptionProp, options, selectedKey, internalSelectedOption]
+    () => selectedOptionProp ?? allOptions.find((opt) => opt.key === selectedKey) ?? internalSelectedOption,
+    [selectedOptionProp, allOptions, selectedKey, internalSelectedOption]
   );
 
   // Multi-select: find all selected options - prefer props, fallback to internal state
   const selectedOptions = React.useMemo<LookupOption[]>(() => {
     if (selectedOptionsProp) return selectedOptionsProp;
     if (selectedKeysProp) {
-      return options.filter((opt) => selectedKeysProp.includes(opt.key));
+      return allOptions.filter((opt) => selectedKeysProp.includes(opt.key));
     }
     return internalSelectedOptions;
-  }, [selectedOptionsProp, selectedKeysProp, options, internalSelectedOptions]);
+  }, [selectedOptionsProp, selectedKeysProp, allOptions, internalSelectedOptions]);
 
   // Check if an option is selected (for multi-select mode)
   const isOptionSelected = React.useCallback(
@@ -151,32 +202,107 @@ export const Lookup: React.FC<LookupProps> = ({
     [multiSelect, maxSelection, selectedOptions.length]
   );
 
+  const isSearching = Boolean(searchText) && searchText.length >= minSearchLength;
+
+  /**
+   * The visible rows of a hierarchical list, depth first.
+   *
+   * While searching the tree is opened to show every match and can't be
+   * folded: a match tucked under a node the user once closed is a match they
+   * never see. A server-side search hands back its own matches with their
+   * ancestors, so then the whole of what came back is opened.
+   */
+  const treeRows = React.useMemo<HierarchyRow<LookupOption>[] | null>(() => {
+    if (!tree) return null;
+    const lowerSearch = searchText.toLowerCase();
+    const matches =
+      isSearching && !disableClientFilter
+        ? new Set(allOptions.filter((opt) => matchesSearch(opt, lowerSearch)).map((opt) => opt.key))
+        : null;
+    return flattenHierarchy(tree, {
+      matches,
+      isExpanded: (key, depth) =>
+        isSearching ? true : treeToggles.get(key) ?? expandedByDefault(defaultExpanded, depth),
+      hasMore: (opt) => Boolean(opt.hasChildren) && !exhaustedKeys.has(opt.key),
+    });
+  }, [tree, allOptions, searchText, isSearching, disableClientFilter, treeToggles, defaultExpanded, exhaustedKeys]);
+
   // Filter options based on search text (skip if disableClientFilter is true)
   const filteredOptions = React.useMemo(() => {
+    if (treeRows) {
+      return treeRows.map((row) => row.item);
+    }
     // When server-side filtering is used, skip client-side filter
     if (disableClientFilter) {
       return options;
     }
-    if (!searchText || searchText.length < minSearchLength) {
+    if (!isSearching) {
       return options;
     }
     const lowerSearch = searchText.toLowerCase();
-    return options.filter((opt) => {
-      // Check primary text
-      if (opt.text.toLowerCase().includes(lowerSearch)) {
-        return true;
+    return options.filter((opt) => matchesSearch(opt, lowerSearch));
+  }, [treeRows, options, searchText, isSearching, disableClientFilter]);
+
+  /** A parent that only opens and closes, because `selectableParents` is off. */
+  const isGroupOnly = React.useCallback(
+    (row: HierarchyRow<LookupOption> | undefined) => Boolean(row && !selectableParents && row.hasChildren),
+    [selectableParents],
+  );
+
+  /** Open or close a node, loading its children the first time if it has more to come. */
+  const setNodeExpanded = React.useCallback(
+    (row: HierarchyRow<LookupOption>, expanded: boolean) => {
+      if (isSearching || !row.hasChildren) return;
+      setTreeToggles((prev) => new Map(prev).set(row.key, expanded));
+
+      const hasLoadedChildren = (tree?.childrenOf.get(row.key)?.length ?? 0) > 0;
+      if (!expanded || hasLoadedChildren || !onLoadChildren || !row.item.hasChildren) return;
+      if (loadingKeys.has(row.key) || exhaustedKeys.has(row.key)) return;
+
+      setLoadingKeys((prev) => new Set(prev).add(row.key));
+      Promise.resolve(onLoadChildren(row.item))
+        .then((children) => {
+          // Returning nothing means the caller adds the children to `options`
+          if (!children) return;
+          setLoadedChildren((prev) => {
+            const next = new Map(prev.map((opt) => [opt.key, opt]));
+            for (const child of children) next.set(child.key, { ...child, parentKey: child.parentKey ?? row.key });
+            return [...next.values()];
+          });
+          setExhaustedKeys((prev) => new Set(prev).add(row.key));
+        })
+        .catch(() => {
+          // Closed again so a second expand retries, rather than an open node with nothing under it
+          setTreeToggles((prev) => new Map(prev).set(row.key, false));
+        })
+        .finally(() => {
+          setLoadingKeys((prev) => {
+            const next = new Set(prev);
+            next.delete(row.key);
+            return next;
+          });
+        });
+    },
+    [isSearching, tree, onLoadChildren, loadingKeys, exhaustedKeys],
+  );
+
+  /** What a chosen value reads as: its name, or with `showPath` its ancestors too. */
+  const displayTextOf = React.useCallback(
+    (opt: LookupOption): string => {
+      if (!hierarchical || !showPath) return opt.text;
+      const known = knownOptionsRef.current;
+      const parts = [opt.text];
+      const seen = new Set([opt.key]);
+      let parent = opt.parentKey ? known.get(opt.parentKey) : undefined;
+      while (parent && !seen.has(parent.key)) {
+        parts.unshift(parent.text);
+        seen.add(parent.key);
+        parent = parent.parentKey ? known.get(parent.parentKey) : undefined;
       }
-      // Check searchFields (hidden searchable content)
-      if (opt.searchFields && opt.searchFields.toLowerCase().includes(lowerSearch)) {
-        return true;
-      }
-      // Check secondaryText only if it's a string
-      if (typeof opt.secondaryText === 'string') {
-        return opt.secondaryText.toLowerCase().includes(lowerSearch);
-      }
-      return false;
-    });
-  }, [options, searchText, minSearchLength, disableClientFilter]);
+      return parts.join(pathSeparator);
+    },
+    [hierarchical, showPath, pathSeparator],
+  );
 
   const highlightedOptionId = React.useMemo(() => {
     if (!isOpen || highlightedIndex < 0 || highlightedIndex >= filteredOptions.length) {
@@ -328,9 +454,44 @@ export const Lookup: React.FC<LookupProps> = ({
         case 'Enter':
           e.preventDefault();
           if (isOpen && highlightedIndex >= 0 && filteredOptions[highlightedIndex]) {
-            handleSelectOption(filteredOptions[highlightedIndex]);
+            const row = treeRows?.[highlightedIndex];
+            if (row && isGroupOnly(row)) {
+              setNodeExpanded(row, !row.expanded);
+            } else {
+              handleSelectOption(filteredOptions[highlightedIndex]);
+            }
           }
           break;
+
+        // Tree keys, once a row is highlighted - before that the caret owns them
+        case 'ArrowRight': {
+          const row = isOpen ? treeRows?.[highlightedIndex] : undefined;
+          if (!row || !row.hasChildren) break;
+          e.preventDefault();
+          if (!row.expanded) {
+            setNodeExpanded(row, true);
+          } else if ((treeRows?.[highlightedIndex + 1]?.depth ?? -1) > row.depth) {
+            setHighlightedIndex(highlightedIndex + 1);
+          }
+          break;
+        }
+
+        case 'ArrowLeft': {
+          const row = isOpen ? treeRows?.[highlightedIndex] : undefined;
+          if (!row) break;
+          if (row.expanded && !isSearching) {
+            e.preventDefault();
+            setNodeExpanded(row, false);
+            break;
+          }
+          const parentKey = tree?.parentOf.get(row.key);
+          const parentIndex = parentKey ? treeRows!.findIndex((r) => r.key === parentKey) : -1;
+          if (parentIndex >= 0) {
+            e.preventDefault();
+            setHighlightedIndex(parentIndex);
+          }
+          break;
+        }
 
         case 'Escape':
           e.preventDefault();
@@ -365,6 +526,11 @@ export const Lookup: React.FC<LookupProps> = ({
       isOpen,
       highlightedIndex,
       filteredOptions,
+      treeRows,
+      tree,
+      isSearching,
+      isGroupOnly,
+      setNodeExpanded,
       handleSelectOption,
       openDropdown,
       closeDropdown,
@@ -637,7 +803,7 @@ export const Lookup: React.FC<LookupProps> = ({
   );
 
   return (
-    <div className={mergeClasses(styles.root, className)}>
+    <div className={mergeClasses(styles.root, inline && styles.inline, className)}>
       <div
         className={mergeClasses(
           lookupClassNames.field,
@@ -707,10 +873,10 @@ export const Lookup: React.FC<LookupProps> = ({
                       : undefined
                   }
                 >
-                  {opt.text}
+                  {displayTextOf(opt)}
                 </span>
               ) : (
-                <Tooltip content={opt.text} relationship="label" withArrow>
+                <Tooltip content={displayTextOf(opt)} relationship="label" withArrow>
                   <span
                     className={mergeClasses(
                       styles.inlineBadgeText,
@@ -741,11 +907,12 @@ export const Lookup: React.FC<LookupProps> = ({
                         : undefined
                     }
                   >
-                    {opt.text}
+                    {displayTextOf(opt)}
                   </span>
                 </Tooltip>
               )}
-              {!disabled && clearable && (
+              {/* Read-only loses the dismiss too: removing the value is changing it */}
+              {!disabled && !readOnly && clearable && (
                 <button
                   type="button"
                   className={styles.inlineBadgeDismiss}
@@ -780,7 +947,7 @@ export const Lookup: React.FC<LookupProps> = ({
               placeholder={badgeItems.length > 0 ? '' : placeholder}
               disabled={disabled}
               aria-expanded={isOpen}
-              aria-haspopup="listbox"
+              aria-haspopup={hierarchical ? 'tree' : 'listbox'}
               aria-controls={isOpen ? `${lookupId}-listbox` : undefined}
               aria-autocomplete="list"
               aria-activedescendant={highlightedOptionId}
@@ -825,7 +992,7 @@ export const Lookup: React.FC<LookupProps> = ({
               id={`${lookupId}-listbox`}
               className={styles.dropdownContent}
               ref={dropdownRef}
-              role="listbox"
+              role={hierarchical ? 'tree' : 'listbox'}
               aria-labelledby={lookupId}
             >
               {header && (
@@ -850,6 +1017,14 @@ export const Lookup: React.FC<LookupProps> = ({
                         : option.key === selectedOption?.key;
                       // In multiSelect mode, disable option if max reached and not already selected
                       const isDisabledByMax = multiSelect && isMaxSelectionReached && !isSelected;
+                      const row = treeRows?.[index];
+                      const groupOnly = isGroupOnly(row);
+                      const isLoadingChildren = Boolean(row && loadingKeys.has(row.key));
+
+                      const handleToggleClick = (e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        if (row) setNodeExpanded(row, !row.expanded);
+                      };
 
                       const handleExpandClick = (e: React.MouseEvent) => {
                         e.stopPropagation();
@@ -869,21 +1044,44 @@ export const Lookup: React.FC<LookupProps> = ({
                         <div
                           key={option.key}
                           id={`${lookupId}-option-${option.key}`}
-                          role="option"
+                          role={row ? 'treeitem' : 'option'}
                           data-index={index}
-                          aria-selected={isSelected}
+                          aria-selected={groupOnly ? undefined : isSelected}
                           aria-disabled={option.disabled || isDisabledByMax || undefined}
+                          aria-level={row ? row.depth + 1 : undefined}
+                          aria-expanded={row?.hasChildren ? row.expanded : undefined}
+                          aria-busy={isLoadingChildren || undefined}
                           className={mergeClasses(
                             styles.option,
                             index === highlightedIndex && styles.optionHighlighted,
                             isSelected && styles.optionSelected,
                             (option.disabled || isDisabledByMax) && styles.optionDisabled
                           )}
-                          onClick={() => handleSelectOption(option)}
+                          onClick={() => (groupOnly && row ? setNodeExpanded(row, !row.expanded) : handleSelectOption(option))}
                           onMouseEnter={() => setHighlightedIndex(index)}
                         >
+                          {/* Tree indent and chevron. A leaf keeps the chevron's room, so names at one level line up */}
+                          {row && (
+                            <span
+                              className={mergeClasses(
+                                styles.treeToggle,
+                                !!option.secondaryText && styles.treeToggleWithSecondary,
+                                row.expanded && styles.treeToggleExpanded,
+                                isSearching && styles.treeToggleFixed
+                              )}
+                              style={{ marginLeft: row.depth * TREE_INDENT }}
+                              onClick={row.hasChildren ? handleToggleClick : undefined}
+                              aria-hidden
+                            >
+                              {isLoadingChildren ? (
+                                <Spinner size="extra-tiny" />
+                              ) : (
+                                row.hasChildren && <ChevronRightRegular />
+                              )}
+                            </span>
+                          )}
                           {/* Show checkbox in multiSelect mode */}
-                          {multiSelect && (
+                          {multiSelect && !groupOnly && (
                             <span className={mergeClasses(
                               styles.optionCheckbox,
                               !!option.secondaryText && styles.optionCheckboxWithSecondary
@@ -903,7 +1101,11 @@ export const Lookup: React.FC<LookupProps> = ({
                             )}>{option.icon}</span>
                           )}
                           <span className={styles.optionContent}>
-                            <span className={styles.optionText}>{option.text}</span>
+                            <span className={mergeClasses(
+                              styles.optionText,
+                              row?.isContext && styles.optionTextContext,
+                              groupOnly && styles.optionTextGroup
+                            )}>{option.text}</span>
                             {option.secondaryText && (
                               <span className={styles.optionSecondaryText}>
                                 {option.secondaryText}

@@ -10,6 +10,7 @@ import {
   formatTimeOnlyValue,
   parseTimeOnlyValue,
   parseStoredValue,
+  placePopup,
   withTime,
 } from './DateTimeField.utils';
 
@@ -193,5 +194,46 @@ describe('isDayFirst', () => {
   it('follows the display pattern over the locale', () => {
     expect(isDayFirst('MM/dd/yyyy', 'en-AU')).toBe(false);
     expect(isDayFirst('dd MMM yyyy', 'en-US')).toBe(true);
+  });
+});
+
+describe('placePopup', () => {
+  const viewport = { width: 1000, height: 800 };
+  const popup = { width: 400, height: 300 };
+  const field = (left: number, top: number, width = 200, height = 32) =>
+    ({ left, right: left + width, top, bottom: top + height });
+
+  it('opens below the field, left edges aligned, when it fits', () => {
+    expect(placePopup(field(100, 100), popup, viewport)).toEqual({ top: 136, left: 100 });
+  });
+
+  it('lines up with the field\'s right edge rather than run off the right of the screen', () => {
+    // A field in the last column of a filter bar.
+    const placed = placePopup(field(760, 100), popup, viewport);
+    expect(placed.left).toBe(960 - 400);
+    expect(placed.left + popup.width).toBeLessThanOrEqual(viewport.width);
+  });
+
+  it('is pushed in from the edge when even that does not fit', () => {
+    // A field that itself runs past the right edge.
+    const placed = placePopup(field(950, 100, 100), popup, viewport);
+    expect(placed.left).toBe(viewport.width - popup.width - 8);
+  });
+
+  it('never starts off the left of the screen', () => {
+    expect(placePopup(field(2, 100), { width: 990, height: 300 }, viewport).left).toBe(8);
+  });
+
+  it('opens above the field when there is no room below but there is above', () => {
+    const placed = placePopup(field(100, 700), popup, viewport);
+    expect(placed.top).toBe(700 - 4 - 300);
+  });
+
+  it('stays below when there is no room above either', () => {
+    expect(placePopup(field(100, 200), { width: 400, height: 700 }, viewport).top).toBe(236);
+  });
+
+  it('adds the scroll offset, for a popup placed in document coordinates', () => {
+    expect(placePopup(field(100, 100), popup, viewport, { x: 10, y: 500 })).toEqual({ top: 636, left: 110 });
   });
 });

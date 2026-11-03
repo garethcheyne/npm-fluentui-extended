@@ -74,8 +74,20 @@ export const RecordHoverCard: React.FC<RecordHoverCardProps> = ({
     setError(null);
   }, [entityName, recordId, providedRecord]);
 
+  /**
+   * Read at call time rather than depended on. Hosts pass these inline - a
+   * `columns={['a', 'b']}` literal is a new array every render - and a load
+   * keyed on their identity re-ran on every render while the card stayed open,
+   * which after a failure meant a request per render, without end. The column
+   * *list* is still a dependency, so a real change of columns does reload.
+   */
+  const latest = React.useRef({ columns, mapRecord, onLoadError });
+  latest.current = { columns, mapRecord, onLoadError };
+  const columnsKey = columns?.join(',') ?? '';
+
   const loadRecord = React.useCallback(async () => {
     if (providedRecord || loadedRef.current || !entityName || !recordId) return;
+    const { columns, mapRecord, onLoadError } = latest.current;
 
     loadedRef.current = true;
     setLoading(true);
@@ -89,6 +101,9 @@ export const RecordHoverCard: React.FC<RecordHoverCardProps> = ({
 
       const raw = await webApiGet<Record<string, unknown>>(
         `${definition.EntitySetName}(${recordId})?$select=${select}`,
+        // Without this Dynamics sends no formatted values, and the card shows
+        // a lookup as its GUID and a choice as its number
+        { headers: { Prefer: 'odata.include-annotations="OData.Community.Display.V1.FormattedValue"' } },
       );
 
       if (disposedRef.current) return;
@@ -133,7 +148,9 @@ export const RecordHoverCard: React.FC<RecordHoverCardProps> = ({
     } finally {
       if (!disposedRef.current) setLoading(false);
     }
-  }, [providedRecord, entityName, recordId, columns, mapRecord, onLoadError]);
+    // columnsKey stands in for `columns`, which is read through `latest`
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [providedRecord, entityName, recordId, columnsKey]);
 
   const handleOpenChange = React.useCallback(
     (_: unknown, data: { open: boolean }) => {

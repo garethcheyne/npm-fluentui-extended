@@ -118,10 +118,11 @@ async function main() {
     }
 
     console.log('\nRunning checks...');
-    run('npm run typecheck');
-    run('npm test');
+    run('pnpm run typecheck');
+    run('pnpm test');
 
     console.log('\nBumping patch version and creating tag...');
+    // npm, not pnpm: `npm version` only bumps package.json and tags, and needs no lockfile
     const tag = run('npm version patch -m "chore(release): %s"', { capture: true });
 
     console.log(`Created ${tag}`);

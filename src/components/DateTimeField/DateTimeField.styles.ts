@@ -1,6 +1,46 @@
 import { makeStyles, tokens } from '@fluentui/react-components';
 
+/**
+ * Stable class names on the field's parts, for a host that has to restyle
+ * them. Griffel's own classes are hashed, so they cannot be targeted.
+ */
+export const dateTimeFieldClassNames = {
+  /** The box that looks like an input: fill, border and icons. */
+  field: 'fue-DateTimeField__field',
+  /** The clear (×) button. */
+  clear: 'fue-DateTimeField__clear',
+  /** The calendar / clock button. */
+  icon: 'fue-DateTimeField__icon',
+} as const;
+
+const field = `.${dateTimeFieldClassNames.field}`;
+const buttons = `& .${dateTimeFieldClassNames.clear}, & .${dateTimeFieldClassNames.icon}`;
+
 export const useDateTimeFieldStyles = makeStyles({
+  /**
+   * `inline`: the date without the field box, in every state. The clear and
+   * calendar buttons are chrome too - drawn on every row they turn a column of
+   * dates into a column of controls - so they come back on hover and focus.
+   *
+   * Named on the field's hover and focus states as well as its rest, which
+   * otherwise win: they are inserted after plain rules.
+   */
+  inline: {
+    [`& ${field}, & ${field}:hover, & ${field}:focus-within`]: {
+      backgroundColor: 'transparent',
+      borderTopColor: 'transparent',
+      borderRightColor: 'transparent',
+      borderBottomColor: 'transparent',
+      borderLeftColor: 'transparent',
+      borderBottomWidth: '1px',
+      // The width of a plain input's own inset, so the date lines up with text beside it
+      paddingLeft: '2px',
+    },
+    [buttons]: { opacity: 0 },
+    ':hover': { [buttons]: { opacity: 1 } },
+    ':focus-within': { [buttons]: { opacity: 1 } },
+  },
+
   root: {
     display: 'flex',
     flexDirection: 'column',

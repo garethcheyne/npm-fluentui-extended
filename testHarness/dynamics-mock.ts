@@ -9,17 +9,16 @@
 const DYNAMICS_URL = (import.meta.env.VITE_DYNAMICS_URL as string)?.replace(/\/$/, '');
 const CLIENT_ID = import.meta.env.VITE_AZURE_CLIENT_ID as string;
 const TENANT_ID = import.meta.env.VITE_AZURE_TENANT_ID as string;
-const CLIENT_SECRET = import.meta.env.VITE_AZURE_CLIENT_SECRET as string;
 
-// Validate configuration
+// Validate configuration. The client secret is not checked here: it lives only
+// on the dev server (AZURE_CLIENT_SECRET, unprefixed, so Vite never sends it to
+// the browser), and a missing one shows up as the token request failing.
 const isConfigured = !!(
   DYNAMICS_URL &&
   CLIENT_ID &&
   TENANT_ID &&
-  CLIENT_SECRET &&
   !DYNAMICS_URL.includes('yourorg') &&
-  !CLIENT_ID.includes('your-azure') &&
-  !CLIENT_SECRET.includes('your-client-secret')
+  !CLIENT_ID.includes('your-azure')
 );
 
 // Connection state (persisted in sessionStorage)

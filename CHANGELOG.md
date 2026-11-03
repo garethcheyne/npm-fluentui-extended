@@ -2,6 +2,66 @@
 
 > Version format: `YYYY.M.DD` (e.g., `2026.8.30` = August 30, 2026)
 
+## 2026.11.4
+
+**Hierarchies**
+
+- ✨ **Hierarchical Lookup.** `hierarchical` shows options as a tree from each option's
+  `parentKey`; the level is worked out, not passed. Search keeps each match with its ancestors,
+  dimmed. `defaultExpanded`, `onLoadChildren` (with `hasChildren`) for trees loaded on demand,
+  `selectableParents`, `showPath` / `pathSeparator`. ← / → open and close nodes; the popup is an
+  ARIA tree.
+- ✨ **`useHierarchyLookup(table)`** wires a Lookup to a Dataverse table's own hierarchy (account →
+  parent account, business unit, custom tables), reading the parent column from metadata. Built on
+  the new `getHierarchyRelationship`, `getHierarchyChildren` and `searchHierarchy`.
+- ✨ **Hierarchical OptionSetField**: `hierarchical`, `parentValue`, `getParentValue` for options
+  loaded from metadata, `selectableParents`, `showPath`.
+
+**Fields inside a cell**
+
+- ✨ **`inline`** on `Lookup`, `OptionSetField` and `DateTimeField` draws the value with no field
+  box in any state, for a host that draws its own focus ring - a grid cell, a list row.
+- 💄 **DataGrid editors no longer draw a box inside the cell.** Lookup, choice and date editors use
+  `inline`; number and text inputs drop their own fill; the active cell itself turns white inside
+  its ring, as in a Dynamics editable grid. A date cell's clear and calendar buttons show on hover
+  and focus only. Unit affixes (`$`, `%`) are plain text, not grey chips.
+- ✨ **DataGrid lookup header and footer.** `lookupHeader` / `lookupFooter` on a lookup column, each a
+  node or a function of the cell and the search in progress (`DataGridLookupSearch`).
+- 🐛 Checkboxes sit centred in their cell.
+- 🐛 Numbers edit at the decimal places they display, and opening a cell without typing writes
+  nothing back. `percent` defaults to 2 places, like money and decimal, and does not repeat its
+  `%` when the column has a `suffix`. A value too wide for its column ends in an ellipsis rather
+  than losing its last digits.
+
+**Fixes**
+
+- 🐛 **DateTimeField: clearing works.** Clicking × left the field "focused" for good, so the old
+  date stayed on screen and was written back the next time the field lost focus.
+- 🐛 **DateTimeField: the popup stays on screen** near the right or bottom edge of the page.
+- 🐛 **QueryBuilder uses the shared Web API client**, so `setWebApiBaseUrl` / `setWebApiFetch`
+  apply to it. It keeps an imported query's `top` and `no-lock` through edits, and no longer offers
+  attributes hidden from Advanced Find.
+- 🐛 **EntityGrid** shows lookup columns named by logical name (`primarycontactid`), requesting them
+  as `_primarycontactid_value`.
+- 🐛 **SystemUserPersona** given only a `userId` loads straight away instead of reading "Unnamed
+  user", and users are cached by id, so a column of personas requests each person once
+  (`clearSystemUserCache` is exported). With neither `userId` nor `user` it renders nothing.
+- 🐛 **RecordHoverCard** shows lookup and choice columns by name and label (it now asks for formatted
+  values), and no longer retries in a loop after a failure while open.
+- 🐛 A `readOnly` Lookup no longer offers to clear its value.
+- 🐛 **ParentPortal** inherits the app's theme instead of forcing light, removes its container from
+  the host page when the last portal unmounts, and drops mirrored styles the app has removed.
+- 🐛 FluentShell's debug report describes the frame the shell measured.
+
+**Tooling and docs**
+
+- 🔧 The repo builds and publishes with **pnpm**.
+- 📝 An **agent skill** ships in `skills/fluentui-extended/` - which component to use, how to keep the
+  native Dynamics look, Dataverse rules, and a reference for every component.
+- 📝 The README fits npm's 64 KB limit: the QueryBuilder guide and the Lookup examples moved to
+  `docs/`.
+- ✅ Tests for every component.
+
 ## 2026.11.3
 
 DataGrid work driven by a 38,000-row price list.

@@ -10,6 +10,7 @@
  *
  * 2. **Advanced Props**
  *    - allowFreeType: Direct keyboard input with natural parsing
+ *    - closeOnSelect: Turn off to keep the popup open until Done
  *    - timeFormat: 12h or 24h display
  *    - minTime/maxTime: Restricted time windows
  *    - timeOnly: Time picker without calendar
@@ -52,6 +53,7 @@ export function DateTimeFieldExamples({ dynamicsConnected }: ExampleProps) {
 
   // Advanced Props section - individual state for each example
   const [freeTypeValue, setFreeTypeValue] = useState<string | null>(null);
+  const [confirmValue, setConfirmValue] = useState<string | null>(null);
   const [format12hValue, setFormat12hValue] = useState<string | null>(null);
   const [format24hValue, setFormat24hValue] = useState<string | null>(null);
   const [restrictedTimeValue, setRestrictedTimeValue] = useState<string | null>(null);
@@ -213,6 +215,23 @@ export function DateTimeFieldExamples({ dynamicsConnected }: ExampleProps) {
             />
             <pre style={{ margin: '12px 0 0', fontSize: 12, color: '#666', whiteSpace: 'pre-wrap' }}>
               Stored: {freeTypeValue ?? '(empty)'}
+            </pre>
+          </div>
+
+          {/* closeOnSelect={false} */}
+          <div style={{ border: '1px solid #e1dfdd', borderRadius: 8, padding: 16, background: '#fff' }}>
+            <h4 style={{ margin: '0 0 8px' }}>Confirm with Done</h4>
+            <p style={{ fontSize: 12, color: '#666', marginBottom: 12 }}>
+              <code>closeOnSelect={'{false}'}</code> — The popup stays open after a pick until Done is clicked.
+            </p>
+            <DateTimeField
+              label="Pick, then Done"
+              closeOnSelect={false}
+              value={confirmValue}
+              onChange={setConfirmValue}
+            />
+            <pre style={{ margin: '12px 0 0', fontSize: 12, color: '#666', whiteSpace: 'pre-wrap' }}>
+              Stored: {confirmValue ?? '(empty)'}
             </pre>
           </div>
 

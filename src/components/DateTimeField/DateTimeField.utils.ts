@@ -475,3 +475,46 @@ export const formatDisplayValue = (
 
   return dateStr;
 };
+
+/** A box, in viewport coordinates. */
+export interface PopupRect {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
+/**
+ * Where to put the date/time popup so all of it is on screen.
+ *
+ * It opens below the field, left edges aligned — unless that would run past the
+ * right of the viewport, when it lines up with the field's right edge instead,
+ * and failing that is pushed in from the edge. It opens above the field when
+ * there is no room below but there is above. Viewport coordinates in, document
+ * coordinates out (the scroll offset added), as an absolutely-placed portal needs.
+ *
+ * A field near the right of a page — a filter bar's last column, say — used to
+ * open its calendar half off screen, because the popup was always placed at the
+ * field's bottom-left corner whatever its size.
+ */
+export function placePopup(
+  anchor: PopupRect,
+  popup: { width: number; height: number },
+  viewport: { width: number; height: number },
+  scroll: { x: number; y: number } = { x: 0, y: 0 },
+  gap = 4,
+  margin = 8,
+): { top: number; left: number } {
+  let left = anchor.left;
+  if (left + popup.width > viewport.width - margin) {
+    left = anchor.right - popup.width;
+  }
+  left = Math.max(margin, Math.min(left, viewport.width - popup.width - margin));
+
+  let top = anchor.bottom + gap;
+  const fitsBelow = top + popup.height <= viewport.height - margin;
+  const above = anchor.top - gap - popup.height;
+  if (!fitsBelow && above >= margin) top = above;
+
+  return { top: top + scroll.y, left: left + scroll.x };
+}

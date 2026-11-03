@@ -51,6 +51,37 @@ The two shadow variants are deprecated in Fluent and will be removed there. They
 existing callers keep working, but `Combobox` and `Dropdown` never supported them, so a component
 containing those narrows to the closest non-shadow fill rather than dropping the value.
 
+### Fields inside a cell
+
+On a form, a field draws its own box. Inside something that is itself the control — a grid cell, a
+list row — that box sits inside the host's own focus ring and reads as a window within a window.
+`Lookup`, `OptionSetField` and `DateTimeField` take `inline` for that case: the value alone, no fill,
+border or underline in any state, with the chevron or the date buttons coming back on hover and
+focus. The host draws the ring. `DataGrid` draws its own editors this way.
+
+```tsx
+<td className="my-cell">
+  <OptionSetField inline size="small" options={options} value={value} onChange={setValue} />
+</td>
+```
+
+## Using with AI coding agents
+
+The package ships an agent skill in `skills/fluentui-extended/`: which component to reach for, how
+to keep a page looking like native Dynamics 365 (a field on a form versus a value in a grid cell, dialogs
+in a web resource, the shell around it), the Dataverse rules the components rely on, and a reference
+for every component and Web API helper.
+
+For Claude Code, copy it into your project's skills folder:
+
+```bash
+mkdir -p .claude/skills
+cp -r node_modules/fluentui-extended/skills/fluentui-extended .claude/skills/
+```
+
+Other agents can be pointed at `node_modules/fluentui-extended/skills/fluentui-extended/SKILL.md`
+directly; it is plain Markdown, with the detail in the `references/` folder beside it.
+
 ## New here? Run the harness
 
 The fastest way to understand this library is to see every component working, in a simulated
@@ -59,8 +90,8 @@ Dynamics 365 form, with the code beside it:
 ```bash
 git clone https://github.com/garethcheyne/npm-fluentui-extended.git
 cd npm-fluentui-extended
-npm install
-npm run harness
+pnpm install
+pnpm run harness
 ```
 
 That opens a mock model-driven app — top bar, sitemap, record form — with each component on its own
@@ -77,6 +108,8 @@ No Dynamics connection is needed; the examples run on mock data. To point them a
 
 A searchable dropdown component styled after Dynamics 365 lookup fields. Supports async search, expandable option details, and customizable header/footer.
 
+**[Worked examples &rarr;](https://github.com/garethcheyne/npm-fluentui-extended/blob/main/docs/Lookup.md)** - async search, icons and details, header and footer, multi-entity lookups. Props are in the [API Reference](#api-reference).
+
 ![Lookup resolved](assets/screenshot-lookup-rest.png)
 
 ![Lookup open](assets/screenshot-lookup-open.png)
@@ -84,6 +117,8 @@ A searchable dropdown component styled after Dynamics 365 lookup fields. Support
 ### QueryBuilder
 
 An Advanced Find-style query builder for Dynamics 365. Build complex filter conditions with AND/OR logic, serialize to FetchXML or OData, and validate queries against the Dynamics 365 API.
+
+**[Read more &rarr;](https://github.com/garethcheyne/npm-fluentui-extended/blob/main/docs/QueryBuilder.md)** - usage, loading and reading FetchXML, queries OData cannot express, props and the programmatic API.
 
 ![QueryBuilder](assets/screenshot-querybuilder.png)
 
@@ -251,25 +286,36 @@ Renders Fluent UI content in the **parent document**, escaping an iframe boundar
 
 **Solution:** `ParentPortal` creates a container in `window.parent.document`, syncs all Griffel CSSOM rules to the parent, and copies Fluent theme tokens — so components render fully styled in the parent page.
 
+A `DialogSurface` portals itself, so it takes the parent document's mount node from
+`useParentPortalMount()` rather than being wrapped. `<ParentPortal>` is for content that does not
+portal on its own.
+
 ```tsx
 import { Dialog, DialogSurface, DialogBody, DialogTitle, DialogContent } from '@fluentui/react-components';
-import { ParentPortal } from 'fluentui-extended';
+import { ParentPortal, useParentPortalMount } from 'fluentui-extended';
 
-function MyDialog({ open, onClose }) {
+function MyDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const mountNode = useParentPortalMount();
   return (
     <Dialog open={open} onOpenChange={(_, d) => !d.open && onClose()}>
-      <ParentPortal>
-        <DialogSurface backdrop={{ appearance: 'dimmed' }}>
-          <DialogBody>
-            <DialogTitle>Escaped the iframe</DialogTitle>
-            <DialogContent>
-              This dialog renders in the parent D365 document with full
-              Fluent styling — no scrollbars, no forced iframe resize.
-            </DialogContent>
-          </DialogBody>
-        </DialogSurface>
-      </ParentPortal>
+      <DialogSurface mountNode={mountNode}>
+        <DialogBody>
+          <DialogTitle>Escaped the iframe</DialogTitle>
+          <DialogContent>
+            This dialog renders in the parent D365 document with full
+            Fluent styling — no scrollbars, no forced iframe resize.
+          </DialogContent>
+        </DialogBody>
+      </DialogSurface>
     </Dialog>
+  );
+}
+
+function Banner() {
+  return (
+    <ParentPortal>
+      <div>Rendered in the parent document</div>
+    </ParentPortal>
   );
 }
 ```
@@ -384,200 +430,9 @@ function App() {
 }
 ```
 
-## Features
-
-### Basic Selection (with key)
-
-```tsx
-const [selectedKey, setSelectedKey] = useState<string | null>(null);
-
-<Lookup
-  options={options}
-  selectedKey={selectedKey}
-  onOptionSelect={(opt) => setSelectedKey(opt?.key ?? null)}
-  placeholder="Search..."
-/>
-```
-
-### Async Search (API Integration)
-
-For async scenarios, use `selectedOption` to persist the display value when options change:
-
-```tsx
-function AsyncLookup() {
-  const [options, setOptions] = useState<LookupOption[]>([]);
-  const [selected, setSelected] = useState<LookupOption | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const handleSearch = async (searchText: string) => {
-    setLoading(true);
-    const response = await fetch(`/api/accounts?search=${searchText}`);
-    setOptions(await response.json());
-    setLoading(false);
-  };
-
-  return (
-    <Lookup
-      options={options}
-      selectedOption={selected}
-      onOptionSelect={setSelected}
-      onSearchChange={handleSearch}
-      loading={loading}
-      searchDebounceMs={300}
-      placeholder="Type to search..."
-    />
-  );
-}
-```
-
-### With Icons and Expandable Details
-
-Options can include icons and expandable detail rows (click chevron to expand):
-
-```tsx
-import { BuildingRegular } from '@fluentui/react-icons';
-
-const options: LookupOption[] = [
-  {
-    key: '1',
-    text: 'Contoso Ltd',
-    secondaryText: 'CON001',
-    icon: <BuildingRegular />,
-    details: [
-      { label: 'Phone', value: '555-0100' },
-      { label: 'Industry', value: 'Technology' },
-      { value: 'Active Customer' },
-    ],
-    data: { id: 'acc-001', revenue: 5000000 }, // Custom data accessible in onOptionSelect
-  },
-];
-```
-
-### Dynamics 365 Style (Header & Footer)
-
-```tsx
-import { Text, Button, Link } from '@fluentui/react-components';
-import { AddRegular, PersonSearchRegular } from '@fluentui/react-icons';
-
-<Lookup
-  options={options}
-  selectedOption={selected}
-  onOptionSelect={setSelected}
-  header={
-    <>
-      <Text size={200}>Accounts</Text>
-      <Button appearance="outline" size="small">Recent records</Button>
-    </>
-  }
-  footer={
-    <>
-      <Link style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <AddRegular /> New
-      </Link>
-      <Link style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <PersonSearchRegular /> Advanced
-      </Link>
-    </>
-  }
-/>
-```
-
-### Multi-Entity Lookup with Filter Buttons
-
-Replicate the native Dynamics 365 lookup pattern where users can filter between entity types:
-
-```tsx
-import { Text, Button, Link, ToggleButton } from '@fluentui/react-components';
-import { BuildingRegular, PersonRegular, ArrowLeftRegular } from '@fluentui/react-icons';
-
-function MultiEntityLookup() {
-  const [showAccounts, setShowAccounts] = useState(true);
-  const [showContacts, setShowContacts] = useState(true);
-
-  const options: LookupOption[] = [
-    { key: 'acc-1', text: 'Contoso Ltd', icon: <BuildingRegular />, details: [...] },
-    { key: 'con-1', text: 'John Smith', icon: <PersonRegular />, details: [...] },
-  ];
-
-  // Filter based on key prefix
-  const filteredOptions = useMemo(() => 
-    options.filter(opt => {
-      if (opt.key.startsWith('acc-')) return showAccounts;
-      if (opt.key.startsWith('con-')) return showContacts;
-      return true;
-    }), [showAccounts, showContacts]
-  );
-
-  return (
-    <Lookup
-      options={filteredOptions}
-      header={
-        // Drill-down view when single entity selected
-        showAccounts !== showContacts ? (
-          <>
-            <Link onClick={() => { setShowAccounts(true); setShowContacts(true); }}>
-              <ArrowLeftRegular /> All
-            </Link>
-            <Text weight="semibold">{showAccounts ? 'Accounts' : 'Contacts'}</Text>
-          </>
-        ) : (
-          // Filter toggles when showing all
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Text size={200}>Results from:</Text>
-              <ToggleButton size="small" checked={showAccounts}
-                onClick={() => { setShowAccounts(true); setShowContacts(false); }}>
-                Accounts
-              </ToggleButton>
-              <ToggleButton size="small" checked={showContacts}
-                onClick={() => { setShowAccounts(false); setShowContacts(true); }}>
-                Contacts
-              </ToggleButton>
-            </div>
-            <Button size="small">Recent records</Button>
-          </>
-        )
-      }
-    />
-  );
-}
-```
-
-### Rich Secondary Text with React Elements
-
-Both `secondaryText` and `details` support React elements, not just strings:
-
-```tsx
-import { Badge } from '@fluentui/react-components';
-import { CheckmarkCircleRegular } from '@fluentui/react-icons';
-
-const options: LookupOption[] = [
-  {
-    key: '1',
-    text: 'John Smith',
-    secondaryText: (
-      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Badge appearance="tint" color="success" size="small" icon={<CheckmarkCircleRegular />}>
-          Active
-        </Badge>
-        <span>john.smith@contoso.com</span>
-      </span>
-    ),
-    icon: <PersonRegular />,
-    details: [
-      { label: 'Status', value: <Badge appearance="filled" color="success" size="small">Verified</Badge> },
-      { label: 'Role', value: <Badge appearance="tint" color="brand" size="small">Decision Maker</Badge> },
-      { value: <span style={{ color: '#0078d4' }}>View full profile →</span> },
-    ],
-  },
-];
-```
-
----
-
 ## Test Harness Examples
 
-Run the test harness with `npm run harness` to see all examples in action. The harness is split into
+Run the test harness with `pnpm run harness` to see all examples in action. The harness is split into
 one tab per component, so each can be viewed and screenshotted on its own.
 
 | Example | Tab | Description |
@@ -717,6 +572,7 @@ that same surface.
 | `loading` | `boolean` | `false` | Show loading spinner |
 | `noResultsMessage` | `string` | `'No results found'` | Empty state message |
 | `clearable` | `boolean` | `true` | Show clear button |
+| `inline` | `boolean` | `false` | Draw as the value with no field box, for a host that draws the focus ring (a grid cell, a list row). See [Fields inside a cell](#fields-inside-a-cell) |
 | `minSearchLength` | `number` | `0` | Min chars before search fires |
 | `searchDebounceMs` | `number` | `300` | Search debounce delay (ms) |
 | `matchInputWidth` | `boolean` | `true` | Match dropdown width to input width |
@@ -733,6 +589,12 @@ that same surface.
 | `hoverCardDelayMs` | `number` | `400` | Hover-intent delay before opening the card |
 | `hoverCardActions` | `ReactNode` | - | Footer actions rendered on the card |
 | `searchFields` | `string` | - | Hidden searchable text (never rendered). Use this to include additional searchable content (codes, IDs) while displaying JSX in `secondaryText` |
+| `hierarchical` | `boolean` | `false` | Show options as a tree from each option's `parentKey`. See [Hierarchical Lookup](#hierarchical-lookup) |
+| `defaultExpanded` | `'all' \| 'none' \| number` | `'all'` | Levels open to start with; `1` opens the top level only |
+| `onLoadChildren` | `(option) => Promise<LookupOption[] \| void>` | - | Load a node's children the first time it opens (options with `hasChildren`) |
+| `selectableParents` | `boolean` | `true` | Off, a parent only opens and closes; only the bottom level can be chosen |
+| `showPath` | `boolean` | `false` | Show the chosen value with its ancestors, e.g. `Electrical › Lighting` |
+| `pathSeparator` | `string` | `' › '` | Separator between the levels of `showPath` |
 
 ### Client-Side Filtering
 
@@ -785,15 +647,15 @@ The Lookup component extends Fluent UI's `Input` and supports these standard pro
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `appearance` | `'outline' \| 'underline' \| 'filled-darker' \| 'filled-lighter'` | `'outline'` | Visual style of the input |
-| `size` | `'small' \| 'medium' \| 'large'` | `'medium'` | Size of the input |
+| `appearance` | `'outline' \| 'underline' \| 'filled-darker' \| 'filled-lighter'` | `'filled-darker'` | Visual style of the input. See [Appearance](#appearance) |
+| `size` | `'small' \| 'medium'` | `'medium'` | `small` is 24px, for dense layouts |
 | `contentBefore` | `ReactNode` | - | Content before the input text |
 | `className` | `string` | - | Additional CSS class |
 | `style` | `CSSProperties` | - | Inline styles |
 
 ```tsx
 // Examples
-<Lookup appearance="filled-darker" size="large" ... />
+<Lookup appearance="outline" size="medium" ... />
 <Lookup appearance="underline" size="small" ... />
 ```
 
@@ -811,6 +673,8 @@ interface LookupOption {
   disabled?: boolean;               // Disable this option
   entityName?: string;              // Dynamics table logical name, e.g. 'account'
   recordId?: string;                // Dynamics record GUID; falls back to key when omitted
+  parentKey?: string | null;        // Parent option's key, for a hierarchical Lookup
+  hasChildren?: boolean;            // Has children not loaded yet (draws the chevron)
 }
 
 interface LookupOptionDetail {
@@ -819,11 +683,58 @@ interface LookupOptionDetail {
 }
 ```
 
-> **Note:** Both `secondaryText` and `details` support React elements, not just strings. See [Rich Secondary Text](#rich-secondary-text-with-react-elements) for examples. When using JSX in `secondaryText`, use `searchFields` to provide hidden searchable text (see [Client-Side Filtering](#client-side-filtering)).
+> **Note:** Both `secondaryText` and `details` support React elements, not just strings. See [Rich Secondary Text](https://github.com/garethcheyne/npm-fluentui-extended/blob/main/docs/Lookup.md#rich-secondary-text-with-react-elements) for examples. When using JSX in `secondaryText`, use `searchFields` to provide hidden searchable text (see [Client-Side Filtering](#client-side-filtering)).
 
 `entityName` plus `recordId` are what switch a generic option into a Dynamics-backed record option.
 That metadata is used by the default selected-value navigation path and by the built-in hover-card
 fetch path.
+
+### Hierarchical Lookup
+
+Set `hierarchical` and give each option the key of its parent. The level is worked out from the
+chain of parents, so it is not passed — a level supplied alongside a parent can only disagree with it.
+An option whose parent is not among the options shows at the top level.
+
+```tsx
+const categories: LookupOption[] = [
+  { key: 'elec', text: 'Electrical' },
+  { key: 'light', text: 'Lighting', parentKey: 'elec' },
+  { key: 'led', text: 'LED downlights', parentKey: 'light' },
+];
+
+<Lookup
+  options={categories}
+  hierarchical
+  defaultExpanded={1}        // top level open
+  selectableParents={false}  // only the bottom level is a real value
+  showPath                   // "Electrical › Lighting › LED downlights"
+  selectedOption={selected}
+  onOptionSelect={setSelected}
+/>
+```
+
+Typing narrows the tree to the matches and their ancestors, opened up and with the ancestors dimmed,
+so each match is seen in its place. The popup is an ARIA `tree`, each row a `treeitem` carrying its
+`aria-level`.
+
+**Dataverse hierarchies.** A table can mark one relationship to itself as hierarchical — account →
+parent account, business unit → parent business unit, product families, and custom tables.
+`useHierarchyLookup` reads that relationship from metadata, so nothing but the table name is passed:
+
+```tsx
+import { useHierarchyLookup } from 'fluentui-extended';
+
+function ParentAccountField() {
+  const [value, setValue] = useState<LookupOption | null>(null);
+  const hierarchy = useHierarchyLookup('account', { filter: 'statecode eq 0' });
+  return <Lookup {...hierarchy} selectedOption={value} onOptionSelect={setValue} showPath />;
+}
+```
+
+It starts from the top of the tree, loads children as nodes are opened, and searches server-side,
+returning each match with its ancestors (one request per level, not per match). Which records have
+children is one FetchXML aggregate per page. The functions underneath — `getHierarchyRelationship`,
+`getHierarchyChildren` and `searchHierarchy` — are exported for use without the hook.
 
 ## Keyboard Navigation
 
@@ -831,399 +742,11 @@ fetch path.
 |-----|--------|
 | `↓` | Open dropdown / Move to next option |
 | `↑` | Move to previous option |
-| `Enter` | Select highlighted option |
+| `→` | Hierarchical: open the highlighted node, or move to its first child |
+| `←` | Hierarchical: close the highlighted node, or move to its parent |
+| `Enter` | Select highlighted option (opens / closes a parent when `selectableParents` is off) |
 | `Escape` | Close dropdown |
 | `Tab` | Close dropdown and move focus |
-
----
-
-## QueryBuilder
-
-The QueryBuilder component provides an Advanced Find-style interface for building complex queries against Dynamics 365 entities.
-
-### Basic Usage (Dynamics 365)
-
-In Dynamics 365, fields are automatically loaded from entity metadata - no need to pass them manually:
-
-```tsx
-import { QueryBuilder, QueryBuilderApplyResult } from 'fluentui-extended';
-import { FluentProvider, webLightTheme } from '@fluentui/react-components';
-
-function App() {
-  const [fetchXml, setFetchXml] = React.useState<string>('');
-
-  const handleChange = (result: QueryBuilderApplyResult) => {
-    setFetchXml(result.fetchXml);
-    // Also available: result.odataFilter, result.fetchXmlFilter, result.state
-  };
-
-  return (
-    <FluentProvider theme={webLightTheme}>
-      <QueryBuilder
-        entityName="account"
-        entityDisplayName="Accounts"
-        onSerializedChange={handleChange}
-      />
-    </FluentProvider>
-  );
-}
-```
-
-### Loading Existing FetchXML
-
-Pass existing FetchXML to pre-populate the query builder:
-
-```tsx
-const existingFetchXml = `
-  <fetch version="1.0">
-    <entity name="account">
-      <filter type="and">
-        <condition attribute="name" operator="like" value="%Contoso%" />
-        <condition attribute="statecode" operator="eq" value="0" />
-      </filter>
-    </entity>
-  </fetch>
-`;
-
-<QueryBuilder
-  entityName="account"
-  initialFetchXml={existingFetchXml}
-  onSerializedChange={handleChange}
-/>
-```
-
-### Getting Values Back
-
-Use `onSerializedChange` to get the query whenever it changes:
-
-```tsx
-const handleChange = (result: QueryBuilderApplyResult) => {
-  // FetchXML for SDK queries
-  console.log(result.fetchXml);
-  // <fetch version="1.0"><entity name="account"><filter type="and">...</filter></entity></fetch>
-
-  // OData for Web API  
-  console.log(result.odataFilter);
-  // name eq 'Contoso' and revenue gt 1000000
-
-  // Just the filter element
-  console.log(result.fetchXmlFilter);
-  // <filter type="and">...</filter>
-
-  // Current state object (for saving/restoring)
-  console.log(result.state);
-};
-```
-
-### Features
-
-#### Import/Edit/Export FetchXML
-
-Download the current query as FetchXML, import FetchXML from elsewhere, or open the current
-query as editable FetchXML:
-
-```tsx
-<QueryBuilder
-  entityName="account"
-  showDownloadFetchXmlButton={true}  // Default: true
-  showUploadFetchXmlButton={true}    // Default: true
-  showEditFetchXmlButton={true}      // Default: true
-/>
-```
-
-**Import FetchXML** opens an empty dialog for pasting in a query from elsewhere.
-
-**Edit FetchXML** opens the same dialog prefilled with the current query's FetchXML, so you can
-tweak it in place or select-all and paste a different query over it. Applying rebuilds the
-builder from whatever is in the box. If the XML doesn't parse, your text is kept and the error
-is shown inline.
-
-#### Live Preview
-
-Show real-time preview of the generated queries. The previews can also be toggled from the
-toolbar, so these props set the *initial* visibility rather than hiding the previews outright:
-
-```tsx
-<QueryBuilder
-  entityName="account"
-  fields={fields}
-  showODataPreview={true}
-  showFetchXmlPreview={true}
-  showPreviewToggleButtons={true}  // Default: true
-/>
-```
-
-#### Queries That OData Cannot Express
-
-FetchXML has operators the OData `$filter` syntax has no equivalent for — relative dates
-(`last-x-days`, `this-month`), fiscal periods, user context (`eq-userid`) and hierarchy
-operators (`under`, `above`). These are evaluated by the FetchXML engine itself.
-
-When a query uses one, it is **omitted from the OData filter** and reported on the result:
-
-```tsx
-<QueryBuilder
-  entityName="account"
-  fields={fields}
-  onSerializedChange={(result) => {
-    if (result.odataUnsupported.length > 0) {
-      // The OData filter is NOT equivalent to the FetchXML - use result.fetchXml instead
-      console.warn('Not expressible in OData:', result.odataUnsupported);
-    }
-  }}
-/>
-```
-
-Each entry gives the field and operator that could not be translated:
-
-```ts
-{ fieldId: 'createdon', fieldLabel: 'Created On', operator: 'last-x-days', operatorLabel: 'Last X Days' }
-```
-
-The OData preview shows the same information as a warning. Use `isOperatorConvertibleToOData`
-to check a single operator yourself.
-
-#### Validation with Dynamics 365 API
-
-The Validate button checks query structure and optionally tests against the Dynamics 365 API:
-
-```tsx
-<QueryBuilder
-  entityName="account"
-  fields={fields}
-  showValidateButton={true}  // Default: true
-/>
-```
-
-When running inside Dynamics 365:
-- Uses native fetch to `/api/data/v9.2/` endpoints
-- Executes a test query with `$top=1&$count=true`
-- Shows record count or API error message
-
-When running outside Dynamics 365:
-- Shows "API validation unavailable — not running in Dynamics 365 environment"
-
-#### Lookup Fields with Async Search
-
-For lookup-type fields, provide an async search callback:
-
-```tsx
-const handleLookupSearch = async (fieldId: string, searchText: string) => {
-  const response = await fetch(`/api/${fieldId}?search=${searchText}`);
-  const data = await response.json();
-  return data.map(item => ({
-    key: item.id,
-    text: item.name,
-    secondaryText: item.code,
-  }));
-};
-
-<QueryBuilder
-  entityName="account"
-  fields={fields}
-  onLookupSearch={handleLookupSearch}
-/>
-```
-
-#### Debug Tracing
-
-Enable debug tracing to see what's happening inside the component:
-
-```tsx
-<QueryBuilder
-  entityName="account"
-  fields={fields}
-  onTrace={(message, data) => {
-    console.debug(
-      '%c FluentUI-Extended ',
-      'background: #845EF7; color: white; padding: 2px 4px; border-radius: 2px; font-weight: bold;',
-      message,
-      data || ''
-    );
-  }}
-/>
-```
-
-This is useful for:
-- Debugging related entity field loading
-- Tracking optionset metadata fetching
-- Understanding when API calls are made
-- Troubleshooting field resolution issues
-
-### Standalone Usage (Outside Dynamics 365)
-
-When not running in Dynamics 365, provide fields manually:
-
-```tsx
-const fields: QueryBuilderField[] = [
-  { id: 'name', label: 'Account Name', dataType: 'string' },
-  { id: 'revenue', label: 'Annual Revenue', dataType: 'number' },
-  { id: 'statecode', label: 'Status', dataType: 'optionset', options: [
-    { label: 'Active', value: 0 },
-    { label: 'Inactive', value: 1 },
-  ]},
-];
-
-<QueryBuilder
-  entityName="account"
-  fields={fields}
-  onSerializedChange={handleChange}
-/>
-```
-
-### Layout and Scrolling
-
-The header and toolbar stay pinned while the filter groups and previews scroll together as one
-region. That scroll only engages when the parent constrains the height — give the wrapper a fixed
-`height` (or `maxHeight`) and the component fills it:
-
-```tsx
-<div style={{ height: 500, display: 'flex', flexDirection: 'column' }}>
-  <QueryBuilder entityName="account" entityDisplayName="Accounts" />
-</div>
-```
-
-In an unconstrained parent the component simply grows to fit its content and the page scrolls instead.
-
-### Query Options
-
-The root `<fetch>` element carries the same attributes the Dynamics advanced-find editor emits:
-
-```xml
-<fetch version="1.0" mapping="logical" no-lock="false" distinct="true">
-```
-
-`distinct` defaults to `true`, which matters once related-entity filters are in play — a single
-record can otherwise match several linked rows and appear more than once. Override per instance:
-
-```tsx
-<QueryBuilder entityName="account" distinct={false} noLock top={50} />
-```
-
-These props take precedence over whatever an imported query carried. When no prop is set, options
-parsed from `initialFetchXml` are preserved rather than dropped on the next serialize.
-
-### QueryBuilder Props
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `entityName` | `string` | - | Logical name of the entity (required) |
-| `entityDisplayName` | `string` | - | Entity name used in the default heading ("Query Builder: {entityDisplayName}") |
-| `title` | `ReactNode \| false` | `"Query Builder: {entityDisplayName}"` | Heading above the toolbar. Pass text or an element to replace it, or `false` to hide it |
-| `fields` | `QueryBuilderField[]` | - | Fields for filtering (auto-loaded via Web API if omitted) |
-| `initialFetchXml` | `string` | - | FetchXML to pre-populate the query builder |
-| `initialState` | `QueryBuilderState` | - | Initial query state object |
-| `distinct` | `boolean` | `true` | Emit `distinct="…"` on the root `<fetch>` |
-| `noLock` | `boolean` | `false` | Emit `no-lock="…"` on the root `<fetch>` |
-| `top` | `number` | - | Emit `top="N"` to cap the row count; omitted when unset |
-| `onSerializedChange` | `(result: QueryBuilderApplyResult) => void` | - | Called when query changes |
-| `onLookupSearch` | `(fieldId: string, searchText: string) => Promise<LookupOption[]>` | - | Lookup field search handler |
-| `showODataPreview` | `boolean` | `false` | Initial visibility of the OData filter preview |
-| `showFetchXmlPreview` | `boolean` | `false` | Initial visibility of the FetchXML preview |
-| `showPreviewToggleButtons` | `boolean` | `true` | Show toolbar buttons that toggle the previews |
-| `showResetToDefaultButton` | `boolean` | `true` | Show Reset button |
-| `showDownloadFetchXmlButton` | `boolean` | `true` | Show Download FetchXML button |
-| `showUploadFetchXmlButton` | `boolean` | `true` | Show Import FetchXML button |
-| `showEditFetchXmlButton` | `boolean` | `true` | Show Edit FetchXML button |
-| `showValidateButton` | `boolean` | `true` | Show Validate button |
-| `showDeleteAllFiltersButton` | `boolean` | `true` | Show Delete All button |
-| `onTrace` | `(message: string, data?: any) => void` | - | Debug/trace callback for component behavior |
-
-### QueryBuilderField
-
-```ts
-interface QueryBuilderField {
-  id: string;           // Logical attribute name
-  label: string;        // Display label
-  dataType: 'string' | 'number' | 'datetime' | 'boolean' | 'optionset' | 'lookup';
-  options?: Array<{ label: string; value: string | number }>;  // Optionset and boolean fields
-}
-```
-
-Options are loaded automatically from entity metadata when `fields` is omitted. Boolean fields
-pick up their Dynamics labels (for example "Allowed" / "Not Allowed" rather than Yes / No), with
-values `'1'` and `'0'` to match the FetchXML representation.
-
-### QueryBuilderApplyResult
-
-```ts
-interface QueryBuilderApplyResult {
-  state: QueryBuilderState;      // Current query state
-  fetchXmlFilter: string;        // Just the <filter> element
-  fetchXml: string;              // Complete FetchXML document
-  odataFilter: string;           // OData $filter value
-  odataQuery?: string;           // Full OData query URL (requires entitySetName)
-  odataUnsupported: QueryBuilderODataUnsupported[];  // Conditions OData cannot express
-}
-
-interface QueryBuilderODataUnsupported {
-  fieldId: string;        // e.g. "createdon"
-  fieldLabel: string;     // e.g. "Created On"
-  operator: string;       // e.g. "last-x-days"
-  operatorLabel: string;  // e.g. "Last X Days"
-}
-```
-
-When `odataUnsupported` is non-empty, `odataFilter` is **not** equivalent to `fetchXml` — the
-untranslatable conditions have been left out. Use `fetchXml` to run the query.
-
-### Programmatic API
-
-#### Serialize State
-
-```ts
-import { serializeQueryBuilderState } from 'fluentui-extended';
-
-const result = serializeQueryBuilderState(state, fields, 'account');
-console.log(result.fetchXml);
-console.log(result.odataFilter);
-```
-
-#### Parse FetchXML
-
-```ts
-import { parseFetchXmlToState } from 'fluentui-extended';
-
-const result = parseFetchXmlToState(fetchXmlString, fields);
-if (result.state) {
-  // Use result.state to populate QueryBuilder
-} else {
-  console.error(result.error);
-}
-```
-
-#### Validate State
-
-```ts
-import { validateQueryBuilderState } from 'fluentui-extended';
-
-const result = validateQueryBuilderState(state, fields);
-if (!result.isValid) {
-  result.errors.forEach(err => {
-    console.log(`${err.fieldLabel}: ${err.message}`);
-  });
-}
-```
-
-### Supported Operators
-
-| Data Type | Operators |
-|-----------|-----------|
-| `string` | Contains, Does Not Contain, Begins With, Does Not Begin With, Ends With, Does Not End With, Like, Not Like, Equals, Not Equals, Is Empty, Has Value |
-| `number` | Greater Than, Greater Than Or Equal, Less Than, Less Than Or Equal, Between, Not Between, Equals, Not Equals, Is One Of, Is Not One Of, Is Empty, Has Value |
-| `datetime` | All number comparisons, plus On / On Or Before / On Or After, relative dates (Today, This Month, Last X Days, Older Than X Months, ...) and fiscal period operators |
-| `optionset` | Equals, Not Equals, Is One Of, Is Not One Of, Is Empty, Has Value |
-| `lookup` | Equals, Not Equals, Is One Of, Is Not One Of, Is Empty, Has Value, plus user-context (Equals Current User, ...) and hierarchy (Under, Above, ...) operators |
-| `boolean` | Equals, Not Equals, Is Empty, Has Value |
-
-Operators map to the [FetchXML condition operators][fetchxml-operators]. Note that FetchXML has
-no `contains` operator — "Contains" and "Does Not Contain" are serialized as `like` / `not-like`
-with `%` wildcards around the value.
-
-Relative date, fiscal period, user-context and hierarchy operators are FetchXML-only and cannot
-be expressed in OData — see [Queries That OData Cannot Express](#queries-that-odata-cannot-express).
-
-[fetchxml-operators]: https://learn.microsoft.com/en-us/power-apps/developer/data-platform/fetchxml/reference/operators
 
 ---
 
@@ -1457,6 +980,7 @@ resolved `Date` objects (`startDate`, `endDate`) in one callback.
 | `timeIntervalMinutes` | `number` | `30` | Spacing of the time dropdown entries |
 | `entityName` / `attributeName` | `string` | - | Read `behavior` from metadata |
 | `clearable` | `boolean` | `true` | Show a clear button |
+| `inline` | `boolean` | `false` | Value only, no field box; the buttons show on hover and focus. See [Fields inside a cell](#fields-inside-a-cell) |
 
 ---
 
@@ -1498,6 +1022,34 @@ is especially useful for long status-reason, industry, or category lists.
 | `onChange` | `(value: number \| number[] \| null) => void` | - | Selection handler |
 | `showColors` | `boolean` | `false` | Render metadata colours as swatches |
 | `clearable` | `boolean` | `true` | Allow clearing the selection |
+| `inline` | `boolean` | `false` | Value only, no field box; the chevron shows on hover and focus. See [Fields inside a cell](#fields-inside-a-cell) |
+| `hierarchical` | `boolean` | `false` | Indent options under their `parentValue`; search keeps each match's ancestors |
+| `getParentValue` | `(option, options) => number \| null` | - | Work out parents for options loaded from metadata |
+| `selectableParents` | `boolean` | `true` | Off, a parent is a heading for the options under it |
+| `showPath` | `boolean` | `false` | Show the chosen value with its ancestors |
+| `pathSeparator` | `string` | `' › '` | Separator between the levels of `showPath` |
+
+### OptionSetField Hierarchy
+
+Dataverse choices have no hierarchy of their own, so a parent comes from the caller: `parentValue` on
+each option, or `getParentValue` for options loaded from metadata. Every level is shown open — an
+option set is small enough to see whole.
+
+```tsx
+<OptionSetField
+  entityName="product"
+  attributeName="new_category"
+  hierarchical
+  // e.g. values numbered so 110 sits under 100
+  getParentValue={(option) => (option.value % 100 === 0 ? null : Math.floor(option.value / 10) * 10)}
+  showPath
+  value={value}
+  onChange={setValue}
+/>
+```
+
+When a hierarchy of choices is real data rather than a convention, the Dataverse way to hold it is a
+table with a hierarchical relationship to itself, picked with a [hierarchical Lookup](#hierarchical-lookup).
 
 ### OptionSetField Behaviour
 
@@ -1679,8 +1231,8 @@ administrator. Pass `types={['systemuser']}` for a people-only picker.
 Component screenshots are generated, not taken by hand:
 
 ```bash
-npm run shots              # capture everything into assets/
-npm run shots lookup-open  # or just one
+pnpm run shots              # capture everything into assets/
+pnpm run shots lookup-open  # or just one
 ```
 
 `?shot=<id>` on the harness renders a **single populated component** with no surrounding chrome —

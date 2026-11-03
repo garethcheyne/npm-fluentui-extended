@@ -44,6 +44,13 @@ export interface DateTimeFieldProps {
    */
   allowFreeType?: boolean;
   /**
+   * Commit the value and close the popup as soon as a selection completes it,
+   * without waiting for Done: picking a date when there is no time picker, or
+   * picking a time when there is one. Today and Now count as picks. Set false to
+   * keep the popup open until Done is clicked. Defaults to true.
+   */
+  closeOnSelect?: boolean;
+  /**
    * Time display format. '12h' shows AM/PM (e.g., "2:30 PM"), '24h' shows military time (e.g., "14:30").
    * Defaults to '24h'.
    */
@@ -109,6 +116,13 @@ export interface DateTimeFieldProps {
   displayFormat?: string;
   /** Size of the input control. Defaults to 'medium'. */
   size?: 'small' | 'medium';
+  /**
+   * Draw the control as its value, with no field box: no fill, border or
+   * underline in any state. For a host that is itself the control and draws the
+   * focus ring - a grid cell, a list row - where the field's own chrome would be
+   * a box inside a box. Off by default; a form field keeps the Dynamics look.
+   */
+  inline?: boolean;
   className?: string;
   /** Called when metadata auto-load fails */
   onLoadError?: (error: Error) => void;

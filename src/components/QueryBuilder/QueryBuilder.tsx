@@ -1,4 +1,6 @@
 import * as React from 'react';
+import { webApiRequest } from '../../api/webApi';
+import { isHiddenFromAdvancedFind } from './QueryBuilder.hooks';
 import { Button, Combobox, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, DialogTrigger, Dropdown, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Option, Spinner, Text, Textarea } from '@fluentui/react-components';
 import { DatePicker } from '@fluentui/react-datepicker-compat';
 import { AddRegular, AppsListRegular, ArrowDownloadRegular, ArrowResetRegular, ArrowUploadRegular, CalendarRegular, CheckmarkCircleRegular, CheckboxCheckedRegular, CopyRegular, DeleteRegular, DismissRegular, EditRegular, EyeOffRegular, EyeRegular, MoreHorizontalRegular, NumberSymbolRegular, SearchRegular, TextTRegular, WarningRegular } from '@fluentui/react-icons';
@@ -226,8 +228,8 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
             setLoading(true);
             try {
                 // Fetch entity metadata using native Web API
-                const entityResponse = await fetch(
-                    `/api/data/v9.2/EntityDefinitions(LogicalName='${props.entityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute,PrimaryIdAttribute`,
+                const entityResponse = await webApiRequest(
+                    `EntityDefinitions(LogicalName='${props.entityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute,PrimaryIdAttribute`,
                     {
                         headers: {
                             'OData-MaxVersion': '4.0',
@@ -250,8 +252,8 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                 }
 
                 // Fetch regular attributes
-                const attributesResponse = await fetch(
-                    `/api/data/v9.2/EntityDefinitions(LogicalName='${props.entityName}')/Attributes?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName,IsValidForAdvancedFind`,
+                const attributesResponse = await webApiRequest(
+                    `EntityDefinitions(LogicalName='${props.entityName}')/Attributes?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName,IsValidForAdvancedFind`,
                     {
                         headers: {
                             'OData-MaxVersion': '4.0',
@@ -270,8 +272,8 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                 const attributesArray = attributesData.value || [];
 
                 // Fetch lookup attributes separately with Targets property
-                const lookupResponse = await fetch(
-                    `/api/data/v9.2/EntityDefinitions(LogicalName='${props.entityName}')/Attributes/Microsoft.Dynamics.CRM.LookupAttributeMetadata?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName,Targets`,
+                const lookupResponse = await webApiRequest(
+                    `EntityDefinitions(LogicalName='${props.entityName}')/Attributes/Microsoft.Dynamics.CRM.LookupAttributeMetadata?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName,Targets`,
                     {
                         headers: {
                             'OData-MaxVersion': '4.0',
@@ -317,8 +319,8 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                 const targetMetadataCache: Record<string, { entitySetName?: string; displayName?: string; primaryNameAttribute?: string; primaryIdAttribute?: string }> = {};
                 for (const targetEntityName of targetEntityNames) {
                     try {
-                        const targetResponse = await fetch(
-                            `/api/data/v9.2/EntityDefinitions(LogicalName='${targetEntityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute,PrimaryIdAttribute`,
+                        const targetResponse = await webApiRequest(
+                            `EntityDefinitions(LogicalName='${targetEntityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute,PrimaryIdAttribute`,
                             {
                                 headers: {
                                     'OData-MaxVersion': '4.0',
@@ -342,7 +344,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                 }
 
                 const resolvedFields: QueryBuilderField[] = mergedAttributes
-                    .filter((attribute: any) => attribute?.LogicalName && attribute?.IsValidForAdvancedFind !== false)
+                    .filter((attribute: any) => attribute?.LogicalName && !isHiddenFromAdvancedFind(attribute))
                     .map((attribute: any) => {
                         const dataType = dataTypeFromAttribute(attribute);
 
@@ -469,12 +471,14 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                 return group;
             });
 
-            return hasChanges ? { groups } : previous;
+            return hasChanges ? { ...previous, groups } : previous;
         });
     }, [availableFields]);
 
     const updateGroup = React.useCallback((groupId: string, updater: (group: QueryBuilderGroup) => QueryBuilderGroup) => {
+        // Spread, not rebuilt: the state also carries imported query options (top, no-lock)
         setBuilderState((previous) => ({
+            ...previous,
             groups: previous.groups.map((group) => (group.id === groupId ? updater(group) : group)),
         }));
     }, []);
@@ -507,10 +511,10 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                 } else {
                     // Use native Web API directly (same origin)
                     // Note: Cannot select Targets or expand OptionSet on base Attributes collection
-                    const url = `/api/data/v9.2/EntityDefinitions(LogicalName='${targetEntity}')/Attributes?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName`;
+                    const url = `EntityDefinitions(LogicalName='${targetEntity}')/Attributes?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName`;
                     trace('[QueryBuilder] Fetching entity metadata', { url });
                     
-                    const response = await fetch(url, {
+                    const response = await webApiRequest(url, {
                         headers: {
                             'OData-MaxVersion': '4.0',
                             'OData-Version': '4.0',
@@ -699,7 +703,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                 if (props.allowGroups === false) {
                     return previous;
                 }
-                return { groups: [...previous.groups, createGroup(defaultField)] };
+                return { ...previous, groups: [...previous.groups, createGroup(defaultField)] };
             }
 
             if (action === 'related') {
@@ -712,6 +716,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                 relatedGroup.conditions = [createRelatedCondition(firstRelated?.id, firstRelated?.targetEntity)];
 
                 return {
+                    ...previous,
                     groups: [...previous.groups, relatedGroup],
                 };
             }
@@ -842,7 +847,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
             const entitySetForApi = entitySetName || props.entityName;
             const queryOptions = odataFilter ? `$filter=${odataFilter}&$top=1&$count=true` : '$top=1&$count=true';
 
-            const response = await fetch(`/api/data/v9.2/${entitySetForApi}?${queryOptions}`, {
+            const response = await webApiRequest(`${entitySetForApi}?${queryOptions}`, {
                 headers: {
                     'OData-MaxVersion': '4.0',
                     'OData-Version': '4.0',
@@ -1406,6 +1411,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = (props) => {
                                                     aria-label="Remove group"
                                                     onClick={() =>
                                                         setBuilderState((previous) => ({
+                                                            ...previous,
                                                             groups: previous.groups.filter((candidate) => candidate.id !== group.id),
                                                         }))
                                                     }

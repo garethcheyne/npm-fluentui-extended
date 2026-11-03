@@ -70,8 +70,12 @@ describe('data types — display', () => {
     expect(show(1234.5, { dataType: 'money' })).toBe('1,234.50');
   });
 
-  it('percent shows one place and carries its sign', () => {
-    expect(show(9.14, { dataType: 'percent' })).toBe('9.1%');
+  it('percent shows two places and carries its sign', () => {
+    expect(show(9.146, { dataType: 'percent' })).toBe('9.15%');
+  });
+
+  it('percent leaves its sign to a suffix when the column has one', () => {
+    expect(show(2.5, { dataType: 'percent', suffix: '%' })).toBe('2.50');
   });
 
   it('an explicit precision overrides the type default', () => {

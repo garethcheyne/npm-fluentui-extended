@@ -4,7 +4,7 @@ import { Calendar } from '@fluentui/react-calendar-compat';
 import { CalendarRegular, ClockRegular, DismissRegular } from '@fluentui/react-icons';
 import { getEntityAttributes } from '../../api/metadata';
 import { DEFAULT_FIELD_APPEARANCE } from '../../types/appearance';
-import { useDateTimeFieldStyles } from './DateTimeField.styles';
+import { dateTimeFieldClassNames, useDateTimeFieldStyles } from './DateTimeField.styles';
 import {
   buildTimeOptions,
   filterTimeOptions,
@@ -17,17 +17,21 @@ import {
   parseFreeFormDateTime,
   isDayFirst,
   parseStoredValue,
+  placePopup,
   timeToMinutes,
   withTime,
 } from './DateTimeField.utils';
 import type { DateTimeBehavior, DateTimeFieldProps } from './DateTimeField.types';
+
+export { dateTimeFieldClassNames };
 
 /**
  * A Dynamics 365 date/time field that respects the attribute's DateTimeBehavior.
  *
  * Features an integrated popup with a calendar on the left and a time picker on the
  * right. When `showTime` is true, both are displayed side-by-side. The footer
- * provides "Today", "Time Now" (when showTime), and "Done" buttons.
+ * provides "Today", "Time Now" (when showTime), and "Done" buttons. By default a
+ * pick that completes the value commits and closes the popup — see `closeOnSelect`.
  *
  * A generic picker treats every value as a moment in time and converts it to the
  * browser's timezone. That is right for UserLocal and wrong for the other two
@@ -44,6 +48,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
   timeOnly = false,
   timeIntervalMinutes = 30,
   allowFreeType = false,
+  closeOnSelect = true,
   timeFormat = '24h',
   minTime,
   maxTime,
@@ -56,6 +61,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
   appearance = DEFAULT_FIELD_APPEARANCE,
   validationMessage,
   clearable = true,
+  inline = false,
   formatDate,
   displayFormat,
   className,
@@ -161,18 +167,43 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
     [onChange, behavior, timeOnly],
   );
 
-  // Position the popup below the input
+  // Place the popup where all of it is on screen — see placePopup. It is placed
+  // once against the field, then again when it has rendered and can be measured.
   const [popupPosition, setPopupPosition] = React.useState({ top: 0, left: 0 });
 
+  const positionPopup = React.useCallback(() => {
+    const field = inputRef.current;
+    if (!field) return;
+    // The field's own document and window, not the global ones: inside an iframe
+    // (a Dynamics web resource) the global window is the host page's.
+    const doc = field.ownerDocument;
+    const view = doc.defaultView;
+    const popup = popupRef.current?.getBoundingClientRect();
+    setPopupPosition(placePopup(
+      field.getBoundingClientRect(),
+      { width: popup?.width ?? 0, height: popup?.height ?? 0 },
+      { width: doc.documentElement.clientWidth, height: doc.documentElement.clientHeight },
+      { x: view?.scrollX ?? 0, y: view?.scrollY ?? 0 },
+    ));
+  }, []);
+
   React.useLayoutEffect(() => {
-    if (isOpen && inputRef.current) {
-      const rect = inputRef.current.getBoundingClientRect();
-      setPopupPosition({
-        top: rect.bottom + window.scrollY + 4,
-        left: rect.left + window.scrollX,
-      });
-    }
-  }, [isOpen]);
+    if (isOpen) positionPopup();
+  }, [isOpen, positionPopup]);
+
+  // The portal mounts after the field's layout effect, so measure the popup when
+  // it attaches, and again if the window changes size while it is open.
+  const attachPopup = React.useCallback((node: HTMLDivElement | null) => {
+    (popupRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+    if (node) positionPopup();
+  }, [positionPopup]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const view = inputRef.current?.ownerDocument.defaultView;
+    view?.addEventListener('resize', positionPopup);
+    return () => view?.removeEventListener('resize', positionPopup);
+  }, [isOpen, positionPopup]);
 
   // Close popup when clicking outside
   React.useEffect(() => {
@@ -211,83 +242,93 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
     }
   };
 
+  // Commit the given selection and close. Takes the values rather than reading
+  // pending state, so a pick can commit in the same handler that made it.
+  const commit = (date: Date | null, time: string) => {
+    let finalDate: Date | null = null;
+
+    if (timeOnly) {
+      // For time-only mode, emit an anchored date on 1970-01-01 plus HH:mm storage
+      if (time) {
+        finalDate = withTime(new Date(1970, 0, 1), time);
+        emit(finalDate);
+      }
+    } else if (date) {
+      finalDate = timeEnabled && time ? withTime(date, time) : date;
+      emit(finalDate);
+    }
+
+    // In free-type mode, update the input text to reflect the selection
+    if (allowFreeType && finalDate) {
+      const display = formatDisplayValue(finalDate, time || formatLocalTime(finalDate), timeEnabled, timeFormat, formatDate, timeOnly, displayFormat);
+      setInputText(display);
+      setIsFocused(false);
+    }
+
+    setIsOpen(false);
+  };
+
+  // The time slot nearest to now within the allowed range
+  const closestTimeToNow = () => {
+    const currentTime = formatLocalTime(new Date());
+    return timeOptions.reduce((prev, curr) =>
+      Math.abs(timeToMinutes(curr) - timeToMinutes(currentTime)) <
+      Math.abs(timeToMinutes(prev) - timeToMinutes(currentTime))
+        ? curr
+        : prev
+    );
+  };
+
   const handleCalendarSelect = (date: Date) => {
     setPendingDate(date);
+    // With a time picker the time is still to come, so only a date-only pick closes
+    if (closeOnSelect && !timeEnabled) {
+      commit(date, pendingTime);
+      return;
+    }
     // If no time is selected yet and time is enabled, default to current time slot
     if (timeEnabled && !pendingTime && timeOptions.length > 0) {
-      const now = new Date();
-      const currentTime = formatLocalTime(now);
-      // Find the closest time option within allowed range
-      const closest = timeOptions.reduce((prev, curr) =>
-        Math.abs(timeToMinutes(curr) - timeToMinutes(currentTime)) <
-        Math.abs(timeToMinutes(prev) - timeToMinutes(currentTime))
-          ? curr
-          : prev
-      );
-      setPendingTime(closest);
+      setPendingTime(closestTimeToNow());
     }
   };
 
   const handleTimeSelect = (time: string) => {
     setPendingTime(time);
     // If no date is selected yet, default to today
+    const date = pendingDate ?? new Date();
     if (!pendingDate) {
-      setPendingDate(new Date());
+      setPendingDate(date);
     }
+    if (closeOnSelect) commit(date, time);
   };
 
   const handleToday = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     setPendingDate(today);
+    if (closeOnSelect && !timeEnabled) commit(today, pendingTime);
   };
 
   const handleTimeNow = () => {
     if (timeOptions.length === 0) return;
-    
-    const now = new Date();
-    const currentTime = formatLocalTime(now);
-    // Find the closest time option within allowed range
-    const closest = timeOptions.reduce((prev, curr) =>
-      Math.abs(timeToMinutes(curr) - timeToMinutes(currentTime)) <
-      Math.abs(timeToMinutes(prev) - timeToMinutes(currentTime))
-        ? curr
-        : prev
-    );
+
+    const closest = closestTimeToNow();
     setPendingTime(closest);
     // Also set date to today if not set
+    const date = pendingDate ?? new Date();
     if (!pendingDate) {
-      setPendingDate(new Date());
+      setPendingDate(date);
     }
+    if (closeOnSelect) commit(date, closest);
   };
 
-  const handleDone = () => {
-    let finalDate: Date | null = null;
-    
-    if (timeOnly) {
-      // For time-only mode, emit an anchored date on 1970-01-01 plus HH:mm storage
-      if (pendingTime) {
-        finalDate = withTime(new Date(1970, 0, 1), pendingTime);
-        emit(finalDate);
-      }
-    } else if (pendingDate) {
-      finalDate = timeEnabled && pendingTime ? withTime(pendingDate, pendingTime) : pendingDate;
-      emit(finalDate);
-    }
-    
-    // In free-type mode, update the input text to reflect the selection
-    if (allowFreeType && finalDate) {
-      const time = pendingTime ?? (finalDate ? formatLocalTime(finalDate) : null);
-      const display = formatDisplayValue(finalDate, time, timeEnabled, timeFormat, formatDate, timeOnly, displayFormat);
-      setInputText(display);
-      setIsFocused(false);
-    }
-    
-    setIsOpen(false);
-  };
+  const handleDone = () => commit(pendingDate, pendingTime);
 
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
+    // Emptied now rather than left to the sync: text still holding the old date
+    // is what the next blur would parse straight back into the value
+    setInputText('');
     emit(null);
   };
 
@@ -367,6 +408,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
 
   const inputWrapperClasses = mergeClasses(
     styles.inputWrapper,
+    dateTimeFieldClassNames.field,
     appearance.startsWith('filled') && styles.inputWrapperFilled,
     size === 'small' && styles.inputWrapperSmall,
     disabled && styles.inputWrapperDisabled,
@@ -381,7 +423,13 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
           className={inputWrapperClasses}
           onClick={handleInputClick}
           onFocus={() => setIsFocused(true)}
-          onBlur={() => !allowFreeType && setIsFocused(false)}
+          // Focus leaving the field altogether ends it, whichever part had it.
+          // The clear and calendar buttons take focus too, and with only the
+          // input's own blur to end it, clicking one left the field "focused"
+          // for good - and the text stopped following the value.
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setIsFocused(false);
+          }}
           tabIndex={allowFreeType ? -1 : disabled ? -1 : 0}
           role="combobox"
           aria-expanded={isOpen}
@@ -409,7 +457,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
           
           {clearable && selectedDate && !disabled && (
             <span
-              className={styles.clearIcon}
+              className={mergeClasses(dateTimeFieldClassNames.clear, styles.clearIcon)}
               onClick={handleClear}
               role="button"
               tabIndex={0}
@@ -427,7 +475,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
           )}
           
           <span
-            className={styles.inputIcon}
+            className={mergeClasses(dateTimeFieldClassNames.icon, styles.inputIcon)}
             onClick={allowFreeType ? handleIconClick : undefined}
             style={allowFreeType ? { cursor: disabled ? 'not-allowed' : 'pointer' } : undefined}
             role={allowFreeType ? 'button' : undefined}
@@ -448,7 +496,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
       {isOpen && (
         <Portal>
           <div
-            ref={popupRef}
+            ref={attachPopup}
             className={styles.popupPortal}
             style={{
               top: popupPosition.top,
@@ -524,12 +572,12 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
   );
 
   if (!label && !validationMessage) {
-    return <div className={mergeClasses(styles.root, className)}>{control}</div>;
+    return <div className={mergeClasses(styles.root, inline && styles.inline, className)}>{control}</div>;
   }
 
   return (
     <Field
-      className={mergeClasses(styles.root, className)}
+      className={mergeClasses(styles.root, inline && styles.inline, className)}
       label={label}
       required={required}
       validationMessage={validationMessage}

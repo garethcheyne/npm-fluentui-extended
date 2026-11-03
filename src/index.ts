@@ -145,6 +145,7 @@ export type {
 	DataGridAffix,
 	DataGridLookupValue,
 	DataGridLookupOption,
+	DataGridLookupSearch,
 	DataGridSelectModifiers,
 	DataGridCellRef,
 	DataGridFill,
@@ -200,6 +201,7 @@ export {
 	entityImageUrl,
 	clearMetadataCache,
 	getSystemUser,
+	clearSystemUserCache,
 	searchSystemUsers,
 	systemUserImageUrl,
 	initialsOf,
@@ -207,6 +209,10 @@ export {
 	searchTeams,
 	getOwner,
 	ownerFromUser,
+	getHierarchyRelationship,
+	getHierarchyChildren,
+	searchHierarchy,
+	clearHierarchyCache,
 } from './api';
 export type {
 	AttributeMetadata,
@@ -219,6 +225,9 @@ export type {
 	OwnerRecord,
 	OwnerType,
 	SearchOwnersOptions,
+	HierarchyRelationship,
+	HierarchyRecord,
+	HierarchyQueryOptions,
 } from './api';
 
 // Google Places client behind AddressLookup - usable on its own for geocoding
@@ -267,3 +276,6 @@ export type {
 } from './components/QueryBuilder';
 export { useHoverDelay } from './hooks/useHoverDelay';
 export type { UseHoverDelayResult } from './hooks/useHoverDelay';
+// A Lookup over a Dataverse table's own hierarchy - account → parent account and the like
+export { useHierarchyLookup } from './hooks/useHierarchyLookup';
+export type { UseHierarchyLookupOptions, HierarchyLookupProps } from './hooks/useHierarchyLookup';

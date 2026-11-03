@@ -75,6 +75,12 @@ export const SystemUserPersona: React.FC<SystemUserPersonaProps> = ({
 
   const effectiveId = providedUser?.systemuserid ?? userId;
 
+  // Read at call time: hosts pass it inline, and a load keyed on its identity
+  // re-ran on every render while the card was open - a request per render after
+  // a failure.
+  const onLoadErrorRef = React.useRef(onLoadError);
+  onLoadErrorRef.current = onLoadError;
+
   const loadUser = React.useCallback(async () => {
     if (providedUser || loadedRef.current || !userId) return;
 
@@ -91,11 +97,11 @@ export const SystemUserPersona: React.FC<SystemUserPersonaProps> = ({
       loadedRef.current = false;
       const failure = err instanceof Error ? err : new Error('Failed to load user');
       setError(failure.message);
-      onLoadError?.(failure);
+      onLoadErrorRef.current?.(failure);
     } finally {
       if (!disposedRef.current) setLoading(false);
     }
-  }, [providedUser, userId, onLoadError]);
+  }, [providedUser, userId]);
 
   // The card is opened by the hover timer as well as by Fluent, and Fluent's
   // `onOpenChange` does not fire for a state change we make ourselves. Watching
@@ -103,6 +109,21 @@ export const SystemUserPersona: React.FC<SystemUserPersonaProps> = ({
   React.useEffect(() => {
     if (open) void loadUser();
   }, [open, loadUser]);
+
+  /**
+   * Load now whenever there is no name to show without it, or no card to defer
+   * the load to - a persona given only an id otherwise reads "Unnamed user". Users
+   * are cached by id (`getSystemUser`), so a column naming the same people over
+   * and over requests each person once. Given a `name`, the load still waits for
+   * the card, which is the only place the rest of the record is shown.
+   */
+  const loadEagerly = !showHoverCard || !name;
+  React.useEffect(() => {
+    if (loadEagerly) void loadUser();
+  }, [loadEagerly, loadUser]);
+
+  // The documented contract: given neither an id nor a record, there is no one to show
+  if (!userId && !providedUser) return null;
 
   const displayName = name ?? user?.fullname ?? '';
   const displaySecondary = secondaryText ?? user?.jobtitle ?? undefined;

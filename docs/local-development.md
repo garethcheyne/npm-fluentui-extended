@@ -142,13 +142,22 @@ function dynamicsProxy(): Plugin {
               Authorization: `Bearer ${await getToken()}`,
               'OData-MaxVersion': '4.0',
               'OData-Version': '4.0',
-              Accept: 'application/json',
+              // Forwarded, not forced: an entity image is requested as image/*, and
+              // Prefer carries paging and the formatted values lookups display.
+              Accept: req.headers.accept ?? 'application/json',
               'Content-Type': 'application/json',
+              ...(req.headers.prefer ? { Prefer: req.headers.prefer } : {}),
             },
           });
+          const contentType = upstream.headers.get('content-type') ?? 'application/json';
           res.statusCode = upstream.status;
-          res.setHeader('Content-Type', upstream.headers.get('content-type') ?? 'application/json');
-          res.end(await upstream.text());
+          res.setHeader('Content-Type', contentType);
+          // A binary body read as text is decoded as UTF-8 and destroyed - images arrive corrupt
+          res.end(
+            /^(image|audio|video|application\/octet-stream)/.test(contentType)
+              ? Buffer.from(await upstream.arrayBuffer())
+              : await upstream.text(),
+          );
         } catch (error) {
           res.statusCode = 500;
           res.end(JSON.stringify({ error: String(error) }));

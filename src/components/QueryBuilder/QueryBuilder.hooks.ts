@@ -5,6 +5,7 @@
  */
 
 import * as React from 'react';
+import { webApiRequest } from '../../api/webApi';
 import type { QueryBuilderField, QueryBuilderLookupTarget } from './QueryBuilder.types';
 import { attributeTypeFromAttribute, buildFieldOptions, dataTypeFromAttribute } from './QueryBuilder.utils';
 import { fetchOptionSetMetadata } from './QueryBuilder.enrichment';
@@ -33,11 +34,21 @@ export const parseAttributeToField = (attr: any): QueryBuilderField => {
 };
 
 /**
+ * Whether an attribute is marked as not for Advanced Find.
+ *
+ * The Web API returns the flag as a managed property, `{ Value: false, ... }`, not a
+ * bare boolean - compared to `false` directly it never matched, and every hidden
+ * attribute was offered as a field. Both shapes are accepted.
+ */
+export const isHiddenFromAdvancedFind = (attr: any): boolean =>
+    attr?.IsValidForAdvancedFind === false || attr?.IsValidForAdvancedFind?.Value === false;
+
+/**
  * Filter function for Dynamics 365 attributes - determines if attribute should be included.
  */
 export const isValidAttribute = (attr: any, forAdvancedFind: boolean = true): boolean => {
     if (!attr?.LogicalName) return false;
-    if (forAdvancedFind && attr?.IsValidForAdvancedFind === false) return false;
+    if (forAdvancedFind && isHiddenFromAdvancedFind(attr)) return false;
     
     const attrType = attr.AttributeType || attr.AttributeTypeName?.Value;
     // Skip virtual, uniqueidentifier (except primary key), and internal attributes
@@ -106,8 +117,8 @@ export const useEntityFields = (
 
             try {
                 // Fetch entity metadata using native Web API
-                const entityResponse = await fetch(
-                    `/api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute,PrimaryIdAttribute`,
+                const entityResponse = await webApiRequest(
+                    `EntityDefinitions(LogicalName='${entityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute,PrimaryIdAttribute`,
                     {
                         headers: {
                             'OData-MaxVersion': '4.0',
@@ -130,8 +141,8 @@ export const useEntityFields = (
                 }
 
                 // Fetch regular attributes
-                const attributesResponse = await fetch(
-                    `/api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName,IsValidForAdvancedFind`,
+                const attributesResponse = await webApiRequest(
+                    `EntityDefinitions(LogicalName='${entityName}')/Attributes?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName,IsValidForAdvancedFind`,
                     {
                         headers: {
                             'OData-MaxVersion': '4.0',
@@ -150,8 +161,8 @@ export const useEntityFields = (
                 const attributesArray = attributesData.value || [];
 
                 // Fetch lookup attributes separately with Targets property
-                const lookupResponse = await fetch(
-                    `/api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes/Microsoft.Dynamics.CRM.LookupAttributeMetadata?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName,Targets`,
+                const lookupResponse = await webApiRequest(
+                    `EntityDefinitions(LogicalName='${entityName}')/Attributes/Microsoft.Dynamics.CRM.LookupAttributeMetadata?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName,Targets`,
                     {
                         headers: {
                             'OData-MaxVersion': '4.0',
@@ -196,8 +207,8 @@ export const useEntityFields = (
                 const targetMetadataCache: Record<string, { entitySetName?: string; displayName?: string; primaryNameAttribute?: string }> = {};
                 for (const targetEntityName of targetEntityNames) {
                     try {
-                        const targetResponse = await fetch(
-                            `/api/data/v9.2/EntityDefinitions(LogicalName='${targetEntityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute,PrimaryIdAttribute`,
+                        const targetResponse = await webApiRequest(
+                            `EntityDefinitions(LogicalName='${targetEntityName}')?$select=EntitySetName,DisplayName,PrimaryNameAttribute,PrimaryIdAttribute`,
                             {
                                 headers: {
                                     'OData-MaxVersion': '4.0',
@@ -291,8 +302,8 @@ export const loadEntityFields = async (
 
     // Use native Web API directly (same origin)
     try {
-        const response = await fetch(
-            `/api/data/v9.2/EntityDefinitions(LogicalName='${targetEntity}')/Attributes?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName`,
+        const response = await webApiRequest(
+            `EntityDefinitions(LogicalName='${targetEntity}')/Attributes?$select=LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName`,
             {
                 headers: {
                     'OData-MaxVersion': '4.0',

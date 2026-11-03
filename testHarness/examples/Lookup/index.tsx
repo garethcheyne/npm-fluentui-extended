@@ -32,7 +32,7 @@ import {
 
 // Import from the library source (../../../src) — in a real app you'd use:
 // import { Lookup } from 'fluentui-extended';
-import { Lookup } from '../../../src';
+import { Lookup, useHierarchyLookup } from '../../../src';
 import type { LookupOption } from '../../../src';
 import type { LookupExampleProps } from '../shared/types';
 
@@ -53,6 +53,43 @@ import {
 
 /** Form fields on a Dynamics form are column-width, not page-width. */
 const fieldWidth: React.CSSProperties = { maxWidth: 420 };
+
+/** A category tree, each option naming its parent by `parentKey`. */
+const categoryOptions: LookupOption[] = [
+  { key: 'appl', text: 'Appliances' },
+  { key: 'kitchen', text: 'Kitchen', parentKey: 'appl' },
+  { key: 'fridges', text: 'Fridges', parentKey: 'kitchen', secondaryText: 'CAT-1101' },
+  { key: 'dish', text: 'Dishwashers', parentKey: 'kitchen', secondaryText: 'CAT-1102' },
+  { key: 'laundry', text: 'Laundry', parentKey: 'appl' },
+  { key: 'washers', text: 'Washing machines', parentKey: 'laundry', secondaryText: 'CAT-1201' },
+  { key: 'dryers', text: 'Dryers', parentKey: 'laundry', secondaryText: 'CAT-1202' },
+  { key: 'elec', text: 'Electrical' },
+  { key: 'lighting', text: 'Lighting', parentKey: 'elec' },
+  { key: 'heating', text: 'Heating', parentKey: 'elec' },
+];
+
+/**
+ * The account hierarchy straight from Dataverse. Its own component so the hook
+ * only runs - and only fetches - once there is a connection to fetch over.
+ */
+function LiveAccountHierarchy() {
+  const [value, setValue] = useState<LookupOption | null>(null);
+  const hierarchy = useHierarchyLookup('account', {
+    filter: 'statecode eq 0',
+    onError: (err) => console.error('[useHierarchyLookup]', err),
+  });
+
+  return (
+    <Lookup
+      {...hierarchy}
+      aria-label="Parent account"
+      placeholder="Search accounts..."
+      selectedOption={value}
+      onOptionSelect={setValue}
+      showPath
+    />
+  );
+}
 
 // =============================================================================
 // LOOKUP EXAMPLES COMPONENT
@@ -122,6 +159,9 @@ export function LookupExamples({
   // ─────────────────────────────────────────────────────────────────────────────
   // STATE: Multi-entity lookup with segmented tabs
   // ─────────────────────────────────────────────────────────────────────────────
+
+  const [selectedCategory, setSelectedCategory] = useState<LookupOption | null>(null);
+  const [leafCategories, setLeafCategories] = useState<LookupOption[]>([]);
 
   const [multiEntityFilter, setMultiEntityFilter] = useState<'accounts' | 'contacts' | 'recent'>('accounts');
   const [selectedMultiEntity, setSelectedMultiEntity] = useState<LookupOption | null>(null);
@@ -645,6 +685,48 @@ export function LookupExamples({
           Expand contacts to see Badges in details.
         </p>
         <CodeExample sampleId="lookup-multi-entity-lookup-with-react-elements" />
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          Hierarchical Lookup
+          Options as a tree from each option's parentKey. Arrow Right / Left
+          open and close the highlighted node.
+          ═══════════════════════════════════════════════════════════════════════ */}
+      <section style={{ marginBottom: 40 }}>
+        <h2>Hierarchical Lookup</h2>
+        <p style={{ color: '#666', marginBottom: 12 }}>
+          <code>hierarchical</code> builds a tree from each option&apos;s <code>parentKey</code>; the level is worked
+          out, not passed. Search keeps each match with its ancestors. With a connection, the last field reads the
+          account hierarchy straight from Dataverse through <code>useHierarchyLookup</code>.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, ...fieldWidth }}>
+          <Lookup
+            aria-label="Category"
+            placeholder="Search categories..."
+            options={categoryOptions}
+            hierarchical
+            defaultExpanded={1}
+            showPath
+            selectedOption={selectedCategory}
+            onOptionSelect={setSelectedCategory}
+          />
+          <Lookup
+            aria-label="Categories"
+            placeholder="Bottom level only..."
+            options={categoryOptions}
+            hierarchical
+            selectableParents={false}
+            multiSelect
+            selectedOptions={leafCategories}
+            onOptionsSelect={setLeafCategories}
+          />
+          {dynamicsConnected ? (
+            <LiveAccountHierarchy />
+          ) : (
+            <Text size={200}>Connect to Dynamics 365 to browse the live account hierarchy.</Text>
+          )}
+        </div>
+        <CodeExample sampleId="lookup-hierarchical-lookup" />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════

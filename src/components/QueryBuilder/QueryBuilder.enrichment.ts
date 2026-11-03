@@ -5,6 +5,7 @@
  * These functions work for both main entity fields and related entity fields.
  */
 
+import { webApiRequest } from '../../api/webApi';
 import type { QueryBuilderField, QueryBuilderLookupTarget } from './QueryBuilder.types';
 import { buildFieldOptions } from './QueryBuilder.utils';
 
@@ -41,7 +42,7 @@ export const fetchOptionSetMetadata = async (
 ): Promise<Map<string, any>> => {
     const results = await Promise.all(
         OPTIONSET_CASTS.map(async ({ castType, optionSelect }) => {
-            const baseUrl = `/api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes/Microsoft.Dynamics.CRM.${castType}?$select=LogicalName`;
+            const baseUrl = `EntityDefinitions(LogicalName='${entityName}')/Attributes/Microsoft.Dynamics.CRM.${castType}?$select=LogicalName`;
             const localSet = `OptionSet($select=${optionSelect})`;
             const globalSet = `GlobalOptionSet($select=${optionSelect})`;
 
@@ -49,7 +50,7 @@ export const fetchOptionSetMetadata = async (
             // both; retry with the local set alone if a cast rejects the combined expand.
             for (const expandClause of [`${localSet},${globalSet}`, localSet]) {
                 try {
-                    const response = await fetch(`${baseUrl}&$expand=${expandClause}`, { headers: ODATA_HEADERS });
+                    const response = await webApiRequest(`${baseUrl}&$expand=${expandClause}`, { headers: ODATA_HEADERS });
                     if (!response.ok) continue;
 
                     const data = await response.json();
@@ -105,9 +106,9 @@ export const enrichLookupFields = async (
                 const typeCast = attrType === 'Customer' ? 'CustomerAttributeMetadata' :
                                attrType === 'Owner' ? 'OwnerAttributeMetadata' :
                                'LookupAttributeMetadata';
-                const targetsUrl = `/api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes(LogicalName='${field.id}')/Microsoft.Dynamics.CRM.${typeCast}?$select=LogicalName,Targets`;
+                const targetsUrl = `EntityDefinitions(LogicalName='${entityName}')/Attributes(LogicalName='${field.id}')/Microsoft.Dynamics.CRM.${typeCast}?$select=LogicalName,Targets`;
                 
-                const targetsResponse = await fetch(targetsUrl, {
+                const targetsResponse = await webApiRequest(targetsUrl, {
                     headers: {
                         'OData-MaxVersion': '4.0',
                         'OData-Version': '4.0',
@@ -124,8 +125,8 @@ export const enrichLookupFields = async (
                         
                         for (const targetEntityName of targetsData.Targets) {
                             try {
-                                const entityMetaUrl = `/api/data/v9.2/EntityDefinitions(LogicalName='${targetEntityName}')?$select=LogicalName,EntitySetName,PrimaryNameAttribute,PrimaryIdAttribute,DisplayName`;
-                                const entityMetaResponse = await fetch(entityMetaUrl, {
+                                const entityMetaUrl = `EntityDefinitions(LogicalName='${targetEntityName}')?$select=LogicalName,EntitySetName,PrimaryNameAttribute,PrimaryIdAttribute,DisplayName`;
+                                const entityMetaResponse = await webApiRequest(entityMetaUrl, {
                                     headers: {
                                         'OData-MaxVersion': '4.0',
                                         'OData-Version': '4.0',

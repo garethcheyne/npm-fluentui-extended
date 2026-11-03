@@ -20,6 +20,7 @@ export {
 export type { LookupNavigation } from './metadata';
 export {
   getSystemUser,
+  clearSystemUserCache,
   searchSystemUsers,
   systemUserImageUrl,
   initialsOf,
@@ -29,6 +30,14 @@ export type { SystemUserRecord, SearchSystemUsersOptions } from './systemUser';
 
 export { searchOwners, searchTeams, getOwner, ownerFromUser } from './owner';
 export type { OwnerRecord, OwnerType, SearchOwnersOptions } from './owner';
+
+export {
+  getHierarchyRelationship,
+  getHierarchyChildren,
+  searchHierarchy,
+  clearHierarchyCache,
+} from './hierarchy';
+export type { HierarchyRelationship, HierarchyRecord, HierarchyQueryOptions } from './hierarchy';
 
 export {
   loadGoogleMaps,

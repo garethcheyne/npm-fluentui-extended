@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Combobox, Field, Option, Spinner, Text, mergeClasses } from '@fluentui/react-components';
 import { getAttributeOptions } from '../../api/metadata';
+import { buildHierarchy, flattenHierarchy, pathOf } from '../Lookup/Lookup.hierarchy';
 import { DEFAULT_FIELD_APPEARANCE, toListboxAppearance } from '../../types/appearance';
 import { useOptionSetFieldStyles } from './OptionSetField.styles';
 import {
@@ -10,6 +11,9 @@ import {
   selectedLabels,
 } from './OptionSetField.utils';
 import type { OptionSetFieldProps, OptionSetOption } from './OptionSetField.types';
+
+/** Indent per level of a hierarchical list, in px - the Lookup's too. */
+const TREE_INDENT = 16;
 
 /**
  * Calculate relative luminance from a hex colour and return the appropriate
@@ -62,6 +66,12 @@ export const OptionSetField: React.FC<OptionSetFieldProps> = ({
   size,
   appearance = DEFAULT_FIELD_APPEARANCE,
   clearable = true,
+  inline = false,
+  hierarchical = false,
+  getParentValue,
+  selectableParents = true,
+  showPath = false,
+  pathSeparator = ' › ',
   open,
   label,
   validationMessage,
@@ -113,14 +123,51 @@ export const OptionSetField: React.FC<OptionSetFieldProps> = ({
     }
   }, [open]);
 
-  const options = providedOptions?.length ? providedOptions : loadedOptions;
+  const sourceOptions = providedOptions?.length ? providedOptions : loadedOptions;
+  // getParentValue is usually an inline function, so it is read at call time rather than memoised on
+  const getParentValueRef = React.useRef(getParentValue);
+  getParentValueRef.current = getParentValue;
+  const options = React.useMemo(() => {
+    const resolve = getParentValueRef.current;
+    if (!hierarchical || !resolve) return sourceOptions;
+    return sourceOptions.map((option) => ({ ...option, parentValue: resolve(option, sourceOptions) ?? null }));
+  }, [hierarchical, sourceOptions]);
+
+  const tree = React.useMemo(
+    () =>
+      hierarchical
+        ? buildHierarchy(options, (option) => String(option.value), (option) =>
+            option.parentValue == null ? null : String(option.parentValue),
+          )
+        : null,
+    [hierarchical, options],
+  );
+
   const selectedValues = React.useMemo(() => parseSelectedValues(value), [value]);
-  const displayLabels = React.useMemo(() => selectedLabels(options, selectedValues), [options, selectedValues]);
+  const displayLabels = React.useMemo(() => {
+    if (!tree || !showPath) return selectedLabels(options, selectedValues);
+    return selectedValues
+      .map((selected) => pathOf(tree, String(selected)).map((option) => option.label).join(pathSeparator))
+      .filter(Boolean);
+  }, [tree, showPath, pathSeparator, options, selectedValues]);
+
+  // Every level open: an option set is small enough to show whole, and the
+  // Combobox has no way to fold a row without choosing it
+  const treeRows = React.useMemo(() => {
+    if (!tree) return null;
+    const query = filterText.trim().toLowerCase();
+    const matches = query
+      ? new Set(options.filter((option) => option.label.toLowerCase().includes(query)).map((option) => String(option.value)))
+      : null;
+    return flattenHierarchy(tree, { isExpanded: () => true, matches });
+  }, [tree, options, filterText]);
+
   const filteredOptions = React.useMemo(() => {
+    if (treeRows) return treeRows.map((row) => row.item);
     const query = filterText.trim().toLowerCase();
     if (!query) return options;
     return options.filter((option) => option.label.toLowerCase().includes(query));
-  }, [options, filterText]);
+  }, [treeRows, options, filterText]);
 
   // Get full selected option objects for badge rendering
   const selectedOptions = React.useMemo(
@@ -184,31 +231,44 @@ export const OptionSetField: React.FC<OptionSetFieldProps> = ({
           onOpenChange={handleOpenChange}
         >
           {filteredOptions.length > 0 ? (
-            filteredOptions.map((option) => (
-              <Option key={option.value} value={String(option.value)} text={option.label} disabled={option.disabled}>
-                <span className={styles.optionContent}>
-                  {showColors && (
-                    <span
-                      className={styles.swatch}
-                      style={option.color ? { backgroundColor: option.color } : undefined}
-                      aria-hidden
-                    />
-                  )}
-                  <span className={styles.optionLabel}>
-                    {asBadge && option.color ? (
+            filteredOptions.map((option, index) => {
+              const row = treeRows?.[index];
+              const groupOnly = Boolean(row && !selectableParents && row.hasChildren);
+              return (
+                <Option
+                  key={option.value}
+                  value={String(option.value)}
+                  text={option.label}
+                  disabled={option.disabled || groupOnly}
+                  className={mergeClasses(row?.isContext && styles.optionContext, groupOnly && styles.optionGroup)}
+                >
+                  <span
+                    className={styles.optionContent}
+                    style={row?.depth ? { marginLeft: row.depth * TREE_INDENT } : undefined}
+                  >
+                    {showColors && (
                       <span
-                        className={mergeClasses(styles.badge, getBadgeTextClass(option.color, styles))}
-                        style={{ backgroundColor: option.color }}
-                      >
-                        {option.label}
-                      </span>
-                    ) : (
-                      option.label
+                        className={styles.swatch}
+                        style={option.color ? { backgroundColor: option.color } : undefined}
+                        aria-hidden
+                      />
                     )}
+                    <span className={styles.optionLabel}>
+                      {asBadge && option.color ? (
+                        <span
+                          className={mergeClasses(styles.badge, getBadgeTextClass(option.color, styles))}
+                          style={{ backgroundColor: option.color }}
+                        >
+                          {option.label}
+                        </span>
+                      ) : (
+                        option.label
+                      )}
+                    </span>
                   </span>
-                </span>
-              </Option>
-            ))
+                </Option>
+              );
+            })
           ) : (
             <Option value="__no_matches__" disabled text="No matches found">
               No matches found
@@ -251,12 +311,12 @@ export const OptionSetField: React.FC<OptionSetFieldProps> = ({
   );
 
   if (!label && !validationMessage) {
-    return <div className={mergeClasses(styles.root, className)}>{control}</div>;
+    return <div className={mergeClasses(styles.root, inline && styles.inline, className)}>{control}</div>;
   }
 
   return (
     <Field
-      className={mergeClasses(styles.root, className)}
+      className={mergeClasses(styles.root, inline && styles.inline, className)}
       label={label}
       required={required}
       validationMessage={validationMessage}

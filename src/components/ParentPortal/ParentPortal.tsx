@@ -1,4 +1,4 @@
-import { FluentProvider, webLightTheme } from '@fluentui/react-components';
+import { FluentProvider } from '@fluentui/react-components';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ParentPortalProps, UseParentPortalMountOptions } from './ParentPortal.types';
@@ -34,13 +34,20 @@ function getParentDocument(): Document | null {
   }
 }
 
+/** Portals sharing a container by id, so the last one out can take it down. */
+const USERS_ATTR = 'data-fue-portal-users';
+/** Set on a container this module created - one the host page supplied is never removed. */
+const CREATED_ATTR = 'data-fue-portal-created';
+
 function getOrCreateContainer(parentDoc: Document, id: string, customStyles?: string): HTMLElement {
   let container = parentDoc.getElementById(id);
   if (!container) {
     container = parentDoc.createElement('div');
     container.id = id;
+    container.setAttribute(CREATED_ATTR, 'true');
     parentDoc.body.appendChild(container);
   }
+  container.setAttribute(USERS_ATTR, String(Number(container.getAttribute(USERS_ATTR) ?? 0) + 1));
 
   const styleId = `${id}-styles`;
   if (!parentDoc.getElementById(styleId)) {
@@ -51,6 +58,20 @@ function getOrCreateContainer(parentDoc: Document, id: string, customStyles?: st
   }
 
   return container;
+}
+
+/**
+ * Let go of a container, removing it and its stylesheet once nothing uses it.
+ *
+ * Left in place, an unmounted portal leaves a fixed, full-window layer at
+ * z-index 100000 in the host page for the rest of its life.
+ */
+function releaseContainer(parentDoc: Document, container: HTMLElement, id: string) {
+  const users = Math.max(0, Number(container.getAttribute(USERS_ATTR) ?? 1) - 1);
+  container.setAttribute(USERS_ATTR, String(users));
+  if (users > 0 || container.getAttribute(CREATED_ATTR) !== 'true') return;
+  container.remove();
+  parentDoc.getElementById(`${id}-styles`)?.remove();
 }
 
 function copyFluentTokens(container: HTMLElement) {
@@ -117,6 +138,15 @@ function useSyncStyles(active: boolean, containerId: string, syncInterval: numbe
           mirror.textContent = css;
         }
       }
+
+      // A stylesheet the iframe has dropped goes from the host too, or its rules
+      // keep applying there until the portal unmounts
+      for (const [src, mirror] of mirrorMap) {
+        if (!src.isConnected) {
+          mirror.remove();
+          mirrorMap.delete(src);
+        }
+      }
     }
 
     syncAllStyles();
@@ -159,6 +189,10 @@ export function useParentPortalMount(options?: UseParentPortalMountOptions): HTM
     const el = getOrCreateContainer(parentDoc, containerId, containerStyles);
     if (syncTokens) copyFluentTokens(el);
     setContainer(el);
+    return () => {
+      releaseContainer(parentDoc, el, containerId);
+      setContainer(null);
+    };
   }, [containerId, containerStyles, syncTokens]);
 
   useSyncStyles(syncStyles && container !== null, containerId, syncInterval);
@@ -191,8 +225,11 @@ export function ParentPortal({
     return <>{children}</>;
   }
 
+  // No theme of its own: a portal keeps React context, so this provider inherits
+  // the app's theme. A fixed webLightTheme here overrode it - a dark app's content
+  // came out light in the host page whatever tokens were copied across.
   return createPortal(
-    <FluentProvider theme={webLightTheme} style={{ background: 'transparent' }}>
+    <FluentProvider style={{ background: 'transparent' }}>
       {children}
     </FluentProvider>,
     container,

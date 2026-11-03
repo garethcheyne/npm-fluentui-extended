@@ -1,6 +1,5 @@
 import { makeStyles, shorthands, tokens } from '@fluentui/react-components';
 import { CELL_STYLE_TOKENS, HEADER_HEIGHT, ROW_STYLE_TOKENS } from './DataGrid.tokens';
-import { lookupClassNames } from '../Lookup/Lookup';
 
 /**
  * Grid chrome.
@@ -344,7 +343,12 @@ export const useDataGridStyles = makeStyles({
     // The active cell is outlined here and nowhere else. Ringing the control as
     // well produces two rings a couple of pixels apart, and `focus-within` is
     // what lets one rule cover a plain input and a composite control alike.
+    //
+    // The cell takes the white fill too, lifting the value off whatever the row
+    // is painted. Filled by the editor instead, it was a box stopping short of
+    // the cell edge inside the ring - a window within a window.
     ':focus-within': {
+      backgroundColor: tokens.colorNeutralBackground1,
       outlineWidth: tokens.strokeWidthThick,
       outlineStyle: 'solid',
       outlineColor: tokens.colorBrandStroke1,
@@ -368,8 +372,7 @@ export const useDataGridStyles = makeStyles({
   cellStateBg: {
     backgroundColor: 'var(--fue-cell-bg)',
     // Filled controls would otherwise cover the state with their own surface.
-    // They get it back while focused, where lifting the value off the fill is
-    // the point.
+    // While focused the cell's own white fill lifts the value off it instead.
     '& .fui-Input:not(:focus-within), & .fui-Combobox:not(:focus-within)': {
       backgroundColor: 'transparent',
     },
@@ -480,13 +483,13 @@ export const useDataGridStyles = makeStyles({
     textAlign: 'inherit',
     ...shorthands.padding('0', '2px'),
     boxSizing: 'border-box',
-    // No ring of its own: the cell draws it, so a plain input and a Lookup read
-    // the same when focused. Only the fill changes here, to lift the value off
-    // whatever the row is painted.
-    ':focus': {
-      backgroundColor: tokens.colorNeutralBackground1,
-      borderRadius: tokens.borderRadiusSmall,
-    },
+    // A value wider than a narrowed column. An input clips silently, and a
+    // right-aligned one loses its last digits - "1,287.00" reads as "1,287.0",
+    // a different number. The ellipsis shows it was cut, as the read-only cells
+    // do; the browser drops it while the input is being typed in.
+    textOverflow: 'ellipsis',
+    // No ring and no fill of its own: the cell draws both while focused, so a
+    // plain input, a date and a Lookup all read the same.
     // The number spinners eat 16px of a column that rarely has it to spare.
     '::-webkit-outer-spin-button': { WebkitAppearance: 'none', margin: 0 },
     '::-webkit-inner-spin-button': { WebkitAppearance: 'none', margin: 0 },
@@ -546,57 +549,15 @@ export const useDataGridStyles = makeStyles({
   },
 
   /**
-   * A choice cell showing only its badge until the cell is used.
-   *
-   * Fluent's combobox carries a filled background and an underline, which is
-   * right on a form and wrong down a column — a hundred of them turns the grid
-   * into a wall of input boxes and buries the badge the colour is carrying. The
-   * chrome comes back on hover and focus, so the cell still reads as editable
-   * at the point someone goes to edit it.
+   * A choice cell. The editors are all drawn `inline` - as their value, with
+   * the cell carrying the one focus ring and the white fill (see `cell`) - so
+   * this is only what is particular to a grid.
    */
   choiceAtRest: {
     // OptionSetField indents its badge by a form field's own input padding,
     // which leaves a badge sitting ten pixels right of the text in the columns
     // either side of it. A grid cell's text starts at 2px, so the badge does too.
     '--fue-optionset-badge-inset': '2px',
-    '& .fui-Combobox': {
-      backgroundColor: 'transparent',
-      ...shorthands.borderColor('transparent'),
-    },
-    '& .fui-Combobox::after': { ...shorthands.borderColor('transparent') },
-    // The chevron is chrome too, and reads as clutter beside a badge.
-    '& .fui-Combobox__expandIcon': { opacity: 0 },
-    ':hover': {
-      '& .fui-Combobox': { backgroundColor: tokens.colorNeutralBackground1 },
-      '& .fui-Combobox__expandIcon': { opacity: 1 },
-    },
-    ':focus-within': {
-      '& .fui-Combobox': { backgroundColor: tokens.colorNeutralBackground1 },
-      '& .fui-Combobox__expandIcon': { opacity: 1 },
-    },
-  },
-
-  /**
-   * A lookup cell showing only its value until the cell is used — the same
-   * treatment as `choiceAtRest`, for the same reason.
-   *
-   * The filled field's grey box, drawn in every row, stopped short of the
-   * column edge and read as a column of input boxes rather than of values. The
-   * field's own left inset also sat the badge further in than the text in the
-   * columns beside it. Fill and border come back on hover and focus.
-   */
-  lookupAtRest: {
-    [`& .${lookupClassNames.field}`]: {
-      backgroundColor: 'transparent',
-      ...shorthands.borderColor('transparent'),
-      paddingLeft: '0',
-    },
-    ':hover': {
-      [`& .${lookupClassNames.field}`]: { backgroundColor: tokens.colorNeutralBackground3 },
-    },
-    ':focus-within': {
-      [`& .${lookupClassNames.field}`]: { backgroundColor: tokens.colorNeutralBackground3 },
-    },
   },
 
   // ── Personas ──────────────────────────────────────────────────────────────
@@ -775,9 +736,16 @@ export const useDataGridStyles = makeStyles({
       paddingBottom: 0,
     },
   },
+  /**
+   * Centred in the cell. Fluent spaces the box from a label with an 8px margin
+   * and pins it to the top of its root, so it lines up with a label's first
+   * line - in a label-less cell that only leaves it sitting high.
+   */
   editorCheckbox: {
     ...shorthands.margin('0'),
+    alignItems: 'center',
     cursor: 'pointer',
+    '& .fui-Checkbox__indicator': { ...shorthands.margin('0'), alignSelf: 'center' },
   },
 
   /**
@@ -795,9 +763,10 @@ export const useDataGridStyles = makeStyles({
 
   // ── Affixes ───────────────────────────────────────────────────────────────
   //
-  // A grey box carrying the unit, hard against the edge that unit belongs to:
-  // `$` leads the value, `%` trails it. The value keeps the rest of the cell, so
-  // the symbol never eats into the digits.
+  // The unit in muted text, hard against the edge it belongs to: `$` leads the
+  // value, `%` trails it. The value keeps the rest of the cell, so the symbol
+  // never eats into the digits. Text rather than a filled box: a grey chip in
+  // every row was one more box inside the cell, as Dynamics does not draw it.
 
   affixWrap: {
     display: 'flex',
@@ -817,9 +786,7 @@ export const useDataGridStyles = makeStyles({
     justifyContent: 'center',
     minWidth: '13px',
     ...shorthands.padding('0', '2px'),
-    backgroundColor: tokens.colorNeutralBackground3,
     color: tokens.colorNeutralForeground3,
-    borderRadius: tokens.borderRadiusSmall,
     fontSize: 'inherit',
     lineHeight: 'inherit',
     userSelect: 'none',

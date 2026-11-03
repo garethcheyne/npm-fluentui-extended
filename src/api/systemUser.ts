@@ -64,10 +64,47 @@ const toRecord = (raw: Record<string, unknown>): SystemUserRecord => ({
   businessUnit: (raw[BUSINESS_UNIT_FORMATTED] as string) ?? null,
 });
 
-/** Retrieve a single user. */
-export const getSystemUser = async (
+/**
+ * Users already fetched, by id, for the life of the page.
+ *
+ * A column of personas names the same handful of people over and over; without
+ * this each row would ask for its user again. The promise is cached rather than
+ * the record, so rows mounting together share one request. A failure is dropped
+ * from the cache, so the next attempt retries rather than inheriting it.
+ */
+const userCache = new Map<string, Promise<SystemUserRecord>>();
+
+/** Clear cached users. Exposed mainly for tests. */
+export const clearSystemUserCache = (): void => {
+  userCache.clear();
+};
+
+/**
+ * Retrieve a single user, once per id: later calls for the same user share the
+ * first request. A call with an abort `signal` is not shared - one caller
+ * cancelling must not cancel the request for everyone else.
+ */
+export const getSystemUser = (
   systemUserId: string,
   options: WebApiRequestOptions = {},
+): Promise<SystemUserRecord> => {
+  if (options.signal) return fetchSystemUser(systemUserId, options);
+
+  const key = systemUserId.replace(/[{}]/g, '').toLowerCase();
+  const cached = userCache.get(key);
+  if (cached) return cached;
+
+  const request = fetchSystemUser(systemUserId, options).catch((err) => {
+    userCache.delete(key);
+    throw err;
+  });
+  userCache.set(key, request);
+  return request;
+};
+
+const fetchSystemUser = async (
+  systemUserId: string,
+  options: WebApiRequestOptions,
 ): Promise<SystemUserRecord> => {
   const raw = await webApiGet<Record<string, unknown>>(
     `systemusers(${systemUserId})?$select=${SYSTEM_USER_COLUMNS.join(',')}`,

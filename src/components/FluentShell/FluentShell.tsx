@@ -1148,7 +1148,7 @@ function buildDebugApi(win: Window = window): ShellDebugApi {
     debug: (on = true) => {
       setOverlayOverride({ debug: on });
       persistDebugFlag(on);
-      return detectHostSurface();
+      return detectHostSurface(undefined, 'auto', win);
     },
     containers: (on = true) => setOverlayOverride({ containers: on }),
     reset: () => {
@@ -1414,9 +1414,11 @@ export function FluentShell(props: FluentShellProps) {
   const showDebug = overrides.debug ?? debug ?? isShellDebugEnabled(shellWindow);
   const showGuides = overrides.containers ?? showContainers;
 
+  // The shell's own window, as it measured: in a frame the global one is the
+  // wrong window, and the report described a surface the shell was not in
   React.useEffect(() => {
-    if (showDebug) logShellDiagnostics(surface, strategy);
-  }, [showDebug, surface, strategy]);
+    if (showDebug) logShellDiagnostics(surface, strategy, shellWindow);
+  }, [showDebug, surface, strategy, shellWindow]);
 
   const cssVars = {
     '--fluentShellPadTop': `${info.spacing.top}px`,
@@ -1454,7 +1456,13 @@ export function FluentShell(props: FluentShellProps) {
             </div>
           </>
         )}
-        {showDebug && <ShellDebugOverlay info={info} styles={styles} />}
+        {showDebug && (
+          <ShellDebugOverlay
+            info={info}
+            styles={styles}
+            onReport={() => logShellDiagnostics(surface, strategy, shellWindow)}
+          />
+        )}
         {children}
       </div>
     </ShellContext.Provider>
@@ -1464,9 +1472,12 @@ export function FluentShell(props: FluentShellProps) {
 function ShellDebugOverlay({
   info,
   styles,
+  onReport,
 }: {
   info: HostSurfaceInfo;
   styles: Record<'debugGutter' | 'debugBadge', string>;
+  /** Logs the full report, for the window the shell measured */
+  onReport: () => void;
 }) {
   const { spacing, hostInset } = info;
   const bands: React.CSSProperties[] = [
@@ -1484,7 +1495,7 @@ function ShellDebugOverlay({
       <div
         className={styles.debugBadge}
         title="Click to log the full FluentShell report to the console"
-        onClick={() => logShellDiagnostics()}
+        onClick={onReport}
       >
         {info.surface}/{info.density} {info.width}px · host{' '}
         {info.measured ? edges(hostInset) : 'cross-origin'} + shell {edges(spacing)} ·{' '}

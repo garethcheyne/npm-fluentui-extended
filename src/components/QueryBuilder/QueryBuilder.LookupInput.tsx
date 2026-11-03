@@ -5,6 +5,7 @@
  */
 
 import * as React from 'react';
+import { webApiRequest } from '../../api/webApi';
 import { Input, Text } from '@fluentui/react-components';
 import { Lookup, type LookupOption } from '../Lookup';
 import type { QueryBuilderLookupOption, QueryBuilderLookupTarget } from './QueryBuilder.types';
@@ -64,7 +65,7 @@ export const LookupValueInput: React.FC<LookupValueInputProps> = ({
                     queryOptions += `&$filter=contains(${nameAttr},'${searchText.replace(/'/g, "''")}')`;
                 }
 
-                const response = await fetch(`/api/data/v9.2/${target.entitySetName}?${queryOptions}`, {
+                const response = await webApiRequest(`${target.entitySetName}?${queryOptions}`, {
                     headers: {
                         'OData-MaxVersion': '4.0',
                         'OData-Version': '4.0',

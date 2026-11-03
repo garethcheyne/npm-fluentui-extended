@@ -6,6 +6,26 @@ import path from 'path';
 let cachedToken: string | null = null;
 let tokenExpiry = 0;
 
+/**
+ * The client secret, read on the dev server and nowhere else.
+ *
+ * Deliberately not `VITE_`-prefixed: Vite hands every `VITE_*` variable to the
+ * browser through `import.meta.env`, and a `vite build` bakes it into the bundle.
+ * The old name is still accepted so an existing .env keeps working, with a nudge
+ * to rename it.
+ */
+let warnedLegacySecret = false;
+function clientSecretOf(env: Record<string, string>): string | undefined {
+  if (env.AZURE_CLIENT_SECRET) return env.AZURE_CLIENT_SECRET;
+  if (env.VITE_AZURE_CLIENT_SECRET && !warnedLegacySecret) {
+    warnedLegacySecret = true;
+    console.warn(
+      '[dynamics-auth] VITE_AZURE_CLIENT_SECRET is exposed to the browser. Rename it to AZURE_CLIENT_SECRET in testHarness/.env.',
+    );
+  }
+  return env.VITE_AZURE_CLIENT_SECRET;
+}
+
 // Plugin to handle OAuth and proxy Dynamics API calls (avoids CORS issues)
 function dynamicsAuthPlugin(): Plugin {
   let env: Record<string, string>;
@@ -18,7 +38,7 @@ function dynamicsAuthPlugin(): Plugin {
 
     const tenantId = env.VITE_AZURE_TENANT_ID;
     const clientId = env.VITE_AZURE_CLIENT_ID;
-    const clientSecret = env.VITE_AZURE_CLIENT_SECRET;
+    const clientSecret = clientSecretOf(env) ?? '';
     const dynamicsUrl = env.VITE_DYNAMICS_URL?.replace(/\/$/, '');
 
     const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
@@ -48,15 +68,16 @@ function dynamicsAuthPlugin(): Plugin {
   return {
     name: 'dynamics-auth',
     configResolved(config) {
-      // Load env vars from the testHarness directory
-      env = loadEnv(config.mode, __dirname, 'VITE_');
+      // Load env vars from the testHarness directory. Every prefix, so the
+      // unprefixed secret is read here - this runs in Node, not the browser.
+      env = loadEnv(config.mode, __dirname, '');
     },
     configureServer(server) {
       // Token endpoint
       server.middlewares.use('/api/dynamics-token', async (req, res) => {
         const tenantId = env.VITE_AZURE_TENANT_ID;
         const clientId = env.VITE_AZURE_CLIENT_ID;
-        const clientSecret = env.VITE_AZURE_CLIENT_SECRET;
+        const clientSecret = clientSecretOf(env);
         const dynamicsUrl = env.VITE_DYNAMICS_URL?.replace(/\/$/, '');
 
         if (!tenantId || !clientId || !clientSecret || !dynamicsUrl) {

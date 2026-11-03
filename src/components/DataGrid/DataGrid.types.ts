@@ -400,7 +400,20 @@ export interface DataGridColumn<T extends DataGridRow = DataGridRow> {
    * empty lookup cell into a picker that queries as the user types, so the whole
    * table is reachable from the cell rather than only a preloaded page.
    */
-  searchLookup?: (text: string) => Promise<DataGridLookupOption[]>;
+  searchLookup?: (text: string, ctx: DataGridCellContext<T>) => Promise<DataGridLookupOption[]>;
+  /**
+   * The strip across the top of a lookup cell's dropdown, as a Dynamics lookup
+   * has. Defaults to the column's label. A function is handed the cell and the
+   * search in progress, for a header that depends on the row — "Categories in
+   * department 053", say. `null` hides it.
+   */
+  lookupHeader?: React.ReactNode | ((ctx: DataGridCellContext<T>, search: DataGridLookupSearch) => React.ReactNode);
+  /**
+   * The strip along the bottom of a lookup cell's dropdown. Defaults to the
+   * search state — a prompt to keep typing, "Searching…", or how many records
+   * were found. Put actions here ("+ New brand"). `null` hides it.
+   */
+  lookupFooter?: React.ReactNode | ((ctx: DataGridCellContext<T>, search: DataGridLookupSearch) => React.ReactNode);
   /** Commit a picked lookup value. Falls back to `onCellChange` with the id. */
   onLookupSelect?: (option: DataGridLookupOption | null, ctx: DataGridCellContext<T>) => void;
   /** Open a resolved reference. Without it the value is not clickable. */
@@ -493,6 +506,17 @@ export interface DataGridColumn<T extends DataGridRow = DataGridRow> {
    * id, and the name beside it belongs to columns the drag knows nothing about.
    */
   fillable?: boolean;
+}
+
+/** The state of a lookup cell's search, as its header and footer are handed it. */
+export interface DataGridLookupSearch {
+  /** What has been typed. */
+  text: string;
+  /** Characters needed before a search runs. */
+  minLength: number;
+  searching: boolean;
+  /** Options found for the current text. */
+  results: DataGridLookupOption[];
 }
 
 /** An option offered by a `lookup` column's search. */
