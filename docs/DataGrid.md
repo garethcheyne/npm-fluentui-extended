@@ -32,8 +32,8 @@ The grid renders only the rows in view. Two thousand rows mount as roughly thirt
 | **Virtualisation** | Row windowing with spacer rows, re-measured on density change |
 | **Columns** | Drag to reorder, drag the right edge to resize, right-click for a menu, show/hide |
 | **Grouping** | One-column grouping with sticky banners, counts, and optional subtotals |
-| **Filtering** | A per-column filter row plus a `globalFilter` for free text |
-| **Sorting** | Ascending first, whatever the data type |
+| **Filtering** | A Dynamics-style **Filter by** panel per column (operator + value), a per-column filter row, and a `globalFilter` for free text. Lookups filter and search on their displayed name |
+| **Sorting** | Ascending first, whatever the data type. Text sorts case-insensitively with numbers in order ("Item 2" before "Item 10"); lookups sort by name |
 | **Editing** | Inline editors chosen by data type, with unsaved-edit layering |
 | **Density** | `compact` / `comfortable` / `spacious` |
 | **Persistence** | Order, widths, visibility, density, sort and grouping, scoped per grid and per org |
@@ -178,6 +178,25 @@ With `keyboardNavigation` on (the default):
 
 Moving through cells without typing stages nothing. Keys pressed inside a cell's own popup — a calendar, a lookup's results — are left to that control.
 
+## Filtering
+
+Each column's menu has **Filter by**, which opens a panel under the column in the same shape as Dynamics' own grid: an operator, a value, and **Apply** / **Clear**. Nothing is filtered until Apply (or Enter). A filtered column shows a solid filter icon beside its label, and its menu gains **Clear filter**.
+
+| Column type | Operators |
+|---|---|
+| Text, lookup | Equals, Does not equal, Contains, Does not contain, Begins with, Does not begin with, Ends with, Does not end with |
+| Number, money, percent | Equals, Does not equal, Greater than, Greater than or equal to, Less than, Less than or equal to |
+| Date, date and time | On, On or after, On or before |
+| Boolean, choice | Equals (from a list of values); choices also Does not equal |
+
+Every type also offers **Contains data** and **Does not contain data**.
+
+Text compares against what the cell shows, so a money column matches `1,250.00` and a lookup matches its record's name rather than its id. Numbers compare as numbers and accept `1,000` or `$1,000`; dates compare by calendar day.
+
+The **Filters** toolbar toggle still shows a filter row. Typing there is a plain *contains*, applied once typing pauses. A filter set from the panel shows its value in the row too.
+
+A column's filter is stored on the TanStack column as a `DataGridFilterValue` (`{ operator, value }`) or, from the filter row, a plain string. `matchesFilter`, `filterOperatorsFor` and `FILTER_OPERATOR_LABELS` are exported for a grid that builds its own filter UI.
+
 ## Column visibility and views
 
 `columnVisibility` / `onColumnVisibilityChange` control visibility from the app. `forceHiddenColumns` hides columns whatever the user chose, without changing that choice — clear it and exactly what was showing comes back, which is what a "customer view" toggle needs. Columns sharing a `columnGroup` are listed together in the column picker, under a toggle for the whole set.
@@ -222,7 +241,7 @@ const grid = useRef<DataGridHandle<QuoteLine>>(null);
 
 grid.current?.scrollToRow('line-1500', 'center');
 grid.current?.highlightRow('line-1500');        // scroll there and outline it briefly
-grid.current?.focusColumnFilter('productName'); // opens the filter row first
+grid.current?.focusColumnFilter('productName'); // shows the filter row and focuses that column's box
 grid.current?.resetColumnWidths();
 const view = grid.current?.getLayout();         // order, widths, visibility, density, sort, grouping
 grid.current?.applyLayout({ visibility: { cost: false } });
@@ -258,7 +277,7 @@ const { table, metrics, columnMap, selectedRowIds, setGroupBy } = useDataGrid({
 | `rowStates` / `cellStates` | `Record<string, style>` | built-in set | Add or restyle states |
 | `renderRowIndicator` | `(row, rowId) => ReactNode` | — | Badge in the leading column |
 | `showEditableHints` | `boolean` | `false` | Underline editable cells |
-| `striped` | `boolean` | `true` | Alternate row shading |
+| `striped` | `boolean` | `false` | Alternate row shading. Off by default, as in Fluent's DataGrid |
 | `density` / `defaultDensity` / `onDensityChange` | | `'comfortable'` | Row heights |
 | `selectable` | `boolean` | `false` | Leading checkbox column |
 | `selectedRowIds` / `onSelectionChange` | `Set<string>` | — | Controlled selection |

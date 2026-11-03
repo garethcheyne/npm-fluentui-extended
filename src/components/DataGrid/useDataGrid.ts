@@ -12,6 +12,9 @@ import {
   type ColumnSizingState,
   type ExpandedState,
   type GroupingState,
+  type Row,
+  type SortingFn,
+  type SortingFnOption,
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table';
@@ -25,8 +28,9 @@ import {
 } from './DataGrid.tokens';
 import {
   applyPinOrder,
+  cellDisplayText,
+  compareText,
   defaultStorage,
-  formatCellValue,
   layoutStorageKey,
   mergeColumnOrder,
   readStored,
@@ -35,6 +39,7 @@ import {
   writeStored,
 } from './DataGrid.utils';
 import { resolveCellValue } from './DataGrid.compute';
+import { matchesFilter } from './DataGrid.filter';
 import type {
   DataGridColumn,
   DataGridDensity,
@@ -46,6 +51,36 @@ import type {
 
 const ALL_FACETS = ['order', 'sizing', 'visibility', 'density', 'sorting', 'grouping'] as const;
 type Facet = (typeof ALL_FACETS)[number];
+
+/** Text columns sort through the shared collator rather than TanStack's regex-based compare. */
+const textSort: SortingFn<DataGridRow> = (a, b, columnId) =>
+  compareText(a.getValue(columnId), b.getValue(columnId));
+
+/**
+ * The sort a column gets from its data type.
+ *
+ * Left to `'auto'`, TanStack inspects the first rows on every sort (copying the
+ * row list to do it) and picks `alphanumeric` for any text with a digit in it —
+ * the slowest comparer it has. Saying which one up front avoids both. Types
+ * whose stored value is not what they show (choices, dates held as text) keep
+ * `'auto'`.
+ */
+function sortingFnFor(dataType: DataGridColumn['dataType']): SortingFnOption<DataGridRow> {
+  switch (dataType) {
+    case 'integer':
+    case 'decimal':
+    case 'money':
+    case 'percent':
+    case 'boolean':
+      return 'basic';
+    case 'string':
+    case 'multiline':
+    case 'lookup':
+      return textSort;
+    default:
+      return 'auto';
+  }
+}
 
 /**
  * A piece of grid state that restores from storage on mount and writes back on
@@ -186,6 +221,25 @@ export function useDataGrid<T extends DataGridRow>(
   const columnDefs = React.useMemo<ColumnDef<T, unknown>[]>(() => {
     const defs: ColumnDef<T, unknown>[] = [];
 
+    /**
+     * Sorts a lookup column on its displayed name. The names are cached per
+     * TanStack row for as long as these definitions live — they are rebuilt
+     * whenever the data or the effective values change, which is when a name
+     * could.
+     */
+    const lookupSortFor = (column: DataGridColumn<T>): SortingFn<T> => {
+      const names = new WeakMap<Row<T>, string>();
+      const nameOf = (row: Row<T>) => {
+        let name = names.get(row);
+        if (name === undefined) {
+          name = cellDisplayText(row.getValue(column.key), column, row);
+          names.set(row, name);
+        }
+        return name;
+      };
+      return (a, b) => compareText(nameOf(a), nameOf(b));
+    };
+
     // The reserved columns carry no value of their own — the body renders their
     // contents directly — but they must exist as columns so they take part in
     // sizing, ordering and the header row's colSpan arithmetic.
@@ -231,6 +285,11 @@ export function useDataGrid<T extends DataGridRow>(
         minSize: column.minWidth ?? MIN_COLUMN_WIDTH,
         maxSize: column.maxWidth ?? MAX_COLUMN_WIDTH,
         enableSorting: column.sortable !== false,
+        // A lookup sorts by the name it shows, not the id it stores. Each row's
+        // name is resolved once and cached (see `lookupSortFor`), not per comparison.
+        sortingFn: column.getLookupValue
+          ? lookupSortFor(column)
+          : (sortingFnFor(column.dataType) as SortingFnOption<T>),
         // TanStack descends first on numeric columns. Every D365 grid ascends
         // first whatever the type, and a column that jumps to its largest value
         // on the first click reads as a bug.
@@ -239,13 +298,13 @@ export function useDataGrid<T extends DataGridRow>(
         enableGrouping: column.groupable === true,
         enableResizing: column.resizable !== false,
         enableHiding: true,
-        // Filtering compares against what the user can see, so "1,250" matches a
-        // money column that stores 1250 and a choice column matches its label.
+        // A plain string (the filter row) is "contains" against what the user can
+        // see, so "1,250" matches a money column that stores 1250, a choice
+        // matches its label and a lookup its name. The Filter by panel's
+        // operators are in `matchesFilter`.
         filterFn: (row, columnId, filterValue) => {
-          const needle = String(filterValue ?? '').trim().toLowerCase();
-          if (!needle) return true;
           const raw = row.getValue(columnId);
-          return formatCellValue(raw, column, row.original).toLowerCase().includes(needle);
+          return matchesFilter(raw, column, () => cellDisplayText(raw, column, row), filterValue);
         },
         // Last, so a consumer reaching for TanStack directly can override any
         // of the defaults above rather than being boxed in by them.
@@ -412,13 +471,13 @@ export function useDataGrid<T extends DataGridRow>(
   );
 
   const searchFn = React.useCallback(
-    (row: { getValue: (id: string) => unknown; original: T }, columnId: string, value: unknown) => {
+    (row: Row<T>, columnId: string, value: unknown) => {
       if (searchScope && !searchScope.has(columnId)) return false;
       const needle = String(value ?? '').trim().toLowerCase();
       if (!needle) return true;
       const column = columnMap.get(columnId);
       if (!column) return false;
-      return formatCellValue(row.getValue(columnId), column, row.original)
+      return cellDisplayText(row.getValue(columnId), column, row)
         .toLowerCase()
         .includes(needle);
     },

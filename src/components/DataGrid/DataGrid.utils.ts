@@ -7,6 +7,7 @@ import type {
   DataGridRowStateStyle,
   DataGridSummary,
 } from './DataGrid.types';
+import type { Row } from '@tanstack/react-table';
 
 // ─── Value access ────────────────────────────────────────────────────────────
 
@@ -179,6 +180,66 @@ export function toImageSrc(value: unknown): string | null {
 }
 
 /**
+ * One number formatter per precision, built once.
+ *
+ * `toLocaleString` with options constructs a fresh `Intl.NumberFormat` on every
+ * call, and formatting runs for every row on each filter keystroke and search —
+ * tens of thousands of constructions for a large grid. The output is identical.
+ */
+const numberFormats = new Map<number, Intl.NumberFormat>();
+function numberFormatFor(digits: number): Intl.NumberFormat {
+  let format = numberFormats.get(digits);
+  if (!format) {
+    format = new Intl.NumberFormat(undefined, {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
+    numberFormats.set(digits, format);
+  }
+  return format;
+}
+
+/**
+ * Text order for sorting: case-insensitive, and numbers inside text compare as
+ * numbers ("Item 2" before "Item 10").
+ *
+ * What TanStack's own `alphanumeric` sort does, at a fraction of the cost — that
+ * one splits both strings with regexes on every comparison, which is seconds of
+ * work for a sort over tens of thousands of rows. Empty sorts first.
+ */
+const textCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+export function compareText(a: unknown, b: unknown): number {
+  return textCollator.compare(a == null ? '' : String(a), b == null ? '' : String(b));
+}
+
+/**
+ * What a cell reads as, for searching, filtering and sorting on.
+ *
+ * A lookup stores its record's id and only resolves the name when drawn, so
+ * matching on the stored value meant typing "laun" found nothing in a column
+ * plainly showing LAUNDRY, and sorting ordered by guid. The column's own
+ * resolver is used here so those agree with what is on screen.
+ */
+export function cellDisplayText<T extends DataGridRow>(
+  raw: unknown,
+  column: DataGridColumn<T>,
+  tableRow: Row<T>,
+): string {
+  if (column.getLookupValue && raw != null && raw !== '') {
+    const resolved = column.getLookupValue({
+      value: raw,
+      row: tableRow.original,
+      rowId: tableRow.id,
+      column,
+      tableRow,
+      readOnly: false,
+    });
+    if (resolved) return resolved.text ?? '';
+  }
+  return formatCellValue(raw, column, tableRow.original);
+}
+
+/**
  * Display text for a value, given its column.
  *
  * A column's own `format` wins outright. Otherwise the data type decides, and
@@ -209,10 +270,7 @@ export function formatCellValue<T extends DataGridRow>(
       const num = toNumber(value);
       if (num == null) return String(value);
       const digits = column.precision ?? defaultPrecision(column.dataType);
-      const text = num.toLocaleString(undefined, {
-        minimumFractionDigits: digits,
-        maximumFractionDigits: digits,
-      });
+      const text = numberFormatFor(digits).format(num);
       return column.dataType === 'percent' ? `${text}%` : text;
     }
 

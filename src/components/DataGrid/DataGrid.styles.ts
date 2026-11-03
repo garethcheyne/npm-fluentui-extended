@@ -1,5 +1,6 @@
 import { makeStyles, shorthands, tokens } from '@fluentui/react-components';
 import { CELL_STYLE_TOKENS, HEADER_HEIGHT, ROW_STYLE_TOKENS } from './DataGrid.tokens';
+import { lookupClassNames } from '../Lookup/Lookup';
 
 /**
  * Grid chrome.
@@ -75,7 +76,8 @@ export const useDataGridStyles = makeStyles({
     position: 'relative',
     paddingTop: '2px',
     paddingBottom: '2px',
-    paddingLeft: '6px',
+    // Lines the label up with the cell text below it, which has the same inset.
+    paddingLeft: tokens.spacingHorizontalS,
     // Room for the chevron, so a long label truncates before it rather than
     // running underneath it.
     paddingRight: '24px',
@@ -90,7 +92,9 @@ export const useDataGridStyles = makeStyles({
     userSelect: 'none',
     height: `${HEADER_HEIGHT}px`,
     boxSizing: 'border-box',
-    backgroundColor: tokens.colorNeutralBackground3,
+    // Fluent's DataGrid header sits on the same surface as the rows, set apart
+    // by its bottom border only. Opaque, since the header is sticky.
+    backgroundColor: tokens.colorNeutralBackground1,
   },
   headerCellSortable: {
     cursor: 'pointer',
@@ -143,11 +147,25 @@ export const useDataGridStyles = makeStyles({
   },
 
   /** The numeric width editor inside the column menu. */
+  /**
+   * The column-width submenu. A menu popover caps its own width, and the editor
+   * is wider than a list of items, so the cap is lifted here — left on, the
+   * last button ran past the edge and was cut off.
+   */
+  widthPopover: {
+    maxWidth: 'none',
+  },
   widthEditor: {
     display: 'flex',
     alignItems: 'center',
-    ...shorthands.gap(tokens.spacingHorizontalXS),
-    ...shorthands.padding(tokens.spacingVerticalS, tokens.spacingHorizontalM),
+    flexWrap: 'nowrap',
+    ...shorthands.gap(tokens.spacingHorizontalS),
+    ...shorthands.padding(tokens.spacingVerticalS, tokens.spacingHorizontalS),
+  },
+  /** Room for a four-digit width and its unit, not a form field's full width. */
+  widthInput: {
+    width: '96px',
+    minWidth: '96px',
   },
   widthUnit: {
     fontSize: tokens.fontSizeBase200,
@@ -164,6 +182,16 @@ export const useDataGridStyles = makeStyles({
     flexShrink: 0,
     fontSize: '12px',
     lineHeight: 1,
+  },
+  /**
+   * The filtered-column mark: solid and in the text's own colour, as Dynamics
+   * draws it, so it reads at a glance beside the label rather than as a faint
+   * outline next to the menu chevron.
+   */
+  headerFilterIcon: {
+    display: 'inline-flex',
+    fontSize: '14px',
+    color: tokens.colorNeutralForeground1,
   },
 
   resizer: {
@@ -189,40 +217,46 @@ export const useDataGridStyles = makeStyles({
     // Sits directly under the header, whose height moves with density.
     top: 'var(--fue-grid-header-height, 26px)',
     zIndex: 2,
-    backgroundColor: tokens.colorNeutralBackground2,
+    backgroundColor: tokens.colorNeutralBackground1,
   },
   filterCell: {
-    // No horizontal padding: slim boolean columns need every pixel for the input.
-    ...shorthands.padding('1px', '0'),
+    // A little inset either side, so neighbouring boxes read as separate fields.
+    ...shorthands.padding('2px', '2px'),
     boxSizing: 'border-box',
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-    backgroundColor: tokens.colorNeutralBackground2,
+    backgroundColor: tokens.colorNeutralBackground1,
     ...shorthands.overflow('hidden'),
   },
+  /**
+   * Drawn as a Fluent filled field — the look Dynamics gives its inputs: a grey
+   * fill with no outline, and a brand underline while focused. The old boxed,
+   * outlined inputs read as a different control set from everything else.
+   */
   filterInput: {
     width: '100%',
     minWidth: 0,
     maxWidth: '100%',
+    height: '100%',
     minHeight: '20px',
     boxSizing: 'border-box',
     // Griffel rejects the all-sides border shorthand, so these stay per-side.
-    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRight: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderLeft: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusSmall,
-    backgroundColor: tokens.colorNeutralBackground1,
+    borderTop: '1px solid transparent',
+    borderRight: '1px solid transparent',
+    borderLeft: '1px solid transparent',
+    borderBottom: `1px solid ${tokens.colorNeutralStrokeAccessible}`,
+    borderRadius: `${tokens.borderRadiusMedium} ${tokens.borderRadiusMedium} 0 0`,
+    backgroundColor: tokens.colorNeutralBackground3,
     color: tokens.colorNeutralForeground1,
-    fontSize: '11px',
+    fontSize: 'var(--fue-grid-font-size, 12px)',
     fontFamily: 'inherit',
-    paddingLeft: '4px',
-    paddingRight: '4px',
+    paddingLeft: tokens.spacingHorizontalS,
+    paddingRight: tokens.spacingHorizontalS,
     outlineStyle: 'none',
+    '::placeholder': { color: tokens.colorNeutralForeground4 },
+    ':hover': { backgroundColor: tokens.colorNeutralBackground3Hover },
     ':focus': {
-      borderTopColor: tokens.colorBrandStroke1,
-      borderRightColor: tokens.colorBrandStroke1,
-      borderBottomColor: tokens.colorBrandStroke1,
-      borderLeftColor: tokens.colorBrandStroke1,
+      borderBottomColor: tokens.colorCompoundBrandStroke,
+      boxShadow: `inset 0 -1px 0 0 ${tokens.colorCompoundBrandStroke}`,
     },
   },
 
@@ -288,10 +322,10 @@ export const useDataGridStyles = makeStyles({
   // ── Cells ─────────────────────────────────────────────────────────────────
 
   cell: {
-    ...shorthands.padding('0', '4px'),
+    // Fluent's DataGrid: 8px either side and row lines only, no column rules.
+    ...shorthands.padding('0', tokens.spacingHorizontalS),
     color: tokens.colorNeutralForeground1,
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRight: `1px solid ${tokens.colorNeutralStroke3}`,
     whiteSpace: 'nowrap',
     ...shorthands.overflow('hidden'),
     boxSizing: 'border-box',
@@ -394,10 +428,12 @@ export const useDataGridStyles = makeStyles({
   /** The grip at the bottom-right of the active cell. */
   fillHandle: {
     position: 'absolute',
-    // Centred on the corner of the outline, as Excel draws it. The outline is
-    // 2px wide and inset, so its centre line runs 1px inside the cell edge.
-    right: '-3px',
-    bottom: '-3px',
+    // Inside the cell's corner, sitting on the inset outline. Straddling the
+    // corner as Excel does put half of it over the next row, and a row that is
+    // its own stacking context — a faded (excluded) row, a dragged one — paints
+    // over anything the cell raises, clipping the square.
+    right: '0',
+    bottom: '0',
     width: '8px',
     height: '8px',
     boxSizing: 'border-box',
@@ -537,6 +573,29 @@ export const useDataGridStyles = makeStyles({
     ':focus-within': {
       '& .fui-Combobox': { backgroundColor: tokens.colorNeutralBackground1 },
       '& .fui-Combobox__expandIcon': { opacity: 1 },
+    },
+  },
+
+  /**
+   * A lookup cell showing only its value until the cell is used — the same
+   * treatment as `choiceAtRest`, for the same reason.
+   *
+   * The filled field's grey box, drawn in every row, stopped short of the
+   * column edge and read as a column of input boxes rather than of values. The
+   * field's own left inset also sat the badge further in than the text in the
+   * columns beside it. Fill and border come back on hover and focus.
+   */
+  lookupAtRest: {
+    [`& .${lookupClassNames.field}`]: {
+      backgroundColor: 'transparent',
+      ...shorthands.borderColor('transparent'),
+      paddingLeft: '0',
+    },
+    ':hover': {
+      [`& .${lookupClassNames.field}`]: { backgroundColor: tokens.colorNeutralBackground3 },
+    },
+    ':focus-within': {
+      [`& .${lookupClassNames.field}`]: { backgroundColor: tokens.colorNeutralBackground3 },
     },
   },
 

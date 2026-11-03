@@ -17,12 +17,14 @@ import {
   ArrowSortUpRegular,
   AutoFitWidthRegular,
   EyeOffRegular,
+  FilterDismissRegular,
   FilterRegular,
   GroupListRegular,
 } from '@fluentui/react-icons';
 import type { Header, Table } from '@tanstack/react-table';
 import type { DataGridColumn, DataGridRow } from './DataGrid.types';
 import { useDataGridStyles } from './DataGrid.styles';
+import { isActiveFilter, toFilterValue } from './DataGrid.filter';
 
 export interface DataGridColumnMenuProps<T extends DataGridRow> {
   table: Table<T>;
@@ -142,6 +144,15 @@ export function DataGridColumnMenu<T extends DataGridRow>(props: DataGridColumnM
               Filter by
             </MenuItem>
           )}
+          {/* Only when there is something to clear, as in Dynamics' own menu. */}
+          {isActiveFilter(toFilterValue(header.column.getFilterValue())) && (
+            <MenuItem
+              icon={<FilterDismissRegular />}
+              onClick={() => header.column.setFilterValue(undefined)}
+            >
+              Clear filter
+            </MenuItem>
+          )}
 
           <MenuDivider />
 
@@ -150,9 +161,10 @@ export function DataGridColumnMenu<T extends DataGridRow>(props: DataGridColumnM
               <MenuTrigger disableButtonEnhancement>
                 <MenuItem icon={<AutoFitWidthRegular />}>Column width</MenuItem>
               </MenuTrigger>
-              <MenuPopover>
+              <MenuPopover className={styles.widthPopover}>
                 <div className={styles.widthEditor}>
                   <Input
+                    className={styles.widthInput}
                     size="small"
                     type="number"
                     min={32}

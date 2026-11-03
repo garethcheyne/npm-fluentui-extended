@@ -16,11 +16,14 @@ import type {
  * The header and filter rows are in here too. Leaving them at a fixed height
  * makes compact mode look wrong from the top down: 22px data rows under a 26px
  * header reads as a header that has not been told about the setting.
+ *
+ * The header and group rows match the data rows, as in Fluent's own DataGrid —
+ * a header shorter than the rows under it reads as a different table.
  */
 export const DENSITY_METRICS: Record<DataGridDensity, DataGridDensityMetrics> = {
   compact: { row: 22, group: 22, header: 22, filter: 20, control: 20, fontSize: 11, lineHeight: 14 },
-  comfortable: { row: 28, group: 26, header: 26, filter: 24, control: 24, fontSize: 12, lineHeight: 16 },
-  spacious: { row: 36, group: 32, header: 32, filter: 28, control: 30, fontSize: 13, lineHeight: 18 },
+  comfortable: { row: 28, group: 28, header: 28, filter: 24, control: 24, fontSize: 12, lineHeight: 16 },
+  spacious: { row: 36, group: 36, header: 36, filter: 28, control: 30, fontSize: 13, lineHeight: 18 },
 };
 
 /** How many rows to render either side of the viewport. */
@@ -67,10 +70,12 @@ export const ROW_STYLE_TOKENS = {
     bgHover: tokens.colorNeutralBackground2Hover,
     accent: 'transparent',
   },
+  // Fluent's DataGrid marks selection with the neutral selected fill, not a
+  // brand tint and bar; the checkbox carries the rest.
   selected: {
-    bg: tokens.colorBrandBackground2,
-    bgHover: tokens.colorBrandBackground2Hover,
-    accent: tokens.colorBrandStroke1,
+    bg: tokens.colorNeutralBackground1Selected,
+    bgHover: tokens.colorNeutralBackground1Selected,
+    accent: 'transparent',
   },
   dirty: {
     bg: tokens.colorPaletteYellowBackground1,

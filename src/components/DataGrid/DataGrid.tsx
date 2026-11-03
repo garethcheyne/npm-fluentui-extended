@@ -37,6 +37,8 @@ import { DataGridToolbar } from './DataGridToolbar';
 import { DataGridContextMenu } from './DataGridContextMenu';
 import { DataGridHeaderCell } from './DataGridHeaderCell';
 import { DataGridBodyRow } from './DataGridBodyRow';
+import { DataGridFilterInput } from './DataGridFilterInput';
+import { toFilterValue } from './DataGrid.filter';
 import { DataGridGroupRow, DataGridSubtotalRow } from './DataGridGroupRow';
 import type {
   DataGridAffix,
@@ -49,6 +51,9 @@ import type {
   DataGridRow,
 } from './DataGrid.types';
 import type { CommandBarItem } from '../CommandBar';
+
+/** One shared empty list, so the sortable context sees no change between renders. */
+const NO_ROW_IDS: string[] = [];
 
 /**
  * Prefix on a group banner's drop id. Row ids and column ids share the drag
@@ -92,7 +97,8 @@ function DataGridInner<T extends DataGridRow>(
     cellStates,
     renderRowIndicator,
     showEditableHints = false,
-    striped = true,
+    // Off by default, as in Fluent's DataGrid, where row lines alone separate rows.
+    striped = false,
     density: densityProp,
     defaultDensity,
     onDensityChange,
@@ -269,15 +275,28 @@ function DataGridInner<T extends DataGridRow>(
     [modelRows, groupBy, hasSubtotals, groupSubtotalLevels],
   );
 
+  /**
+   * Stable, so the virtualiser keeps its measurements between renders. It
+   * memoises them on these two functions' identities: new ones each render made
+   * it re-measure every item — a walk of the whole list — on every scroll event.
+   */
+  const estimateSize = React.useCallback(
+    (index: number) => (displayItems[index]?.type === 'row' ? metrics.row : metrics.group),
+    [displayItems, metrics.row, metrics.group],
+  );
+  // Density is part of the key so a change forces a re-measure; without it the
+  // virtualiser keeps the old heights and the rows overlap.
+  const getItemKey = React.useCallback(
+    (index: number) => `${grid.density}:${displayItems[index]?.key ?? index}`,
+    [grid.density, displayItems],
+  );
+
   const virtualizer = useVirtualizer({
     count: displayItems.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: (index) =>
-      displayItems[index]?.type === 'row' ? metrics.row : metrics.group,
+    estimateSize,
     overscan: OVERSCAN,
-    // Density is part of the key so a change forces a re-measure; without it the
-    // virtualiser keeps the old heights and the rows overlap.
-    getItemKey: (index) => `${grid.density}:${displayItems[index]?.key ?? index}`,
+    getItemKey,
   });
 
   const virtualItems = virtualizer.getVirtualItems();
@@ -928,6 +947,39 @@ function DataGridInner<T extends DataGridRow>(
 
   // ── Groups ────────────────────────────────────────────────────────────────
 
+  /**
+   * Each group's leaf rows, worked out once per row model rather than on every
+   * render. A banner is re-rendered on every scroll event, and walking a group
+   * of tens of thousands of rows each time was a large share of scroll cost.
+   * Filled lazily, so only the banners actually drawn pay for it.
+   */
+  const groupLeavesCache = React.useMemo(
+    () => new Map<string, { rows: Row<T>[]; rowIds: string[]; count: number }>(),
+    // Rebuilt when the rows or the summary filter change; the map itself is the cache.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [modelRows, includeInSummary],
+  );
+  const groupLeavesOf = React.useCallback(
+    (groupRow: Row<T>) => {
+      let entry = groupLeavesCache.get(groupRow.id);
+      if (!entry) {
+        // Leaf rows only: at an outer level the descendants include the inner
+        // banners too, which are not rows anyone can select or count.
+        const rows = groupRow.getLeafRows().filter((r) => !r.getIsGrouped());
+        entry = {
+          rows,
+          rowIds: rows.map((r) => r.id),
+          count: includeInSummary
+            ? rows.filter((r) => includeInSummary(r.original, r.id)).length
+            : rows.length,
+        };
+        groupLeavesCache.set(groupRow.id, entry);
+      }
+      return entry;
+    },
+    [groupLeavesCache, includeInSummary],
+  );
+
   /** Everything the group hooks are handed about one banner. */
   const groupContext = React.useCallback(
     (groupRow: Row<T>): DataGridGroupContext<T> => {
@@ -940,11 +992,11 @@ function DataGridInner<T extends DataGridRow>(
           : columnKey
             ? groupRow.getValue(columnKey)
             : null;
-      // Leaf rows only: at an outer level the descendants include the inner
-      // banners too, which are not rows anyone can select or count.
-      const rows = groupRow.getLeafRows().filter((r) => !r.getIsGrouped());
-      const rowIds = rows.map((r) => r.id);
-      const selectedCount = rowIds.filter((id) => selectedRowIds.has(id)).length;
+      const { rows, rowIds, count } = groupLeavesOf(groupRow);
+      let selectedCount = 0;
+      if (selectedRowIds.size > 0) {
+        for (const id of rowIds) if (selectedRowIds.has(id)) selectedCount++;
+      }
       const selection =
         selectedCount === 0 ? 'none' : selectedCount === rowIds.length ? 'all' : 'some';
 
@@ -958,9 +1010,7 @@ function DataGridInner<T extends DataGridRow>(
         label: renderGroupLabel
           ? renderGroupLabel(value, groupRow.subRows, groupRow.depth)
           : groupLabel(value, columnMap.get(columnKey), groupRow, readOnly),
-        count: includeInSummary
-          ? rows.filter((r) => includeInSummary(r.original, r.id)).length
-          : rows.length,
+        count,
         expanded: groupRow.getIsExpanded(),
         toggle: () => groupRow.toggleExpanded(),
         selection,
@@ -974,7 +1024,7 @@ function DataGridInner<T extends DataGridRow>(
         },
       };
     },
-    [groupBy, selectedRowIds, paths, renderGroupLabel, columnMap, readOnly, includeInSummary, grid],
+    [groupBy, selectedRowIds, paths, renderGroupLabel, columnMap, readOnly, groupLeavesOf, grid],
   );
 
   // ── Imperative handle ─────────────────────────────────────────────────────
@@ -1238,7 +1288,6 @@ function DataGridInner<T extends DataGridRow>(
                           align={column ? columnAlign(column) : 'left'}
                           groupBy={groupBy}
                           onGroupBy={grid.setGroupBy}
-                          onShowFilter={focusColumnFilter}
                           onResetWidths={grid.resetColumnWidths}
                           draggable={reorderableColumns && column?.movable !== false}
                           menuEnabled={columnMenu}
@@ -1269,15 +1318,15 @@ function DataGridInner<T extends DataGridRow>(
                         }}
                       >
                         {header.column.getCanFilter() && (
-                          <input
+                          <DataGridFilterInput
                             data-filter-for={header.column.id}
                             className={styles.filterInput}
-                            value={(header.column.getFilterValue() as string) ?? ''}
+                            // A Filter by panel filter shows its value here too;
+                            // typing over it turns it back into a plain "contains".
+                            value={toFilterValue(header.column.getFilterValue())?.value ?? ''}
                             placeholder={'Filter\u2026'}
                             aria-label={`Filter ${columnMap.get(header.column.id)?.label ?? header.column.id}`}
-                            onChange={(e) =>
-                              header.column.setFilterValue(e.currentTarget.value || undefined)
-                            }
+                            onCommit={(next) => header.column.setFilterValue(next || undefined)}
                           />
                         )}
                       </td>
@@ -1296,7 +1345,13 @@ function DataGridInner<T extends DataGridRow>(
                 </tr>
               )}
 
-              <SortableContext items={rowIdsInOrder} strategy={verticalListSortingStrategy}>
+              {/* Row ids only when rows can be dragged: each row's sortable hook
+                  searches and slices this list, which is wasted work over a large
+                  grid that cannot be reordered. */}
+              <SortableContext
+                items={onRowReorder ? rowIdsInOrder : NO_ROW_IDS}
+                strategy={verticalListSortingStrategy}
+              >
                 {virtualItems.map((virtualItem) => {
                   const item = displayItems[virtualItem.index];
                   if (!item) return null;

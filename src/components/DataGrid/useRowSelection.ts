@@ -115,7 +115,15 @@ export function useRowSelection(options: UseRowSelectionOptions): UseRowSelectio
   }, []);
 
   const selectable = selectableRowIds ?? rowIdsInOrder;
-  const allSelected = selectable.length > 0 && selectable.every((id) => selectedRowIds.has(id));
+  // Fewer selected than there are rows means not all of them, without looking
+  // at each — this runs on every render, scrolling included.
+  const allSelected = React.useMemo(
+    () =>
+      selectable.length > 0 &&
+      selectedRowIds.size >= selectable.length &&
+      selectable.every((id) => selectedRowIds.has(id)),
+    [selectable, selectedRowIds],
+  );
 
   const toggleAll = React.useCallback(() => {
     const ids = selectableRef.current;

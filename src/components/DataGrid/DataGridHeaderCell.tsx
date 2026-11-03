@@ -1,11 +1,13 @@
 import * as React from 'react';
 import { Tooltip, mergeClasses } from '@fluentui/react-components';
-import { ChevronDownRegular } from '@fluentui/react-icons';
+import { ChevronDownRegular, FilterFilled } from '@fluentui/react-icons';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { flexRender, type Header, type Table } from '@tanstack/react-table';
 import { useDataGridStyles } from './DataGrid.styles';
 import { DataGridColumnMenu } from './DataGridColumnMenu';
+import { DataGridFilterPopover } from './DataGridFilterPopover';
+import { isActiveFilter, toFilterValue } from './DataGrid.filter';
 import type { DataGridColumn, DataGridRow } from './DataGrid.types';
 
 export interface DataGridHeaderCellProps<T extends DataGridRow> {
@@ -19,7 +21,11 @@ export interface DataGridHeaderCellProps<T extends DataGridRow> {
   align: 'left' | 'center' | 'right';
   groupBy: string[];
   onGroupBy: (groupBy: string[]) => void;
-  onShowFilter: (columnKey: string) => void;
+  /**
+   * @deprecated No longer called: the column menu's Filter by opens the filter
+   * panel under the column itself. Kept so existing callers still compile.
+   */
+  onShowFilter?: (columnKey: string) => void;
   onResetWidths: () => void;
   /** Drag-to-reorder. Off for pinned or immovable columns. */
   draggable: boolean;
@@ -49,7 +55,6 @@ export function DataGridHeaderCell<T extends DataGridRow>(props: DataGridHeaderC
     align,
     groupBy,
     onGroupBy,
-    onShowFilter,
     onResetWidths,
     draggable,
     menuEnabled,
@@ -60,13 +65,25 @@ export function DataGridHeaderCell<T extends DataGridRow>(props: DataGridHeaderC
 
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [menuAt, setMenuAt] = React.useState<{ x: number; y: number } | null>(null);
+  const [filterOpen, setFilterOpen] = React.useState(false);
+  // The panel hangs from the header cell itself, so it is kept as state rather
+  // than a ref — the popover has to re-render once the element exists.
+  const [cellEl, setCellEl] = React.useState<HTMLTableCellElement | null>(null);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useSortable({
     id: header.column.id,
     disabled: !draggable,
   });
+  const cellRef = React.useCallback(
+    (el: HTMLTableCellElement | null) => {
+      setNodeRef(el);
+      setCellEl(el);
+    },
+    [setNodeRef],
+  );
 
   const sorted = header.column.getIsSorted();
+  const filtered = isActiveFilter(toFilterValue(header.column.getFilterValue()));
   const isGrouped = groupBy.includes(header.column.id);
 
   const style: React.CSSProperties = {
@@ -81,7 +98,7 @@ export function DataGridHeaderCell<T extends DataGridRow>(props: DataGridHeaderC
 
   return (
     <th
-      ref={setNodeRef}
+      ref={cellRef}
       style={style}
       colSpan={header.colSpan}
       className={mergeClasses(
@@ -117,6 +134,13 @@ export function DataGridHeaderCell<T extends DataGridRow>(props: DataGridHeaderC
               ? column.renderHeader(header.column)
               : flexRender(header.column.columnDef.header, header.getContext())}
           </span>
+          {/* Marks a filtered column, as Dynamics does, so a short list is not
+              mistaken for a short table. */}
+          {filtered && (
+            <span className={mergeClasses(styles.headerIcon, styles.headerFilterIcon)} aria-label="Filtered">
+              <FilterFilled />
+            </span>
+          )}
           {sorted && (
             <span className={styles.headerIcon} aria-hidden>
               {sorted === 'asc' ? '\u2191' : '\u2193'}
@@ -180,11 +204,25 @@ export function DataGridHeaderCell<T extends DataGridRow>(props: DataGridHeaderC
           column={column}
           groupBy={groupBy}
           onGroupBy={onGroupBy}
-          onShowFilter={onShowFilter}
+          // Filter by opens the panel under this column. Deferred a tick so the
+          // click that chose it, still finishing as the menu closes, is not
+          // taken by the panel as a click outside it.
+          onShowFilter={() => window.setTimeout(() => setFilterOpen(true), 0)}
           onResetWidths={onResetWidths}
           position={menuAt}
           open={menuOpen}
           onOpenChange={setMenuOpen}
+        />
+      )}
+
+      {column && filterOpen && (
+        <DataGridFilterPopover
+          open={filterOpen}
+          onOpenChange={setFilterOpen}
+          target={cellEl}
+          column={column}
+          value={header.column.getFilterValue()}
+          onApply={(next) => header.column.setFilterValue(next)}
         />
       )}
     </th>

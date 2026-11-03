@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
 import { DataGrid } from './DataGrid';
@@ -398,7 +398,20 @@ describe('DataGrid sorting and filtering', () => {
     renderGrid({ showFilters: true });
     const filter = screen.getByLabelText('Filter Price');
     fireEvent.change(filter, { target: { value: '200.00' } });
+    // Enter applies the filter without waiting for typing to pause.
+    fireEvent.keyDown(filter, { key: 'Enter' });
     expect(dataRows()).toHaveLength(1);
+  });
+
+  it('applies a column filter once typing pauses, not on every keystroke', async () => {
+    renderGrid({ showFilters: true });
+    const before = dataRows().length;
+    const filter = screen.getByLabelText('Filter Price');
+    fireEvent.change(filter, { target: { value: '200.00' } });
+    // The box shows what was typed straight away; the rows follow shortly after.
+    expect((filter as HTMLInputElement).value).toBe('200.00');
+    expect(dataRows()).toHaveLength(before);
+    await waitFor(() => expect(dataRows()).toHaveLength(1));
   });
 
   it('searches every column when none is named', () => {

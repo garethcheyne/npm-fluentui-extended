@@ -13,6 +13,16 @@ import { DEFAULT_FIELD_APPEARANCE } from '../../types/appearance';
 import { LookupHoverCard } from './Lookup.HoverCard';
 import type { LookupProps, LookupOption } from './Lookup.types';
 
+/**
+ * Stable class names on the Lookup's parts, for a host that has to restyle
+ * them — the grid strips the field's fill at rest, as it does a choice's.
+ * Griffel's own classes are hashed, so they cannot be targeted.
+ */
+export const lookupClassNames = {
+  /** The box that looks like an input: fill, border and badges. */
+  field: 'fue-Lookup__field',
+} as const;
+
 export const Lookup: React.FC<LookupProps> = ({
   id,
   options = [],
@@ -630,6 +640,7 @@ export const Lookup: React.FC<LookupProps> = ({
     <div className={mergeClasses(styles.root, className)}>
       <div
         className={mergeClasses(
+          lookupClassNames.field,
           styles.tagInputWrapper,
           appearance === 'filled-darker' || appearance === 'filled-lighter'
             ? styles.tagInputWrapperFilled

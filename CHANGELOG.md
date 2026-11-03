@@ -2,6 +2,48 @@
 
 > Version format: `YYYY.M.DD` (e.g., `2026.8.30` = August 30, 2026)
 
+## 2026.11.3
+
+DataGrid work driven by a 38,000-row price list.
+
+**Filtering**
+
+- ✨ **Filter by panel.** The column menu's Filter by now opens a panel under the column, as
+  Dynamics' own grid does: an operator suited to the column type (Equals, Contains, Begins with,
+  Greater than, On or after, Contains data, …), a value, and Apply / Clear. A filtered column shows
+  a solid filter icon beside its label, and its menu gains **Clear filter**. `matchesFilter`,
+  `filterOperatorsFor`, `FILTER_OPERATOR_LABELS` and the `DataGridFilterValue` type are exported.
+- 🐛 **Lookups filter, search and sort on their name.** A lookup stores its record's id, so typing
+  part of a name in the filter row or the toolbar search found nothing, and sorting ordered by
+  guid. All three now use the text the cell shows (via `getLookupValue`).
+- ✨ **The filter row applies once typing pauses** (200 ms, or Enter), instead of re-filtering the
+  whole grid on every keystroke, and is drawn as Fluent filled fields.
+
+**Appearance** — closer to Fluent's DataGrid. These change the defaults for every grid.
+
+- 💄 The header and group rows are as tall as the data rows at each density.
+- 💄 The header sits on the row surface with a bottom border, instead of a grey fill.
+- 💄 No vertical column lines; cells have 8px padding either side.
+- 💄 `striped` now defaults to **`false`**. Pass `striped` to keep alternate row shading.
+- 💄 Selected rows use the neutral selected fill instead of a brand tint and left bar.
+- 💄 Lookup cells show just their value at rest; the field's fill and border come back on hover
+  and focus, as choice cells already did. Lookup gains `lookupClassNames.field` for hosts that
+  restyle it.
+- 🐛 The fill handle sits inside the active cell's corner, so a faded row below can no longer clip it.
+- 🐛 The column-width editor in the column menu is no longer cut off.
+
+**Performance on large grids**
+
+- ⚡ Scrolling no longer re-measures every row: the virtualiser's `estimateSize` and `getItemKey`
+  keep their identity between renders.
+- ⚡ Text columns sort with a shared `Intl.Collator` instead of TanStack's regex-based
+  `alphanumeric` comparer; number and boolean columns sort with `basic`.
+- ⚡ Number formatting reuses one `Intl.NumberFormat` per precision.
+- ⚡ Group banners compute their leaf rows once per data change, not on every render, and skip the
+  selection count when nothing is selected.
+- ⚡ Row drag-and-drop bookkeeping is skipped when rows cannot be reordered.
+- ⚡ Select-all compares counts before checking each row.
+
 ## 2026.10.28
 
 - 🐛 **DateTimeField reads typed dates in the user's day/month order.** With `allowFreeType`,

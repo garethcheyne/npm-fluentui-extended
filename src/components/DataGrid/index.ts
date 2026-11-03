@@ -111,3 +111,12 @@ export type {
   DataGridSubtotalRowProps,
   DataGridSubtotalCell,
 } from './DataGridGroupRow';
+export { DataGridFilterPopover } from './DataGridFilterPopover';
+export {
+  FILTER_OPERATOR_LABELS,
+  filterOperatorsFor,
+  defaultFilterOperator,
+  matchesFilter,
+  type DataGridFilterOperator,
+  type DataGridFilterValue,
+} from './DataGrid.filter';

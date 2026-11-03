@@ -663,7 +663,7 @@ interface DataGridOwnProps<T extends DataGridRow = DataGridRow> {
   renderRowIndicator?: (row: T, rowId: string) => React.ReactNode;
   /** Underline every cell that can be edited, so people can see where to type. */
   showEditableHints?: boolean;
-  /** Alternate row shading. Defaults to true. */
+  /** Alternate row shading. Defaults to false, as in Fluent's DataGrid. */
   striped?: boolean;
   /** Row height preset. Uncontrolled unless paired with `onDensityChange`. */
   density?: DataGridDensity;

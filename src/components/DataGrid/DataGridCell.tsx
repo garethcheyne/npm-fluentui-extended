@@ -443,7 +443,7 @@ function LookupCell<T extends DataGridRow>({
     };
   }, [searchLookup, search]);
 
-  const className = mergeClasses(styles.editorControl, dirty && styles.editorDirty);
+  const className = mergeClasses(styles.editorControl, styles.lookupAtRest, dirty && styles.editorDirty);
   const canPick = editable && Boolean(searchLookup);
 
   if (resolved) {
