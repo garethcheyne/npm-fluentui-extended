@@ -2,6 +2,25 @@
 
 > Version format: `YYYY.M.DD` (e.g., `2026.8.30` = August 30, 2026)
 
+## 2026.11.12
+
+**DataGrid fill handle**
+
+- ✨ **Double-click the fill handle to fill all rows below.** Copies the active cell's value into
+  every row below it, overwriting what is there, as the drag does. Only the rows shown are filled,
+  so a filter limits it. Nothing happens from an empty cell, so a stray double-click cannot clear
+  a column. Unlike Excel it does not stop at the next value: a checkbox or choice column is never
+  empty, so that rule would fill nothing in the columns most often set in bulk.
+- ✨ **Dragging the fill handle scrolls the grid.** Holding the pointer near the top or bottom edge,
+  or past it, scrolls the grid, faster the further past the edge, so a fill can reach rows that
+  were off screen when the drag began. A pointer outside the grid extends the fill to the edge row.
+
+**DataGrid lookups**
+
+- ✨ **`lookupMinSearch`** on a lookup column sets how many characters are typed before
+  `searchLookup` runs (default 2). `0` lists options as soon as the dropdown opens, for a short list
+  the row already narrows; the search runs only while that cell's dropdown is open.
+
 ## 2026.11.4
 
 **Hierarchies**

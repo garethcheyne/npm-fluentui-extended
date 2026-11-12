@@ -62,6 +62,8 @@ export interface DataGridBodyRowProps<T extends GridRow> {
   fillColumnKey: string | null;
   /** Renders the fill grip. Null when the active cell's column cannot be filled. */
   onFillStart: ((event: React.MouseEvent, rowId: string, columnKey: string) => void) | null;
+  /** A double-click on the fill grip. */
+  onFillDown: (rowId: string, columnKey: string) => void;
   getCellValue: (row: T, columnKey: string, rowId: string) => unknown;
   onCellChange?: (row: T, columnKey: string, value: unknown, rowId: string) => void;
   onSelect: (rowId: string, modifiers: DataGridSelectModifiers) => void;
@@ -109,6 +111,7 @@ function DataGridBodyRowInner<T extends GridRow>(props: DataGridBodyRowProps<T>)
     activeColumnKey,
     fillColumnKey,
     onFillStart,
+    onFillDown,
     getCellValue,
     onCellChange,
     onSelect,
@@ -310,11 +313,20 @@ function DataGridBodyRowInner<T extends GridRow>(props: DataGridBodyRowProps<T>)
               onCommit={(next) => onCellChange?.(row, column.key, next, rowId)}
             />
             {isActive && onFillStart && (
-              <Tooltip content="Drag to fill down" relationship="label" withArrow>
+              <Tooltip
+                content="Drag to fill, or double-click to fill all rows below"
+                relationship="label"
+                withArrow
+              >
                 <span
                   className={styles.fillHandle}
                   role="presentation"
                   onMouseDown={(e) => onFillStart(e, rowId, column.key)}
+                  onDoubleClick={(e) => {
+                    // Not also a double-click on the row, which consumers use to open it.
+                    e.stopPropagation();
+                    onFillDown(rowId, column.key);
+                  }}
                 />
               </Tooltip>
             )}

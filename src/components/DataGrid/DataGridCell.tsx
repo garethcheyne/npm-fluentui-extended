@@ -395,7 +395,7 @@ function ChoiceCell<T extends DataGridRow>({
 
 // ─── Lookups ─────────────────────────────────────────────────────────────────
 
-/** Characters typed before a lookup cell searches. */
+/** Characters typed before a lookup cell searches, unless the column says otherwise. */
 const LOOKUP_MIN_SEARCH = 2;
 
 /** A header or footer as the column gave it: a node, a function of the cell, `null` for none, or the default. */
@@ -446,13 +446,26 @@ function LookupCell<T extends DataGridRow>({
   const [search, setSearch] = React.useState('');
   const [results, setResults] = React.useState<DataGridLookupOption[]>([]);
   const [searching, setSearching] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
+
+  // Closing clears the Lookup's own search box, so clear the text searched for too:
+  // reopening should list afresh for the row as it is now, not repeat an old search.
+  const handleOpenChange = React.useCallback((next: boolean) => {
+    setOpen(next);
+    if (!next) setSearch('');
+  }, []);
+
+  const minSearch = column.lookupMinSearch ?? LOOKUP_MIN_SEARCH;
+  // With no minimum, every mounted cell would otherwise search on every render
+  // of the grid, whether or not anyone is looking at its dropdown.
+  const shouldSearch = minSearch > 0 ? search.trim().length >= minSearch : open;
 
   const searchLookup = column.searchLookup;
   // Read through a ref so a re-render of the row does not re-run the search.
   const ctxRef = React.useRef(ctx);
   ctxRef.current = ctx;
   React.useEffect(() => {
-    if (!searchLookup || search.trim().length < LOOKUP_MIN_SEARCH) {
+    if (!searchLookup || !shouldSearch) {
       setResults([]);
       return;
     }
@@ -473,13 +486,13 @@ function LookupCell<T extends DataGridRow>({
     return () => {
       live = false;
     };
-  }, [searchLookup, search]);
+  }, [searchLookup, search, shouldSearch]);
 
   const className = mergeClasses(styles.editorControl, dirty && styles.editorDirty);
   const canPick = editable && Boolean(searchLookup);
 
   // The dropdown's header and footer, as a Dynamics lookup has them.
-  const searchState: DataGridLookupSearch = { text: search, minLength: LOOKUP_MIN_SEARCH, searching, results };
+  const searchState: DataGridLookupSearch = { text: search, minLength: minSearch, searching, results };
   const header = lookupSlot(column.lookupHeader, ctx, searchState, () => (
     <Text size={200} weight="semibold">{column.label ?? column.key}</Text>
   ));
@@ -560,7 +573,8 @@ function LookupCell<T extends DataGridRow>({
           column.renderHoverCard ? () => column.renderHoverCard?.(resolved, ctx) : undefined
         }
         hoverCardTarget="rest"
-        minSearchLength={LOOKUP_MIN_SEARCH}
+        minSearchLength={minSearch}
+        onOpenChange={canPick ? handleOpenChange : undefined}
         header={canPick ? header : undefined}
         footer={canPick ? footer : undefined}
         searchDebounceMs={300}
@@ -584,7 +598,8 @@ function LookupCell<T extends DataGridRow>({
       appearance="filled-darker"
       clearable={false}
       disableClientFilter
-      minSearchLength={LOOKUP_MIN_SEARCH}
+      minSearchLength={minSearch}
+      onOpenChange={handleOpenChange}
       header={canPick ? header : undefined}
       footer={canPick ? footer : undefined}
       searchDebounceMs={300}

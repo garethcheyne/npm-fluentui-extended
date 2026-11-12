@@ -32,7 +32,7 @@ import {
 import { computeEditPatch, buildDisplayItems, groupPaths } from './DataGrid.compute';
 import { useDataGrid } from './useDataGrid';
 import { useRowSelection } from './useRowSelection';
-import { isFillable, useFillHandle } from './useFillHandle';
+import { isFillable, rowsToFillDown, useFillHandle } from './useFillHandle';
 import { DataGridToolbar } from './DataGridToolbar';
 import { DataGridContextMenu } from './DataGridContextMenu';
 import { DataGridHeaderCell } from './DataGridHeaderCell';
@@ -578,7 +578,21 @@ function DataGridInner<T extends DataGridRow>(
   const { beginFill, preview: fillPreview } = useFillHandle({
     rowIdsInOrder,
     onCommit: commitFill,
+    scrollRef,
   });
+
+  /** A double-click on the handle: copy the value into every row below it. */
+  const fillDownFrom = React.useCallback(
+    (rowId: string, columnKey: string) => {
+      const row = rowsById.get(rowId);
+      const value = row ? grid.readCellValue(row.original, columnKey, rowId) : null;
+      // Filling from an empty cell would clear the whole column below it.
+      if (value == null || (typeof value === 'string' && value.trim() === '')) return;
+      const targets = rowsToFillDown(rowIdsInOrder, rowId);
+      if (targets.length > 0) commitFill(columnKey, rowId, targets);
+    },
+    [rowsById, grid, rowIdsInOrder, commitFill],
+  );
 
   /**
    * Whether a cell takes typing. Tab walks only these, so it never stops on a
@@ -1448,6 +1462,7 @@ function DataGridInner<T extends DataGridRow>(
                         fillPreview?.rowIds.has(row.id) ? fillPreview.columnKey : null
                       }
                       onFillStart={canFillActive ? beginFill : null}
+                      onFillDown={fillDownFrom}
                       getCellValue={grid.readCellValue}
                       onCellChange={onCellChange ? handleCellChange : undefined}
                       onSelect={selectRow}

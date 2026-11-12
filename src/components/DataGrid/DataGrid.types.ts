@@ -402,6 +402,15 @@ export interface DataGridColumn<T extends DataGridRow = DataGridRow> {
    */
   searchLookup?: (text: string, ctx: DataGridCellContext<T>) => Promise<DataGridLookupOption[]>;
   /**
+   * Characters typed before `searchLookup` runs. Defaults to 2.
+   *
+   * `0` lists options as soon as the dropdown opens, with `searchLookup` handed
+   * an empty string: for a short list the row already narrows, such as a
+   * supplier's brands in the row's department. The search runs only while that
+   * cell's dropdown is open, so a column of closed cells costs nothing.
+   */
+  lookupMinSearch?: number;
+  /**
    * The strip across the top of a lookup cell's dropdown, as a Dynamics lookup
    * has. Defaults to the column's label. A function is handed the cell and the
    * search in progress, for a header that depends on the row — "Categories in
@@ -712,7 +721,9 @@ interface DataGridOwnProps<T extends DataGridRow = DataGridRow> {
 
   /**
    * Excel's fill handle: a grip on the active cell that copies its value down
-   * (or up) over the rows it is dragged across.
+   * (or up) over the rows it is dragged across, scrolling the grid when held at
+   * its top or bottom edge. Double-clicking it copies the value into every row
+   * below (of those shown), overwriting what is there.
    *
    * Defaults to true wherever the grid is editable. Per-column control is on
    * {@link DataGridColumn.fillable}.

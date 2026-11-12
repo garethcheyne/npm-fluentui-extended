@@ -16,6 +16,37 @@ export function isFillable<T extends DataGridRow>(
   return !UNFILLABLE_TYPES.has(column.dataType ?? 'string');
 }
 
+/**
+ * The rows a double-click on the handle fills: every row below the source, down
+ * to the last one shown, overwriting what is there.
+ *
+ * Not Excel's stop-at-the-next-value. A checkbox or choice column never has an
+ * empty cell, so that rule would fill nothing in exactly the columns people most
+ * want to set in bulk. Only the rows shown are in the order, so a filter limits
+ * the fill to the rows it lets through.
+ */
+export function rowsToFillDown(rowIdsInOrder: string[], sourceRowId: string): string[] {
+  const source = rowIdsInOrder.indexOf(sourceRowId);
+  return source < 0 ? [] : rowIdsInOrder.slice(source + 1);
+}
+
+/** How close to the top or bottom edge, in pixels, the drag starts scrolling. */
+const AUTO_SCROLL_EDGE = 32;
+/** The most a drag scrolls per animation frame, in pixels. */
+const AUTO_SCROLL_MAX_STEP = 40;
+
+/**
+ * How far to scroll this frame for a pointer at `y`: none inside the edges,
+ * growing the further the pointer is past one, so overshooting goes faster.
+ */
+export function autoScrollStep(y: number, top: number, bottom: number): number {
+  const speed = (distance: number) =>
+    Math.min(AUTO_SCROLL_MAX_STEP, Math.max(2, Math.round(distance / 2)));
+  if (y > bottom - AUTO_SCROLL_EDGE) return speed(y - (bottom - AUTO_SCROLL_EDGE));
+  if (y < top + AUTO_SCROLL_EDGE) return -speed(top + AUTO_SCROLL_EDGE - y);
+  return 0;
+}
+
 /** The rows the drag is currently over, as the grid needs to draw them. */
 export interface FillPreview {
   columnKey: string;
@@ -28,6 +59,8 @@ export interface UseFillHandleOptions {
   rowIdsInOrder: string[];
   /** Called on release with the rows covered, source excluded. */
   onCommit: (columnKey: string, sourceRowId: string, targetRowIds: string[]) => void;
+  /** The grid's scrolling body, scrolled when the drag nears its top or bottom edge. */
+  scrollRef?: React.RefObject<HTMLElement | null>;
 }
 
 export interface UseFillHandleResult {
@@ -56,9 +89,13 @@ export interface UseFillHandleResult {
  * The row under the pointer is found by hit-testing rather than by arithmetic on
  * the scroll offset, so it stays correct with grouped rows, subtotal rows and
  * per-row heights in play, none of which divide evenly.
+ *
+ * Holding the pointer near the top or bottom edge of the grid, or past it,
+ * scrolls the grid, so a drag can reach rows that were not on screen when it
+ * started.
  */
 export function useFillHandle(options: UseFillHandleOptions): UseFillHandleResult {
-  const { rowIdsInOrder, onCommit } = options;
+  const { rowIdsInOrder, onCommit, scrollRef } = options;
 
   const [preview, setPreview] = React.useState<FillPreview | null>(null);
 
@@ -66,6 +103,8 @@ export function useFillHandle(options: UseFillHandleOptions): UseFillHandleResul
   orderRef.current = rowIdsInOrder;
   const onCommitRef = React.useRef(onCommit);
   onCommitRef.current = onCommit;
+  /** Ends the drag in progress, if any, without committing it. */
+  const stopRef = React.useRef<(() => void) | null>(null);
 
   const beginFill = React.useCallback(
     (event: React.MouseEvent, rowId: string, columnKey: string) => {
@@ -89,10 +128,41 @@ export function useFillHandle(options: UseFillHandleOptions): UseFillHandleResul
        * visits, and the drag silently does nothing.
        */
       const doc = event.currentTarget.ownerDocument;
+      const win = doc.defaultView ?? window;
+      const scroller = scrollRef?.current ?? null;
 
       let lastIndex = anchorIndex;
+      let pointer = { x: event.clientX, y: event.clientY };
+      let frame = 0;
+
+      /**
+       * The part of the scroller rows show in, in client coordinates: below the
+       * sticky header, above any sticky footer, inside the scrollbars.
+       */
+      const rowArea = () => {
+        if (!scroller) return null;
+        const rect = scroller.getBoundingClientRect();
+        const top = Math.max(
+          rect.top + scroller.clientTop,
+          scroller.querySelector('thead')?.getBoundingClientRect().bottom ?? -Infinity,
+        );
+        const bottom = Math.min(
+          rect.top + scroller.clientTop + scroller.clientHeight,
+          scroller.querySelector('tfoot')?.getBoundingClientRect().top ?? Infinity,
+        );
+        const left = rect.left + scroller.clientLeft;
+        const right = left + scroller.clientWidth;
+        return { top, bottom, left, right };
+      };
 
       const rowIndexAt = (clientX: number, clientY: number): number => {
+        // A pointer past the edge of the grid counts as over the edge row, so
+        // overshooting while it scrolls still extends the fill.
+        const area = rowArea();
+        if (area && area.bottom > area.top && area.right > area.left) {
+          clientX = Math.min(Math.max(clientX, area.left + 1), area.right - 1);
+          clientY = Math.min(Math.max(clientY, area.top + 1), area.bottom - 1);
+        }
         const element = doc.elementFromPoint(clientX, clientY);
         const rowEl = element?.closest<HTMLElement>('[data-row-id]');
         const id = rowEl?.dataset.rowId;
@@ -116,12 +186,43 @@ export function useFillHandle(options: UseFillHandleOptions): UseFillHandleResul
       cursorStyle.textContent = '* { cursor: grabbing !important; }';
       doc.head.appendChild(cursorStyle);
 
-      const onMove = (e: MouseEvent) => apply(rowIndexAt(e.clientX, e.clientY));
+      /**
+       * One frame of auto-scroll. It keeps going while the pointer is held at an
+       * edge, since no mousemove arrives then, and stops once the grid can
+       * scroll no further that way; the next move starts it again.
+       */
+      const tick = () => {
+        frame = 0;
+        const area = rowArea();
+        if (!scroller || !area) return;
+        const step = autoScrollStep(pointer.y, area.top, area.bottom);
+        if (step === 0) return;
+        const before = scroller.scrollTop;
+        scroller.scrollTop = before + step;
+        if (scroller.scrollTop === before) return;
+        // Rows virtualise in behind the scroll a frame later, so the row under
+        // the pointer is looked up again on every frame rather than once.
+        apply(rowIndexAt(pointer.x, pointer.y));
+        frame = win.requestAnimationFrame(tick);
+      };
 
-      const onUp = (e: MouseEvent) => {
+      const onMove = (e: MouseEvent) => {
+        pointer = { x: e.clientX, y: e.clientY };
+        apply(rowIndexAt(e.clientX, e.clientY));
+        if (!frame) frame = win.requestAnimationFrame(tick);
+      };
+
+      const stop = () => {
         doc.removeEventListener('mousemove', onMove);
         doc.removeEventListener('mouseup', onUp);
+        if (frame) win.cancelAnimationFrame(frame);
+        frame = 0;
         cursorStyle.remove();
+        stopRef.current = null;
+      };
+
+      const onUp = (e: MouseEvent) => {
+        stop();
         setPreview(null);
 
         const index = rowIndexAt(e.clientX, e.clientY);
@@ -131,15 +232,23 @@ export function useFillHandle(options: UseFillHandleOptions): UseFillHandleResul
         if (targets.length > 0) onCommitRef.current(columnKey, rowId, targets);
       };
 
+      stopRef.current?.();
+      stopRef.current = stop;
       doc.addEventListener('mousemove', onMove);
       doc.addEventListener('mouseup', onUp);
     },
-    [],
+    [scrollRef],
   );
 
-  // A drag that outlives its component would keep painting a preview over a grid
-  // that has moved on.
-  React.useEffect(() => () => setPreview(null), []);
+  // A drag that outlives its component would keep painting a preview, and
+  // scrolling, a grid that has moved on.
+  React.useEffect(
+    () => () => {
+      stopRef.current?.();
+      setPreview(null);
+    },
+    [],
+  );
 
   return { beginFill, preview };
 }

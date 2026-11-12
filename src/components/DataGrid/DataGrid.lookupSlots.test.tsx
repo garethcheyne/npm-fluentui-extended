@@ -109,6 +109,90 @@ describe('lookup dropdown header and footer', () => {
   });
 });
 
+describe('lookupMinSearch', () => {
+  it('still waits for two characters by default', async () => {
+    const searchLookup = vi.fn().mockResolvedValue(OPTIONS);
+    renderGrid({ searchLookup });
+    await search('b');
+    expect(await screen.findByText('Type at least 2 characters to search')).toBeInTheDocument();
+    expect(searchLookup).not.toHaveBeenCalled();
+  });
+
+  it('lists options when the dropdown opens at 0, with nothing typed', async () => {
+    const searchLookup = vi.fn().mockResolvedValue(OPTIONS);
+    renderGrid({ searchLookup, lookupMinSearch: 0 });
+    await userEvent.setup().click(screen.getByPlaceholderText('Search…'));
+
+    expect(await screen.findByText('BASINMIX')).toBeInTheDocument();
+    expect(await screen.findByText('2 records')).toBeInTheDocument();
+    expect(searchLookup.mock.calls[0][0]).toBe('');
+  });
+
+  it('does not search for a cell whose dropdown is closed', async () => {
+    const searchLookup = vi.fn().mockResolvedValue(OPTIONS);
+    renderGrid({ searchLookup, lookupMinSearch: 0 });
+    await screen.findByPlaceholderText('Search…');
+    expect(searchLookup).not.toHaveBeenCalled();
+  });
+
+  it('narrows as the user types, and lists everything again when they clear it', async () => {
+    const searchLookup = vi.fn(async (text: string) => OPTIONS.filter((o) => o.text.includes(text.toUpperCase())));
+    renderGrid({ searchLookup, lookupMinSearch: 0 });
+    const user = await search('mix');
+    await waitFor(() => expect(screen.queryByText('BASINADD')).toBeNull());
+    expect(screen.getByText('BASINMIX')).toBeInTheDocument();
+
+    await user.clear(screen.getByPlaceholderText('Search…'));
+    expect(await screen.findByText('BASINADD')).toBeInTheDocument();
+  });
+
+  it('lists afresh for the row as it is now each time it opens', async () => {
+    const user = userEvent.setup();
+    const searchLookup = vi.fn().mockResolvedValue(OPTIONS);
+    renderGrid({ searchLookup, lookupMinSearch: 0 });
+    const input = screen.getByPlaceholderText('Search…');
+
+    await user.click(input);
+    await screen.findByText('BASINMIX');
+    await user.type(input, 'mix');
+    await waitFor(() => expect(searchLookup).toHaveBeenCalledWith('mix', expect.anything()));
+
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByText('BASINMIX')).toBeNull());
+    searchLookup.mockClear();
+
+    await user.click(document.body);
+    await user.click(input);
+    await screen.findByText('BASINMIX');
+    expect(searchLookup.mock.calls[0][0]).toBe('');
+  });
+
+  it('lists options from a cell that already has a value', async () => {
+    const searchLookup = vi.fn().mockResolvedValue(OPTIONS);
+    render(
+      <FluentProvider theme={webLightTheme}>
+        <DataGrid<Row>
+          data={[{ id: 'r1', department: '053', category: 'c1' }]}
+          columns={[{
+            key: 'category',
+            label: 'Category',
+            dataType: 'lookup',
+            editable: true,
+            lookupMinSearch: 0,
+            getLookupValue: () => ({ id: 'c1', text: 'CURRENT' }),
+            searchLookup,
+          }]}
+          getRowId={(row) => row.id}
+          onCellChange={vi.fn()}
+        />
+      </FluentProvider>,
+    );
+    await userEvent.setup().click(await screen.findByText('CURRENT'));
+    expect(await screen.findByText('BASINMIX')).toBeInTheDocument();
+    expect(searchLookup.mock.calls[0][0]).toBe('');
+  });
+});
+
 describe('defaultLookupFooter', () => {
   const base = { minLength: 2, searching: false, results: [] as DataGridLookupOption[] };
 

@@ -124,7 +124,7 @@ export function Lines({ rows }: { rows: Line[] }) {
 | `renderRowIndicator` | `(row, rowId) => ReactNode` | – |
 | `showEditableHints` | `boolean` | `false` (underlines editable cells) |
 | `onFill` | `(fill: DataGridFill<T>) => void` | – (else one `onCellChange` per row) |
-| `fillHandle` / `keyboardNavigation` | `boolean` | `true` / `true` |
+| `fillHandle` / `keyboardNavigation` | `boolean` | `true` / `true` (dragging scrolls at the grid's edges; double-clicking the handle fills every shown row below, overwriting) |
 
 - Write the one-liner `(row, key, rowId, base) => pending[rowId]?.[key] ?? base` – falling back to `baseValue` keeps `accessor` and `computed` columns working. Sorting, filtering, grouping and totals all read through `getCellValue`.
 - Row states: `'default'|'selected'|'dirty'|'new'|'muted'|'error'|'deleted'|'placeholder'`. Return an array to layer (later wins per field); selection is drawn last.
@@ -152,6 +152,7 @@ export function Lines({ rows }: { rows: Line[] }) {
 | --- | --- |
 | `getLookupValue(ctx) => { id, text, entity?, secondaryText? } \| null` | **Required to show a name.** Without it a stored id renders as raw text (read-only) or as an empty picker (editable) |
 | `searchLookup(text, ctx) => Promise<DataGridLookupOption[]>` | Makes the cell a picker. Runs after **2** typed characters, debounced 300 ms, stale results discarded. Option: `{ key, text, secondaryText?, icon?, data? }` |
+| `lookupMinSearch` | Characters typed before `searchLookup` runs; default 2. `0` lists options when the dropdown opens, with `text` empty: for a short list the row narrows. Runs only while that cell's dropdown is open |
 | `onLookupSelect(option \| null, ctx)` | Replaces the default commit (`onCellChange(row, key, option.key)`); use it to also write denormalised columns from `option.data` |
 | `lookupHeader` / `lookupFooter` | `ReactNode \| (ctx, search) => ReactNode`; `null` hides. Defaults: column label / "Type at least 2 characters to search", "Searching…", "N records", "No matching records". `search = { text, minLength, searching, results }` |
 | `lookupEntity` | Entity a resolved value opens / hover card targets |
